@@ -1,6 +1,3 @@
-// Copyright (c) HashiCorp, Inc.
-// SPDX-License-Identifier: MPL-2.0
-
 package provider
 
 import (
@@ -11,20 +8,20 @@ import (
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
 )
 
-func resources() *schema.Resource {
+func users() *schema.Resource {
 	return &schema.Resource{
 		// This description is used by the documentation generator and the language server.
-		Description: "Adaptive Resources.",
+		Description: "Terraform provider for Adaptive Users.",
 
-		CreateContext: resourcesCreate,
-		ReadContext:   resourcesRead,
-		UpdateContext: resourcesUpdate,
-		DeleteContext: resourcesDelete,
+		CreateContext: usersCreate,
+		ReadContext:   usersRead,
+		UpdateContext: usersUpdate,
+		DeleteContext: usersDelete,
 
 		Schema: map[string]*schema.Schema{
-			"resource": {
+			"user_id": {
 				// This description is used by the documentation generator and the language server.
-				Description: "Sample attribute.",
+				Description: "User ID",
 				Type:        schema.TypeString,
 				Optional:    true,
 			},
@@ -32,7 +29,8 @@ func resources() *schema.Resource {
 	}
 }
 
-func resourcesCreate(ctx context.Context, d *schema.ResourceData, meta any) diag.Diagnostics {
+
+func usersCreate(ctx context.Context, d *schema.ResourceData, meta any) diag.Diagnostics {
 	// use the meta value to retrieve your client from the provider configure method
 	// client := meta.(*apiClient)
 
@@ -47,21 +45,21 @@ func resourcesCreate(ctx context.Context, d *schema.ResourceData, meta any) diag
 	return diag.Errorf("not implemented")
 }
 
-func resourcesRead(ctx context.Context, d *schema.ResourceData, meta any) diag.Diagnostics {
+func usersRead(ctx context.Context, d *schema.ResourceData, meta any) diag.Diagnostics {
 	// use the meta value to retrieve your client from the provider configure method
 	// client := meta.(*apiClient)
 
 	return diag.Errorf("not implemented")
 }
 
-func resourcesUpdate(ctx context.Context, d *schema.ResourceData, meta any) diag.Diagnostics {
+func usersUpdate(ctx context.Context, d *schema.ResourceData, meta any) diag.Diagnostics {
 	// use the meta value to retrieve your client from the provider configure method
 	// client := meta.(*apiClient)
 
 	return diag.Errorf("not implemented")
 }
 
-func resourcesDelete(ctx context.Context, d *schema.ResourceData, meta any) diag.Diagnostics {
+func usersDelete(ctx context.Context, d *schema.ResourceData, meta any) diag.Diagnostics {
 	// use the meta value to retrieve your client from the provider configure method
 	// client := meta.(*apiClient)
 

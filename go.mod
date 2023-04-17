@@ -1,4 +1,4 @@
-module github.com/hashicorp/terraform-provider-scaffolding
+module github.com/adaptive-scale/terraform-provider-adaptive
 
 go 1.18
 
