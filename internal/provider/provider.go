@@ -6,6 +6,7 @@ package provider
 import (
 	"context"
 
+	client "github.com/adaptive-scale/terraform-client"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/diag"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
 )
@@ -29,34 +30,52 @@ func init() {
 func New(version string) func() *schema.Provider {
 	return func() *schema.Provider {
 		p := &schema.Provider{
-			DataSourcesMap: map[string]*schema.Resource{
-				"adaptive_data_source": dataSourceScaffolding(),
+			Schema: map[string]*schema.Schema{
+				"service_token": {
+					Type:        schema.TypeString,
+					Required:    true,
+					Description: "Service account token for authenticating with the Adaptive service.",
+					DefaultFunc: schema.EnvDefaultFunc("ADAPTIVE_SVC_TOKEN", nil),
+				},
+				"workspace_url": {
+					Type:        schema.TypeString,
+					Optional:    true,
+					Description: "The workspace to use for the provider. If not set, the default workspace will be used app.adaptive.live",
+				},
 			},
+			// DataSourcesMap: map[string]*schema.Resource{
+			// 	"adaptive_data_source": dataSourceScaffolding(),
+			// },
 			ResourcesMap: map[string]*schema.Resource{
-				"adaptive_resources": resources(),
-				"adaptive_users": users(),
-
+				"adaptive_gcp":         resourceAdaptiveGCP(),
+				"adaptive_aws":         resourceAdaptiveAWS(),
+				"adaptive_azure":       resourceAdaptiveAzure(),
+				"adaptive_google":      resourceAdaptiveGoogle(),
+				"adaptive_okta":        resourceAdaptiveOkta(),
+				"adaptive_ssh":         resourceAdaptiveSSH(),
+				"adaptive_servicelist": resourceAdaptiveServiceList(),
+				"adaptive_mysql":       resourceAdaptiveMySQL(),
+				"adaptive_mongodb":     resourceAdaptiveMongo(),
+				"adaptive_postgres":    resourceAdaptivePostgres(),
+				"adaptive_cockroachdb": resourceAdaptiveCockroachDB(),
+				"adaptive_session":     resourceAdaptiveSession(),
+				"adaptive_users":       users(),
 			},
+			ConfigureContextFunc: providerConfigure,
 		}
-
-		p.ConfigureContextFunc = configure(version, p)
-
 		return p
 	}
 }
+func providerConfigure(ctx context.Context, d *schema.ResourceData) (interface{}, diag.Diagnostics) {
+	serviceToken := d.Get("service_token").(string)
+	workspaceURL := d.Get("workspace_url").(string)
 
-type apiClient struct {
-	// Add whatever fields, client or connection info, etc. here
-	// you would need to setup to communicate with the upstream
-	// API.
-}
-
-func configure(version string, p *schema.Provider) func(context.Context, *schema.ResourceData) (any, diag.Diagnostics) {
-	return func(context.Context, *schema.ResourceData) (any, diag.Diagnostics) {
-		// Setup a User-Agent for your API client (replace the provider name for yours):
-		// userAgent := p.UserAgent("terraform-provider-scaffolding", version)
-		// TODO: myClient.UserAgent = userAgent
-
-		return &apiClient{}, nil
+	if serviceToken == "" {
+		return nil, diag.Errorf("The 'serviceToken' field is required.")
 	}
+
+	// Initialize the Adaptive API client with the provided service token.
+	c := client.NewClient(serviceToken, workspaceURL)
+
+	return c, nil
 }
