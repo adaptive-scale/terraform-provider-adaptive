@@ -6,7 +6,7 @@ package provider
 import (
 	"context"
 
-	client "github.com/adaptive-scale/terraform-client"
+	client "github.com/adaptive-scale/terraform-provider-adaptive/internal/terraform-client"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/diag"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
 )

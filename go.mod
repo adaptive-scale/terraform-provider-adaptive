@@ -3,14 +3,11 @@ module github.com/adaptive-scale/terraform-provider-adaptive
 go 1.18
 
 require (
-	github.com/adaptive-scale/terraform-client v0.0.1
 	github.com/hashicorp/terraform-plugin-docs v0.13.0
 	github.com/hashicorp/terraform-plugin-log v0.8.0
 	github.com/hashicorp/terraform-plugin-sdk/v2 v2.25.0
 	gopkg.in/yaml.v2 v2.4.0
 )
-
-replace github.com/adaptive-scale/terraform-client v0.0.1 => /Users/dumbmachine/adaptive/terraform-provider-adaptive/terraform-client
 
 require (
 	github.com/Masterminds/goutils v1.1.1 // indirect

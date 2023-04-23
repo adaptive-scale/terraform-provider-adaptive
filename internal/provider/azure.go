@@ -13,7 +13,7 @@ import (
 	"errors"
 	"time"
 
-	adaptive "github.com/adaptive-scale/terraform-client"
+	adaptive "github.com/adaptive-scale/terraform-provider-adaptive/internal/terraform-client"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/diag"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
 	"gopkg.in/yaml.v2"
