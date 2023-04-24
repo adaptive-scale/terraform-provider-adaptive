@@ -26,6 +26,8 @@ func NewClient(serviceToken, workspaceURL string) *Client {
 
 	if workspaceURL == "" {
 		workspaceURL = baseURL
+	} else {
+		workspaceURL = fmt.Sprintf("http://%s/api/v1", workspaceURL)
 	}
 
 	return &Client{

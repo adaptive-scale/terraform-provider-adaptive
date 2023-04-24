@@ -1,6 +1,6 @@
 TEST?=$$(go list ./... | grep -v 'vendor')
 HOSTNAME=adaptive.com
-NAMESPACE=edu
+# NAMESPACE=edu
 NAME=adaptive
 BINARY=terraform-provider-${NAME}
 VERSION=0.2

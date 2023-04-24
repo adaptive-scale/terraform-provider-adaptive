@@ -5,8 +5,12 @@ package provider
 
 import (
 	"context"
+	"encoding/json"
+	"errors"
+	"fmt"
 
 	client "github.com/adaptive-scale/terraform-provider-adaptive/internal/terraform-client"
+	"github.com/hashicorp/terraform-plugin-log/tflog"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/diag"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
 )
@@ -66,16 +70,37 @@ func New(version string) func() *schema.Provider {
 		return p
 	}
 }
+
+type AdaptiveCLISVCToken struct {
+	Token        string `json:"token"`
+	WorkspaceURL string `json:"url"`
+}
+
+func tryReadingServiceToken(potentialToken, workspaceURL string) (string, string, error) {
+	if potentialToken == "" {
+		return "", "", errors.New("'serviceToken' field cannot be empty")
+	}
+	// check if json marshallable
+	var _token AdaptiveCLISVCToken
+	if _err := json.Unmarshal([]byte(potentialToken), &_token); _err == nil {
+		return _token.Token, _token.WorkspaceURL, nil
+	}
+	return potentialToken, workspaceURL, nil
+
+}
+
 func providerConfigure(ctx context.Context, d *schema.ResourceData) (interface{}, diag.Diagnostics) {
 	serviceToken := d.Get("service_token").(string)
 	workspaceURL := d.Get("workspace_url").(string)
 
-	if serviceToken == "" {
-		return nil, diag.Errorf("The 'serviceToken' field is required.")
+	svcToken, wsURL, err := tryReadingServiceToken(serviceToken, workspaceURL)
+	if err != nil {
+		return nil, diag.Errorf(fmt.Sprintf("bad service token: %s", err))
 	}
-
+	tflog.Trace(ctx, "Configuring HashiCups client")
+	tflog.Trace(ctx, fmt.Sprintf("Using workspace: %s and %s", wsURL, svcToken))
 	// Initialize the Adaptive API client with the provided service token.
-	c := client.NewClient(serviceToken, workspaceURL)
+	c := client.NewClient(svcToken, wsURL)
 
 	return c, nil
 }

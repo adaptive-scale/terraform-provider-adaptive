@@ -39,12 +39,7 @@ provider "adaptive" {
 
 To configure the provider for use, you must add [Service Token](https://docs.adaptive.live/). Generate the token using your User Settings Page.
 
-Or if you want to use adaptive-cli token instead:
-
-```bash
-$ adaptive login
-$ jq -r '.token' ~/.adaptive/token | pbcopy
-```
+Now you can you that token like so:
 
 You can use the token:
 
@@ -59,6 +54,20 @@ You can use the token:
 2. Plain text secret
 
    ```bash
+   provider "adaptive" {
+     # Add configuration options
+     service_token = "<service_token>"
+   }
+   ```
+
+3. if you want to use adaptive-cli token instead:
+
+   ```bash
+   # this will store the token in ~/.adaptive/token
+   $ adaptive login
+   ```
+
+   ```hcl
    provider "adaptive" {
      # Add configuration options
      service_token = "<service_token>"
