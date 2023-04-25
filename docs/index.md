@@ -18,10 +18,10 @@ You can use the Adaptive Terraform provider to configure and manage your Adaptiv
 To install the Adaptive provider, copy and paste this code into your Terraform configuration.
 
 ```hcl
-# Install StrongDM provider
+# Install Adaptive Provider
 terraform {
   required_providers {
-    sdm = {
+     = {
       source = "adaptive.live/adaptive"
       version = ">=3.3.0"
     }
