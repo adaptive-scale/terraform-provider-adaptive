@@ -20,6 +20,7 @@ import (
 
 type GCPIntegrationConfiguration struct {
 	Version   string `yaml:"version"`
+	Name      string `yaml:"name"`
 	ProjectID string `yaml:"project_id"`
 	KeyFile   string `yaml:"key_file"`
 }
@@ -58,6 +59,7 @@ func resourceAdaptiveGCP() *schema.Resource {
 func schemaToGCPIntegrationConfiguration(d *schema.ResourceData) GCPIntegrationConfiguration {
 	return GCPIntegrationConfiguration{
 		Version:   "1",
+		Name:      d.Get("name").(string),
 		ProjectID: d.Get("project_id").(string),
 		KeyFile:   d.Get("key_file").(string),
 	}

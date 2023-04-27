@@ -60,6 +60,7 @@ func resourceAdaptiveGoogle() *schema.Resource {
 
 type GoogleOAuthIntegrationConfiguration struct {
 	Version      string `yaml:"Version"`
+	Name         string `yaml:"name"`
 	Domain       string `yaml:"domain"`
 	ClientID     string `yaml:"clientID"`
 	ClientSecret string `yaml:"clientSecret"`
@@ -67,7 +68,8 @@ type GoogleOAuthIntegrationConfiguration struct {
 
 func schemaToGoogleOAuthIntegrationConfiguration(d *schema.ResourceData) GoogleOAuthIntegrationConfiguration {
 	return GoogleOAuthIntegrationConfiguration{
-		// Version:      d.Get("version").(string),
+		Version:      "1",
+		Name:         d.Get("name").(string),
 		Domain:       d.Get("domain").(string),
 		ClientID:     d.Get("client_id").(string),
 		ClientSecret: d.Get("client_secret").(string),

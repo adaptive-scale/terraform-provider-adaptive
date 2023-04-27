@@ -25,8 +25,8 @@ import (
 )
 
 type MySQLIntegrationConfiguration struct {
-	Version string `yaml:"version"`
-	//Name         string `yaml:"name"`
+	Version      string `yaml:"version"`
+	Name         string `yaml:"name"`
 	Username     string `yaml:"username"`
 	Password     string `yaml:"password"`
 	DatabaseName string `yaml:"databaseName"`
@@ -87,6 +87,7 @@ func resourceAdaptiveMySQL() *schema.Resource {
 func schemaToMySQLIntegrationConfiguration(d *schema.ResourceData) MySQLIntegrationConfiguration {
 	return MySQLIntegrationConfiguration{
 		Version:      "",
+		Name:         d.Get("name").(string),
 		Username:     d.Get("username").(string),
 		Password:     d.Get("password").(string),
 		DatabaseName: d.Get("database_name").(string),

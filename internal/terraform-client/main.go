@@ -27,7 +27,7 @@ func NewClient(serviceToken, workspaceURL string) *Client {
 	if workspaceURL == "" {
 		workspaceURL = baseURL
 	} else {
-		workspaceURL = fmt.Sprintf("http://%s/api/v1", workspaceURL)
+		workspaceURL = fmt.Sprintf("%s/api/v1", workspaceURL)
 	}
 
 	return &Client{
@@ -35,6 +35,10 @@ func NewClient(serviceToken, workspaceURL string) *Client {
 		workspaceURL: workspaceURL,
 		httpClient:   &http.Client{},
 	}
+}
+
+func (c *Client) authorizationAPI() string {
+	return fmt.Sprintf("%s/terraform/authorization", c.workspaceURL)
 }
 
 func (c *Client) resourceAPI() string {
@@ -48,6 +52,10 @@ func (c *Client) sessionAPI() string {
 func (c *Client) do(req *http.Request) (*http.Response, error) {
 	req.Header.Set("Authorization", c.serviceToken)
 	res, err := c.httpClient.Do(req)
+	if err != nil {
+		return nil, err
+	}
+
 	if res.StatusCode == 401 {
 		return nil, errors.New("bad token. please check your service token")
 	}
@@ -60,6 +68,106 @@ func (c *Client) do(req *http.Request) (*http.Response, error) {
 	// 	return nil, fmt.Errorf("duplicate %s", entity)
 	// }
 	return res, err
+}
+
+// Authorizations
+func (c *Client) CreateAuthorization(ctx context.Context, aName, description, permissions, resourceName string) (*CreateAuthorizationResponse, error) {
+	req := CreateAuthorizationRequest{
+		AuthorizationName: aName,
+		Resource:          resourceName,
+		Description:       description,
+		Permissions:       permissions,
+	}
+	payloadBuf := bytes.NewBuffer([]byte{})
+	if err := json.NewEncoder(payloadBuf).Encode(req); err != nil {
+		err = fmt.Errorf("failed to json encode request body. err %w", err)
+		return nil, err
+	}
+
+	request, err := http.NewRequest("POST", fmt.Sprintf("%s/create", c.authorizationAPI()), payloadBuf)
+	if err != nil {
+		return nil, err
+	}
+
+	_response, err := c.do(request)
+	if err != nil {
+		return nil, err
+	}
+	if _response.StatusCode == 409 {
+		return nil, fmt.Errorf("duplicate authorization with name %s", req.AuthorizationName)
+	}
+	// if _response.StatusCode != 200 {
+	// 	return nil, fmt.Errorf("error creating authorization %s", req.SessionName)
+	// }
+	if _response.StatusCode != 200 {
+		var errReason string
+		err := json.NewDecoder(_response.Body).Decode(&errReason)
+		if err != nil {
+			tflog.Trace(ctx, fmt.Sprintf("decode error: %s", err))
+		}
+		return nil, fmt.Errorf("error creating authorization %s, reason %s", req.AuthorizationName, errReason)
+	}
+
+	var response CreateAuthorizationResponse
+	if err := json.NewDecoder(_response.Body).Decode(&response); err != nil {
+		return nil, fmt.Errorf("failed to decode response body. err %w", err)
+	}
+	return &response, nil
+}
+
+func (c *Client) UpdateAuthorization(ctx context.Context, authID, newName, newDescription string) (*UpdateAuthorizationResponse, error) {
+	req := UpdateAuthorizationRequest{
+		AuthorizationName:        newName,
+		AuthorizationDescription: newDescription,
+	}
+	payloadBuf := bytes.NewBuffer([]byte{})
+	if err := json.NewEncoder(payloadBuf).Encode(req); err != nil {
+		err = fmt.Errorf("failed to json encode request body. err %w", err)
+		return nil, err
+	}
+
+	request, err := http.NewRequest("POST", fmt.Sprintf("%s/update/%s", c.authorizationAPI(), authID), payloadBuf)
+	if err != nil {
+		return nil, err
+	}
+
+	_response, err := c.do(request)
+	if err != nil {
+		return nil, err
+	}
+	if _response.StatusCode == 409 {
+		return nil, fmt.Errorf("duplicate authorization with name %s", req.AuthorizationName)
+	}
+	if _response.StatusCode != 200 {
+		var errReason string
+		err := json.NewDecoder(_response.Body).Decode(&errReason)
+		if err != nil {
+			tflog.Trace(ctx, fmt.Sprintf("decode error: %s", err))
+		}
+		return nil, fmt.Errorf("error creating authorization %s, reason %s", req.AuthorizationName, errReason)
+	}
+
+	var response UpdateAuthorizationResponse
+	if err := json.NewDecoder(_response.Body).Decode(&response); err != nil {
+		return nil, fmt.Errorf("failed to decode response body. err %w", err)
+	}
+	return &response, nil
+}
+
+func (c *Client) DeleteAuthorization(ctx context.Context, authID string) (bool, error) {
+	request, err := http.NewRequest("POST", fmt.Sprintf("%s/delete/%s", c.authorizationAPI(), authID), nil)
+	if err != nil {
+		return false, err
+	}
+
+	response, err := c.do(request)
+	if err != nil {
+		return false, fmt.Errorf("failed to request adaptive api. err %w", err)
+	}
+	if response.StatusCode != 200 {
+		return false, fmt.Errorf("error deleting authorization %s", authID)
+	}
+	return true, nil
 }
 
 // Sessions

@@ -39,7 +39,7 @@ func New(version string) func() *schema.Provider {
 					Type:        schema.TypeString,
 					Required:    true,
 					Description: "Service account token for authenticating with the Adaptive service.",
-					DefaultFunc: schema.EnvDefaultFunc("ADAPTIVE_SVC_TOKEN", nil),
+					DefaultFunc: schema.EnvDefaultFunc("ADAPTIVE_SVC_TOKEN", ""),
 				},
 				"workspace_url": {
 					Type:        schema.TypeString,
@@ -51,19 +51,21 @@ func New(version string) func() *schema.Provider {
 			// 	"adaptive_data_source": dataSourceScaffolding(),
 			// },
 			ResourcesMap: map[string]*schema.Resource{
-				"adaptive_gcp":         resourceAdaptiveGCP(),
-				"adaptive_aws":         resourceAdaptiveAWS(),
-				"adaptive_azure":       resourceAdaptiveAzure(),
-				"adaptive_google":      resourceAdaptiveGoogle(),
-				"adaptive_okta":        resourceAdaptiveOkta(),
-				"adaptive_ssh":         resourceAdaptiveSSH(),
-				"adaptive_servicelist": resourceAdaptiveServiceList(),
-				"adaptive_mysql":       resourceAdaptiveMySQL(),
-				"adaptive_mongodb":     resourceAdaptiveMongo(),
-				"adaptive_postgres":    resourceAdaptivePostgres(),
-				"adaptive_cockroachdb": resourceAdaptiveCockroachDB(),
-				"adaptive_session":     resourceAdaptiveSession(),
-				"adaptive_users":       users(),
+				"adaptive_authorization": resourceAdaptiveAuthorization(),
+				"adaptive_resource":      resourceAdaptiveResource(),
+				"adaptive_gcp":           resourceAdaptiveGCP(),
+				"adaptive_aws":           resourceAdaptiveAWS(),
+				"adaptive_azure":         resourceAdaptiveAzure(),
+				"adaptive_google":        resourceAdaptiveGoogle(),
+				"adaptive_okta":          resourceAdaptiveOkta(),
+				"adaptive_ssh":           resourceAdaptiveSSH(),
+				"adaptive_servicelist":   resourceAdaptiveServiceList(),
+				"adaptive_mysql":         resourceAdaptiveMySQL(),
+				"adaptive_mongodb":       resourceAdaptiveMongo(),
+				"adaptive_postgres":      resourceAdaptivePostgres(),
+				"adaptive_cockroachdb":   resourceAdaptiveCockroachDB(),
+				"adaptive_session":       resourceAdaptiveSession(),
+				"adaptive_users":         users(),
 			},
 			ConfigureContextFunc: providerConfigure,
 		}
@@ -97,7 +99,6 @@ func providerConfigure(ctx context.Context, d *schema.ResourceData) (interface{}
 	if err != nil {
 		return nil, diag.Errorf(fmt.Sprintf("bad service token: %s", err))
 	}
-	tflog.Trace(ctx, "Configuring HashiCups client")
 	tflog.Trace(ctx, fmt.Sprintf("Using workspace: %s and %s", wsURL, svcToken))
 	// Initialize the Adaptive API client with the provided service token.
 	c := client.NewClient(svcToken, wsURL)

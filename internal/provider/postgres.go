@@ -92,6 +92,7 @@ type PostgresIntegrationConfiguration struct {
 // TODO: .(string) is assumption will cause problems
 func schemaToPostgresIntegrationConfiguration(d *schema.ResourceData) PostgresIntegrationConfiguration {
 	return PostgresIntegrationConfiguration{
+		Name:         d.Get("name").(string),
 		Username:     d.Get("username").(string),
 		Password:     d.Get("password").(string),
 		DatabaseName: d.Get("database_name").(string),

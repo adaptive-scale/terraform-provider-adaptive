@@ -21,6 +21,7 @@ import (
 )
 
 type ServiceListIntegrationConfiguration struct {
+	Name    string `yaml:"name"`
 	Version string `yaml:"version"`
 	URLs    string `yaml:"urls"`
 }
@@ -55,6 +56,7 @@ func resourceAdaptiveServiceList() *schema.Resource {
 func schemaToServiceListIntegrationConfiguration(d *schema.ResourceData) ServiceListIntegrationConfiguration {
 	return ServiceListIntegrationConfiguration{
 		Version: "1",
+		Name:    d.Get("name").(string),
 		URLs:    d.Get("urls").(string),
 	}
 }

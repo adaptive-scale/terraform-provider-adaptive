@@ -25,6 +25,7 @@ import (
 
 type SSHIntegrationConfiguration struct {
 	Version     string `yaml:"version"`
+	Name        string `yaml:"name"`
 	Username    string `yaml:"username"`
 	UsePassword bool   `yaml:"usePassword"`
 	Password    string `yaml:"password"`
@@ -79,6 +80,7 @@ func resourceAdaptiveSSH() *schema.Resource {
 func schemaToSSHIntegrationConfiguration(d *schema.ResourceData) SSHIntegrationConfiguration {
 	return SSHIntegrationConfiguration{
 		Version:     "1.0",
+		Name:        d.Get("name").(string),
 		Username:    d.Get("username").(string),
 		UsePassword: d.Get("key").(string) == "",
 		Password:    d.Get("key").(string),
