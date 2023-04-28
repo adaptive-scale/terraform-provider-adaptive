@@ -1,6 +1,10 @@
 package provider
 
-import "github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
+import (
+	"strings"
+
+	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
+)
 
 type KubernetesIntegrationConfiguration struct {
 	Name         string `yaml:"name"`
@@ -13,7 +17,7 @@ func schemaToKubernetesIntegrationConfiguration(d *schema.ResourceData) Kubernet
 	return KubernetesIntegrationConfiguration{
 		Name:         d.Get("name").(string),
 		ApiServer:    d.Get("api_server").(string),
-		ClusterCerts: d.Get("cluster_cert").(string),
-		ClusterToken: d.Get("cluster_token").(string),
+		ClusterCerts: strings.TrimSpace(d.Get("cluster_cert").(string)),
+		ClusterToken: strings.TrimSpace(d.Get("cluster_token").(string)),
 	}
 }

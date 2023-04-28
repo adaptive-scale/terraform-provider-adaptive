@@ -10,6 +10,7 @@ resource "adaptive_gcp" "example" {
 import (
 	"context"
 	"errors"
+	"strings"
 	"time"
 
 	adaptive "github.com/adaptive-scale/terraform-provider-adaptive/internal/terraform-client"
@@ -61,7 +62,7 @@ func schemaToGCPIntegrationConfiguration(d *schema.ResourceData) GCPIntegrationC
 		Version:   "1",
 		Name:      d.Get("name").(string),
 		ProjectID: d.Get("project_id").(string),
-		KeyFile:   d.Get("key_file").(string),
+		KeyFile:   strings.TrimSpace(d.Get("key_file").(string)),
 	}
 }
 
@@ -116,7 +117,7 @@ func resourceAdaptiveGCPUpdate(ctx context.Context, d *schema.ResourceData, m in
 func resourceAdaptiveGCPDelete(ctx context.Context, d *schema.ResourceData, m interface{}) diag.Diagnostics {
 	resourceID := d.Id()
 	client := m.(*adaptive.Client)
-	_, err := client.DeleteResource(resourceID)
+	_, err := client.DeleteResource(resourceID, d.Get("Name").(string))
 	if err != nil {
 		return diag.FromErr(err)
 	}

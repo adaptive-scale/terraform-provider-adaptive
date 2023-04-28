@@ -19,6 +19,7 @@ Example resource usage:
 import (
 	"context"
 	"errors"
+	"strings"
 	"time"
 
 	adaptive "github.com/adaptive-scale/terraform-provider-adaptive/internal/terraform-client"
@@ -107,8 +108,8 @@ func schemaToCockroachDBIntegrationConfiguration(d *schema.ResourceData) Cockroa
 		DatabaseName: d.Get("database_name").(string),
 		HostName:     d.Get("host").(string),
 		Port:         d.Get("port").(string),
-		SSLMode:      d.Get("ssl_mode").(string),
-		RootCert:     d.Get("root_cert").(string),
+		// SSLMode:      d.Get("ssl_mode").(string),
+		RootCert: strings.TrimSpace(d.Get("root_cert").(string)),
 	}
 }
 
@@ -163,7 +164,7 @@ func resourceAdaptiveCockroachDBUpdate(ctx context.Context, d *schema.ResourceDa
 func resourceAdaptiveCockroachDBDelete(ctx context.Context, d *schema.ResourceData, m interface{}) diag.Diagnostics {
 	resourceID := d.Id()
 	client := m.(*adaptive.Client)
-	_, err := client.DeleteResource(resourceID)
+	_, err := client.DeleteResource(resourceID, d.Get("Name").(string))
 	if err != nil {
 		return diag.FromErr(err)
 	}

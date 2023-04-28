@@ -52,132 +52,127 @@ func resourceAdaptiveResource() *schema.Resource {
 			"type": {
 				Type:        schema.TypeString,
 				Required:    true,
-				Description: "Type of the adaptive integration.",
+				Description: "Type of the Adaptive resource",
 			},
 			"name": {
 				Type:        schema.TypeString,
 				Required:    true,
-				Description: "Name of the adaptive integration.",
+				Description: "Name of the Adaptive resource",
 			},
 			"uri": {
 				Type:        schema.TypeString,
 				Optional:    true,
-				Description: "URI of the adaptive integration.",
+				Description: "Connection string to a resource. Used by MongoDB",
 			},
 			"host": {
 				Type:        schema.TypeString,
 				Optional:    true,
-				Description: "Hostname of the adaptive integration.",
+				Description: "Hostname of the adaptive resource. Used by CockroachDB, Postgres, Mysql, SSH resources",
 			},
 			"port": {
 				Type:        schema.TypeString,
 				Optional:    true,
-				Description: "Port number of the adaptive integration.",
+				Description: "Port number of the adaptive resource. Used by CockroachDB, Postgres, Mysql, SSH resources",
 			},
 			"username": {
 				Type:        schema.TypeString,
 				Optional:    true,
-				Description: "Username for the adaptive integration authentication.",
+				Description: "Username for the adaptive resource authentication. Used by CockroachDB, Postgres, Mysql, SSH resources",
 			},
 			"password": {
 				Type:        schema.TypeString,
 				Optional:    true,
-				Description: "Password for the adaptive integration authentication.",
+				Description: "Password for the adaptive integration authentication.Used by CockroachDB, Postgres, Mysql, SSH resources",
 			},
 			"database_name": {
 				Type:        schema.TypeString,
 				Optional:    true,
-				Description: "",
-			},
-			"ssl_mode": {
-				Type:        schema.TypeString,
-				Optional:    true,
-				Description: "",
-			},
-			"api_server": {
-				Type:        schema.TypeString,
-				Optional:    true,
-				Description: "Used by Kubernetes",
-			},
-			"cluster_token": {
-				Type:        schema.TypeString,
-				Optional:    true,
-				Description: "Used by Kubernetes",
-			},
-			"cluster_cert": {
-				Type:        schema.TypeString,
-				Optional:    true,
-				Description: "Used by Kubernetes",
+				Description: "The name of the database to connect to. Used by CockroachDB, Postgres, Mysql resources",
 			},
 			"root_cert": {
 				Type:        schema.TypeString,
 				Optional:    true,
-				Description: "Used by CockroachDB",
+				Description: "The root certificate to use for the CockroachDB instance.",
+			},
+			// "ssl_mode": {
+			// 	Type:        schema.TypeString,
+			// 	Optional:    true,
+			// 	Description: "The SSL mode to use when connecting to the database. Used by CockroachDB, Postgres, Mysql resources",
+			// },
+			"api_server": {
+				Type:        schema.TypeString,
+				Optional:    true,
+				Description: "The url for Kubernetes API server. Used by Kubernetes resource",
+			},
+			"cluster_token": {
+				Type:        schema.TypeString,
+				Optional:    true,
+				Description: "The cluster token for Kubernetes API server. Used by Kubernetes resource",
+			},
+			"cluster_cert": {
+				Type:        schema.TypeString,
+				Optional:    true,
+				Description: "The cluster token for Kubernetes API server. Used by Kubernetes resource",
 			},
 			"region_name": {
 				Type:        schema.TypeString,
 				Optional:    true,
-				Description: "Used by AWS",
+				Description: "The AWS region name. Used by AWS resource.",
 			},
 			"access_key_id": {
 				Type:        schema.TypeString,
 				Optional:    true,
-				Description: "Used by AWS",
+				Description: "The AWS access key id. Used by AWS resource.",
 			},
 			"secret_access_key": {
 				Type:        schema.TypeString,
 				Optional:    true,
-				Description: "Used by AWS",
+				Description: "The AWS secret access key in plaintext. Used by AWS resource.",
 			},
 			"tenant_id": {
 				Type:        schema.TypeString,
 				Optional:    true,
-				Description: "Used by AWS",
+				Description: "The Azure tenant ID. Used by Azure resource.",
 			},
 			"application_id": {
 				Type:        schema.TypeString,
 				Optional:    true,
-				Description: "Used by AWS",
+				Description: "The Azure application ID. Used by Azure resource.",
 			},
 			"client_secret": {
 				Type:        schema.TypeString,
 				Optional:    true,
-				Description: "Used by AWS",
-			},
-			"hostname": {
-				Type:        schema.TypeString,
-				Optional:    true,
-				Description: "Used by AWS",
+				Description: "The client secret for a resource. Used by Azure, Google, Okta resources.",
 			},
 			"project_id": {
 				Type:        schema.TypeString,
 				Optional:    true,
-				Description: "Used by AWS",
+				Description: "The GCP project ID. Used by GCP resource",
 			},
 			"key_file": {
 				Type:        schema.TypeString,
 				Optional:    true,
-				Description: "Used by AWS",
+				Description: "The content of GCP key file. Used by GCP resource",
 			},
 			"domain": {
 				Type:        schema.TypeString,
 				Optional:    true,
-				Description: "Used by AWS",
+				Description: "The domain name for a resource. Used by Google, Okta resource",
 			},
 			"client_id": {
 				Type:        schema.TypeString,
 				Optional:    true,
-				Description: "Used by AWS",
+				Description: "The client ID of a OAuth application. Used by Google, Okta resource",
 			},
 			"urls": {
 				Type:        schema.TypeString,
 				Optional:    true,
-				Description: "Used by AWS",
+				Description: "Comma-separated list of URLs. Used by Services resource",
 			},
 			"key": {
 				Type:        schema.TypeString,
 				Optional:    true,
-				Description: "Used by AWS",
+				Description: "The SSH key to use when connecting to the instance. If not specified, password authentication will be used. Used by SSH resource",
 			},
 		},
 	}
@@ -288,7 +283,7 @@ func resourceAdaptiveResourceUpdate(ctx context.Context, d *schema.ResourceData,
 func resourceAdaptiveResourceDelete(ctx context.Context, d *schema.ResourceData, m interface{}) diag.Diagnostics {
 	resourceID := d.Id()
 	client := m.(*adaptive.Client)
-	_, err := client.DeleteResource(resourceID)
+	_, err := client.DeleteResource(resourceID, d.Get("Name").(string))
 	if err != nil {
 		return diag.FromErr(err)
 	}

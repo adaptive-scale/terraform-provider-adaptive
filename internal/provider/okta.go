@@ -128,7 +128,7 @@ func resourceAdaptiveOktaUpdate(ctx context.Context, d *schema.ResourceData, m i
 func resourceAdaptiveOktaDelete(ctx context.Context, d *schema.ResourceData, m interface{}) diag.Diagnostics {
 	resourceID := d.Id()
 	client := m.(*adaptive.Client)
-	_, err := client.DeleteResource(resourceID)
+	_, err := client.DeleteResource(resourceID, d.Get("Name").(string))
 	if err != nil {
 		return diag.FromErr(err)
 	}
