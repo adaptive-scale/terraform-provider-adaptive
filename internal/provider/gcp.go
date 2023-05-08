@@ -117,7 +117,7 @@ func resourceAdaptiveGCPUpdate(ctx context.Context, d *schema.ResourceData, m in
 func resourceAdaptiveGCPDelete(ctx context.Context, d *schema.ResourceData, m interface{}) diag.Diagnostics {
 	resourceID := d.Id()
 	client := m.(*adaptive.Client)
-	_, err := client.DeleteResource(resourceID, d.Get("Name").(string))
+	_, err := client.DeleteResource(resourceID, d.Get("name").(string))
 	if err != nil {
 		return diag.FromErr(err)
 	}

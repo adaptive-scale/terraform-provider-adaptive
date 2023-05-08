@@ -10,13 +10,10 @@ import (
 	"net/http"
 	"strings"
 	"time"
-
-	"github.com/hashicorp/terraform-plugin-log/tflog"
 )
 
 const (
-	// baseURL = "https://app.adaptive.com"
-	baseURL = "http://localhost:8080/api/v1"
+	defaultAdaptiveURL = "https://app.adaptive.com/api/v1"
 )
 
 type Client struct {
@@ -28,7 +25,7 @@ type Client struct {
 func NewClient(serviceToken, workspaceURL string) *Client {
 
 	if workspaceURL == "" {
-		workspaceURL = baseURL
+		workspaceURL = defaultAdaptiveURL
 	} else {
 		workspaceURL = fmt.Sprintf("%s/api/v1", workspaceURL)
 	}
@@ -62,14 +59,6 @@ func (c *Client) do(req *http.Request) (*http.Response, error) {
 	if res.StatusCode == 401 {
 		return nil, errors.New("bad token. please check your service token")
 	}
-	// if res.StatusCode == 409 {
-	// 	isResourceAPI := strings.Contains(req.URL.String(), "/resource")
-	// 	entity := "session"
-	// 	if isResourceAPI {
-	// 		entity = "resource"
-	// 	}
-	// 	return nil, fmt.Errorf("duplicate %s", entity)
-	// }
 	return res, err
 }
 
@@ -94,10 +83,10 @@ func _readAuthorization(c *Client, authID string) (map[string]interface{}, error
 }
 
 func (c *Client) ReadAuthorization(authID string, waitForStatus bool) (any, error) {
-	timeout := time.Second * 3
+	timeout := time.Second * 5
 	retryForStatus := 2
 	if waitForStatus {
-		retryForStatus = 10
+		retryForStatus = 20
 	}
 
 	resp, err := Do(
@@ -120,7 +109,7 @@ func (c *Client) ReadAuthorization(authID string, waitForStatus bool) (any, erro
 			}
 		}))
 	if err != nil {
-		return nil, fmt.Errorf("could to read session %s", authID)
+		return nil, fmt.Errorf("could to read session %s %w", authID, err)
 	}
 	if strings.ToLower(resp["Status"].(string)) != "created" {
 		return nil, fmt.Errorf("error read session %s", authID)
@@ -156,14 +145,11 @@ func (c *Client) CreateAuthorization(ctx context.Context, aName, description, pe
 	if _response.StatusCode == 409 {
 		return nil, fmt.Errorf("duplicate authorization with name %s", req.AuthorizationName)
 	}
-	// if _response.StatusCode != 200 {
-	// 	return nil, fmt.Errorf("error creating authorization %s", req.SessionName)
-	// }
 	if _response.StatusCode != 200 {
 		var errReason string
 		err := json.NewDecoder(_response.Body).Decode(&errReason)
 		if err != nil {
-			tflog.Trace(ctx, fmt.Sprintf("decode error: %s", err))
+			log.Printf("decode error: %s", err)
 		}
 		return nil, fmt.Errorf("error creating authorization %s, reason %s", req.AuthorizationName, errReason)
 	}
@@ -208,7 +194,7 @@ func (c *Client) UpdateAuthorization(ctx context.Context, authID, newName, newDe
 		var errReason string
 		err := json.NewDecoder(_response.Body).Decode(&errReason)
 		if err != nil {
-			tflog.Trace(ctx, fmt.Sprintf("decode error: %s", err))
+			log.Printf("decode error: %s", err)
 		}
 		return nil, fmt.Errorf("error creating authorization %s, reason %s", req.AuthorizationName, errReason)
 	}
@@ -269,7 +255,7 @@ func (c *Client) CreateSession(ctx context.Context, sessionName, resourceName, a
 		var errReason string
 		err := json.NewDecoder(_response.Body).Decode(&errReason)
 		if err != nil {
-			tflog.Trace(ctx, fmt.Sprintf("decode error: %s", err))
+			log.Printf("decode error: %s", err)
 		}
 		return nil, fmt.Errorf("error creating session %s, reason %s", req.SessionName, errReason)
 	}
@@ -338,10 +324,10 @@ func (c *Client) ReadSession(sessionID string, waitForStatus bool) (map[string]i
 			}
 		}))
 	if err != nil {
-		return nil, fmt.Errorf("could to read session %s", sessionID)
+		return nil, fmt.Errorf("could to create session %s", sessionID)
 	}
 	if strings.ToLower(resp["Status"].(string)) != "created" {
-		return nil, fmt.Errorf("error read session %s", sessionID)
+		return nil, fmt.Errorf("error create session %s", sessionID)
 	}
 	return resp, nil
 }
@@ -399,8 +385,8 @@ func (c *Client) DeleteSession(sessionID string) (bool, error) {
 		return false, fmt.Errorf("error deleting session %s", sessionID)
 	}
 	// Once delete request is succesful, we check for status of session
-	timeout := time.Second * 3
-	retryForStatus := 10
+	timeout := time.Second * 5
+	retryForStatus := 20
 
 	resp, err := Do(
 		func() (map[string]interface{}, error) {
@@ -422,7 +408,7 @@ func (c *Client) DeleteSession(sessionID string) (bool, error) {
 			}
 		}))
 	if err != nil {
-		return false, fmt.Errorf("could to read session %s", sessionID)
+		return false, fmt.Errorf("could to read session %s %w", sessionID, err)
 	}
 	if status, ok := resp["Status"].(string); ok {
 		if strings.ToLower(status) != "terminated" {
@@ -516,10 +502,11 @@ func (c *Client) DeleteResource(resourceID, resourceName string) (bool, error) {
 	if _response.StatusCode != 200 {
 		var errReason string
 		_ = json.NewDecoder(_response.Body).Decode(&errReason)
-		// if err != nil {
-		// 	tflog.Trace(ctx, fmt.Sprintf("decode error: %s", err))
-		// }
-		return false, fmt.Errorf("error deleting resource %s, reason %s", resourceName, errReason)
+		msg := fmt.Sprintf("error deleting resource %s", resourceName)
+		if len(errReason) > 0 {
+			msg += fmt.Sprintf(". reason %s", errReason)
+		}
+		return false, errors.New(msg)
 	}
 	return true, nil
 }
