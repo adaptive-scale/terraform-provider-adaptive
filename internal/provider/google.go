@@ -60,6 +60,7 @@ func resourceAdaptiveGoogle() *schema.Resource {
 
 type GoogleOAuthIntegrationConfiguration struct {
 	Version      string `yaml:"Version"`
+	Name         string `yaml:"name"`
 	Domain       string `yaml:"domain"`
 	ClientID     string `yaml:"clientID"`
 	ClientSecret string `yaml:"clientSecret"`
@@ -67,7 +68,8 @@ type GoogleOAuthIntegrationConfiguration struct {
 
 func schemaToGoogleOAuthIntegrationConfiguration(d *schema.ResourceData) GoogleOAuthIntegrationConfiguration {
 	return GoogleOAuthIntegrationConfiguration{
-		// Version:      d.Get("version").(string),
+		Version:      "1",
+		Name:         d.Get("name").(string),
 		Domain:       d.Get("domain").(string),
 		ClientID:     d.Get("client_id").(string),
 		ClientSecret: d.Get("client_secret").(string),
@@ -126,7 +128,7 @@ func resourceAdaptiveGoogleUpdate(ctx context.Context, d *schema.ResourceData, m
 func resourceAdaptiveGoogleDelete(ctx context.Context, d *schema.ResourceData, m interface{}) diag.Diagnostics {
 	resourceID := d.Id()
 	client := m.(*adaptive.Client)
-	_, err := client.DeleteResource(resourceID)
+	_, err := client.DeleteResource(resourceID, d.Get("name").(string))
 	if err != nil {
 		return diag.FromErr(err)
 	}

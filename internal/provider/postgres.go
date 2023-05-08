@@ -92,12 +92,13 @@ type PostgresIntegrationConfiguration struct {
 // TODO: .(string) is assumption will cause problems
 func schemaToPostgresIntegrationConfiguration(d *schema.ResourceData) PostgresIntegrationConfiguration {
 	return PostgresIntegrationConfiguration{
+		Name:         d.Get("name").(string),
 		Username:     d.Get("username").(string),
 		Password:     d.Get("password").(string),
 		DatabaseName: d.Get("database_name").(string),
 		HostName:     d.Get("host").(string),
 		Port:         d.Get("port").(string),
-		SSLMode:      d.Get("ssl_mode").(string),
+		// SSLMode:      d.Get("ssl_mode").(string),
 	}
 }
 
@@ -152,7 +153,7 @@ func resourceAdaptivePostgresUpdate(ctx context.Context, d *schema.ResourceData,
 func resourceAdaptivePostgresDelete(ctx context.Context, d *schema.ResourceData, m interface{}) diag.Diagnostics {
 	resourceID := d.Id()
 	client := m.(*adaptive.Client)
-	_, err := client.DeleteResource(resourceID)
+	_, err := client.DeleteResource(resourceID, d.Get("name").(string))
 	if err != nil {
 		return diag.FromErr(err)
 	}

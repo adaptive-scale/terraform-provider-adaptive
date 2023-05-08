@@ -21,6 +21,7 @@ import (
 
 type AzureIntegrationConfiguration struct {
 	Version       string `yaml:"version"`
+	Name          string `yaml:"name"`
 	TenantID      string `yaml:"tenantID"`
 	ApplicationID string `yaml:"applicationID"`
 	ClientSecret  string `yaml:"clientSecret"`
@@ -69,6 +70,7 @@ func resourceAdaptiveAzure() *schema.Resource {
 func schemaToAzureIntegrationConfiguration(d *schema.ResourceData) AzureIntegrationConfiguration {
 	return AzureIntegrationConfiguration{
 		Version:       "1.0",
+		Name:          d.Get("name").(string),
 		TenantID:      d.Get("tenant_id").(string),
 		ApplicationID: d.Get("application_id").(string),
 		ClientSecret:  d.Get("client_secret").(string),
@@ -126,7 +128,7 @@ func resourceAdaptiveAzureUpdate(ctx context.Context, d *schema.ResourceData, m 
 func resourceAdaptiveAzureDelete(ctx context.Context, d *schema.ResourceData, m interface{}) diag.Diagnostics {
 	resourceID := d.Id()
 	client := m.(*adaptive.Client)
-	_, err := client.DeleteResource(resourceID)
+	_, err := client.DeleteResource(resourceID, d.Get("name").(string))
 	if err != nil {
 		return diag.FromErr(err)
 	}

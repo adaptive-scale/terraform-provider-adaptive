@@ -23,6 +23,7 @@ import (
 
 type OktaOAuthIntegrationConfiguration struct {
 	Version      string `yaml:"version"`
+	Name         string `yaml:"name"`
 	Domain       string `yaml:"domain"`
 	ClientID     string `yaml:"clientID"`
 	ClientSecret string `yaml:"clientSecret"`
@@ -69,6 +70,7 @@ func resourceAdaptiveOkta() *schema.Resource {
 func schemaToOktaIntegrationConfiguration(d *schema.ResourceData) OktaOAuthIntegrationConfiguration {
 	return OktaOAuthIntegrationConfiguration{
 		Version:      "1.0",
+		Name:         d.Get("name").(string),
 		Domain:       d.Get("domain").(string),
 		ClientID:     d.Get("client_id").(string),
 		ClientSecret: d.Get("client_secret").(string),
@@ -126,7 +128,7 @@ func resourceAdaptiveOktaUpdate(ctx context.Context, d *schema.ResourceData, m i
 func resourceAdaptiveOktaDelete(ctx context.Context, d *schema.ResourceData, m interface{}) diag.Diagnostics {
 	resourceID := d.Id()
 	client := m.(*adaptive.Client)
-	_, err := client.DeleteResource(resourceID)
+	_, err := client.DeleteResource(resourceID, d.Get("name").(string))
 	if err != nil {
 		return diag.FromErr(err)
 	}

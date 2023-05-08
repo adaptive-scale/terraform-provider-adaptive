@@ -116,6 +116,15 @@ func resourceAdaptiveSessionUpdate(ctx context.Context, d *schema.ResourceData, 
 	if d.HasChange("session_type") {
 		return diag.Errorf("Cannot change session_type after creation")
 	}
+	if d.HasChange("resource") {
+		return diag.Errorf("Cannot change resource after creation")
+	}
+	if d.HasChange("authorization") {
+		return diag.Errorf("Cannot change authorizaton after creation")
+	}
+	if d.HasChange("cluster") {
+		return diag.Errorf("Cannot change cluster after creation")
+	}
 
 	resp, err := client.UpdateSession(
 		sessionID,

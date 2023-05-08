@@ -25,6 +25,7 @@ import (
 
 type SSHIntegrationConfiguration struct {
 	Version     string `yaml:"version"`
+	Name        string `yaml:"name"`
 	Username    string `yaml:"username"`
 	UsePassword bool   `yaml:"usePassword"`
 	Password    string `yaml:"password"`
@@ -61,6 +62,11 @@ func resourceAdaptiveSSH() *schema.Resource {
 				Required:    true,
 				Description: "The port number of the SSH instance to connect to.",
 			},
+			"password": {
+				Type:     schema.TypeString,
+				Optional: true,
+				Default:  "",
+			},
 			"key": {
 				Type:        schema.TypeString,
 				Optional:    true,
@@ -79,6 +85,7 @@ func resourceAdaptiveSSH() *schema.Resource {
 func schemaToSSHIntegrationConfiguration(d *schema.ResourceData) SSHIntegrationConfiguration {
 	return SSHIntegrationConfiguration{
 		Version:     "1.0",
+		Name:        d.Get("name").(string),
 		Username:    d.Get("username").(string),
 		UsePassword: d.Get("key").(string) == "",
 		Password:    d.Get("key").(string),
@@ -139,7 +146,7 @@ func resourceAdaptiveSSHUpdate(ctx context.Context, d *schema.ResourceData, m in
 func resourceAdaptiveSSHDelete(ctx context.Context, d *schema.ResourceData, m interface{}) diag.Diagnostics {
 	resourceID := d.Id()
 	client := m.(*adaptive.Client)
-	_, err := client.DeleteResource(resourceID)
+	_, err := client.DeleteResource(resourceID, d.Get("name").(string))
 	if err != nil {
 		return diag.FromErr(err)
 	}

@@ -25,8 +25,8 @@ import (
 )
 
 type MySQLIntegrationConfiguration struct {
-	Version string `yaml:"version"`
-	//Name         string `yaml:"name"`
+	Version      string `yaml:"version"`
+	Name         string `yaml:"name"`
 	Username     string `yaml:"username"`
 	Password     string `yaml:"password"`
 	DatabaseName string `yaml:"databaseName"`
@@ -87,6 +87,7 @@ func resourceAdaptiveMySQL() *schema.Resource {
 func schemaToMySQLIntegrationConfiguration(d *schema.ResourceData) MySQLIntegrationConfiguration {
 	return MySQLIntegrationConfiguration{
 		Version:      "",
+		Name:         d.Get("name").(string),
 		Username:     d.Get("username").(string),
 		Password:     d.Get("password").(string),
 		DatabaseName: d.Get("database_name").(string),
@@ -147,7 +148,7 @@ func resourceAdaptiveMySQLUpdate(ctx context.Context, d *schema.ResourceData, m 
 func resourceAdaptiveMySQLDelete(ctx context.Context, d *schema.ResourceData, m interface{}) diag.Diagnostics {
 	resourceID := d.Id()
 	client := m.(*adaptive.Client)
-	_, err := client.DeleteResource(resourceID)
+	_, err := client.DeleteResource(resourceID, d.Get("name").(string))
 	if err != nil {
 		return diag.FromErr(err)
 	}

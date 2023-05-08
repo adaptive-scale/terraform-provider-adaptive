@@ -53,3 +53,24 @@ type UpdateSessionRequest = CreateSessionRequest
 type UpdateSessionResponse struct {
 	ID string `json:"id"`
 }
+
+// Authorizations
+type CreateAuthorizationRequest struct {
+	AuthorizationName string `json:"name"`
+	Resource          string `json:"resource"`
+	Description       string `json:"description"`
+	Permissions       string `json:"permissions"`
+}
+
+type CreateAuthorizationResponse struct {
+	ID string `json:"id"`
+}
+
+type UpdateAuthorizationRequest struct {
+	AuthorizationName        string `json:"name"`
+	AuthorizationDescription string `json:"description"`
+}
+
+type UpdateAuthorizationResponse struct {
+	ID string `json:"id"`
+}

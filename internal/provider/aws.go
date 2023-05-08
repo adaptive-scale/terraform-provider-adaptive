@@ -22,6 +22,7 @@ import (
 )
 
 type AWSCLIIntegrationConfiguration struct {
+	Name               string `yaml:"name"`
 	Version            string `yaml:"version"`
 	AWSRegionName      string `yaml:"aws_region_name"`
 	AWSAccessKeyID     string `yaml:"aws_access_key_id"`
@@ -65,9 +66,10 @@ func resourceAdaptiveAWS() *schema.Resource {
 	}
 }
 
-func schemaToAWSCLIIntegrationConfiguration(d *schema.ResourceData) AWSCLIIntegrationConfiguration {
+func schemaToAWSIntegrationConfiguration(d *schema.ResourceData) AWSCLIIntegrationConfiguration {
 	return AWSCLIIntegrationConfiguration{
 		Version:            "1.0",
+		Name:               d.Get("name").(string),
 		AWSRegionName:      d.Get("region_name").(string),
 		AWSAccessKeyID:     d.Get("access_key_id").(string),
 		AWSSecretAccessKey: d.Get("secret_access_key").(string),
@@ -77,7 +79,7 @@ func schemaToAWSCLIIntegrationConfiguration(d *schema.ResourceData) AWSCLIIntegr
 func resourceAdaptiveAWSCreate(ctx context.Context, d *schema.ResourceData, m interface{}) diag.Diagnostics {
 	client := m.(*adaptive.Client)
 
-	obj := schemaToAWSCLIIntegrationConfiguration(d)
+	obj := schemaToAWSIntegrationConfiguration(d)
 	config, err := yaml.Marshal(obj)
 	if err != nil {
 		err := errors.New("provider error, could not marshal")
@@ -106,7 +108,7 @@ func resourceAdaptiveAWSUpdate(ctx context.Context, d *schema.ResourceData, m in
 	client := m.(*adaptive.Client)
 	resourceID := d.Id()
 
-	obj := schemaToAWSCLIIntegrationConfiguration(d)
+	obj := schemaToAWSIntegrationConfiguration(d)
 	config, err := yaml.Marshal(obj)
 	if err != nil {
 		err := errors.New("provider error, could not marshal")
@@ -125,7 +127,7 @@ func resourceAdaptiveAWSUpdate(ctx context.Context, d *schema.ResourceData, m in
 func resourceAdaptiveAWSDelete(ctx context.Context, d *schema.ResourceData, m interface{}) diag.Diagnostics {
 	resourceID := d.Id()
 	client := m.(*adaptive.Client)
-	_, err := client.DeleteResource(resourceID)
+	_, err := client.DeleteResource(resourceID, d.Get("name").(string))
 	if err != nil {
 		return diag.FromErr(err)
 	}

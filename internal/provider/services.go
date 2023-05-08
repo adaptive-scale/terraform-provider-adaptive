@@ -21,6 +21,7 @@ import (
 )
 
 type ServiceListIntegrationConfiguration struct {
+	Name    string `yaml:"name"`
 	Version string `yaml:"version"`
 	URLs    string `yaml:"urls"`
 }
@@ -55,6 +56,7 @@ func resourceAdaptiveServiceList() *schema.Resource {
 func schemaToServiceListIntegrationConfiguration(d *schema.ResourceData) ServiceListIntegrationConfiguration {
 	return ServiceListIntegrationConfiguration{
 		Version: "1",
+		Name:    d.Get("name").(string),
 		URLs:    d.Get("urls").(string),
 	}
 }
@@ -110,7 +112,7 @@ func resourceAdaptiveServiceListUpdate(ctx context.Context, d *schema.ResourceDa
 func resourceAdaptiveServiceListDelete(ctx context.Context, d *schema.ResourceData, m interface{}) diag.Diagnostics {
 	resourceID := d.Id()
 	client := m.(*adaptive.Client)
-	_, err := client.DeleteResource(resourceID)
+	_, err := client.DeleteResource(resourceID, d.Get("name").(string))
 	if err != nil {
 		return diag.FromErr(err)
 	}

@@ -8,9 +8,12 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io/ioutil"
+	"log"
+	"os"
+	"path"
 
 	client "github.com/adaptive-scale/terraform-provider-adaptive/internal/terraform-client"
-	"github.com/hashicorp/terraform-plugin-log/tflog"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/diag"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
 )
@@ -37,9 +40,9 @@ func New(version string) func() *schema.Provider {
 			Schema: map[string]*schema.Schema{
 				"service_token": {
 					Type:        schema.TypeString,
-					Required:    true,
-					Description: "Service account token for authenticating with the Adaptive service.",
-					DefaultFunc: schema.EnvDefaultFunc("ADAPTIVE_SVC_TOKEN", nil),
+					Optional:    true,
+					Description: "Service account token for authenticating with the Adaptive service. If not provided, provider will default to reading token from default adaptive-cli",
+					DefaultFunc: schema.EnvDefaultFunc("ADAPTIVE_SVC_TOKEN", ""),
 				},
 				"workspace_url": {
 					Type:        schema.TypeString,
@@ -47,23 +50,10 @@ func New(version string) func() *schema.Provider {
 					Description: "The workspace to use for the provider. If not set, the default workspace will be used app.adaptive.live",
 				},
 			},
-			// DataSourcesMap: map[string]*schema.Resource{
-			// 	"adaptive_data_source": dataSourceScaffolding(),
-			// },
 			ResourcesMap: map[string]*schema.Resource{
-				"adaptive_gcp":         resourceAdaptiveGCP(),
-				"adaptive_aws":         resourceAdaptiveAWS(),
-				"adaptive_azure":       resourceAdaptiveAzure(),
-				"adaptive_google":      resourceAdaptiveGoogle(),
-				"adaptive_okta":        resourceAdaptiveOkta(),
-				"adaptive_ssh":         resourceAdaptiveSSH(),
-				"adaptive_servicelist": resourceAdaptiveServiceList(),
-				"adaptive_mysql":       resourceAdaptiveMySQL(),
-				"adaptive_mongodb":     resourceAdaptiveMongo(),
-				"adaptive_postgres":    resourceAdaptivePostgres(),
-				"adaptive_cockroachdb": resourceAdaptiveCockroachDB(),
-				"adaptive_session":     resourceAdaptiveSession(),
-				"adaptive_users":       users(),
+				"adaptive_session":       resourceAdaptiveSession(),
+				"adaptive_resource":      resourceAdaptiveResource(),
+				"adaptive_authorization": resourceAdaptiveAuthorization(),
 			},
 			ConfigureContextFunc: providerConfigure,
 		}
@@ -92,14 +82,26 @@ func tryReadingServiceToken(potentialToken, workspaceURL string) (string, string
 func providerConfigure(ctx context.Context, d *schema.ResourceData) (interface{}, diag.Diagnostics) {
 	serviceToken := d.Get("service_token").(string)
 	workspaceURL := d.Get("workspace_url").(string)
+	if serviceToken == "" {
+		log.Println("empty token initilization. defaulting to adaptive-cli config folder")
+
+		defaultLocation := "~/.adaptive/token"
+		homeDir, err := os.UserHomeDir()
+		if err != nil {
+			return nil, diag.FromErr(fmt.Errorf("service_token not provided and failed to read token from default location (%s). reason: %w", defaultLocation, err))
+		}
+		serviceTokenJSON, err := ioutil.ReadFile(path.Join(homeDir, ".adaptive", "token"))
+		if err != nil {
+			return nil, diag.FromErr(fmt.Errorf("service_token not provided and failed to read token from default location (%s). reason: %w", defaultLocation, err))
+		}
+		// let tryReadingServiceToken parse the json
+		serviceToken = string(serviceTokenJSON)
+	}
 
 	svcToken, wsURL, err := tryReadingServiceToken(serviceToken, workspaceURL)
 	if err != nil {
 		return nil, diag.Errorf(fmt.Sprintf("bad service token: %s", err))
 	}
-	tflog.Trace(ctx, "Configuring HashiCups client")
-	tflog.Trace(ctx, fmt.Sprintf("Using workspace: %s and %s", wsURL, svcToken))
-	// Initialize the Adaptive API client with the provided service token.
 	c := client.NewClient(svcToken, wsURL)
 
 	return c, nil
