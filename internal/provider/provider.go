@@ -51,7 +51,7 @@ func New(version string) func() *schema.Provider {
 				},
 			},
 			ResourcesMap: map[string]*schema.Resource{
-				"adaptive_session":       resourceAdaptiveSession(),
+				"adaptive_endpoint":      resourceAdaptiveSession(),
 				"adaptive_resource":      resourceAdaptiveResource(),
 				"adaptive_authorization": resourceAdaptiveAuthorization(),
 			},
