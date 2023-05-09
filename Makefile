@@ -1,9 +1,9 @@
 TEST?=$$(go list ./... | grep -v 'vendor')
-HOSTNAME=adaptive.com
-NAMESPACE=edu
+HOSTNAME=adaptive-scale
+NAMESPACE=local
 NAME=adaptive
 BINARY=terraform-provider-${NAME}
-VERSION=0.2
+VERSION=0.0.4
 OS_ARCH=darwin_arm64
 
 default: install

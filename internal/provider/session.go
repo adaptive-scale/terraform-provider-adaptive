@@ -48,7 +48,7 @@ func resourceAdaptiveSession() *schema.Resource {
 				Required:    true,
 				Description: "The resource used to create the session.",
 			},
-			"session_type": {
+			"type": {
 				Type:        schema.TypeString,
 				Default:     SessionTypeDefault,
 				Optional:    true,
@@ -56,7 +56,8 @@ func resourceAdaptiveSession() *schema.Resource {
 			},
 			"ttl": {
 				Type:        schema.TypeString,
-				Required:    true,
+				Optional:    true,
+				Default:     "3h",
 				Description: "The port number of the Postgres instance to connect to.",
 			},
 			"authorization": {
@@ -93,7 +94,7 @@ func resourceAdaptiveSessionCreate(ctx context.Context, d *schema.ResourceData, 
 		d.Get("authorization").(string),
 		d.Get("cluster").(string),
 		d.Get("ttl").(string),
-		d.Get("session_type").(string),
+		d.Get("type").(string),
 	)
 	if err != nil {
 		return diag.FromErr(err)
@@ -113,8 +114,8 @@ func resourceAdaptiveSessionUpdate(ctx context.Context, d *schema.ResourceData, 
 	client := m.(*adaptive.Client)
 	sessionID := d.Id()
 
-	if d.HasChange("session_type") {
-		return diag.Errorf("Cannot change session_type after creation")
+	if d.HasChange("type") {
+		return diag.Errorf("Cannot change type after creation")
 	}
 	if d.HasChange("resource") {
 		return diag.Errorf("Cannot change resource after creation")
@@ -133,7 +134,7 @@ func resourceAdaptiveSessionUpdate(ctx context.Context, d *schema.ResourceData, 
 		d.Get("authorization").(string),
 		d.Get("cluster").(string),
 		d.Get("ttl").(string),
-		d.Get("session_type").(string),
+		d.Get("type").(string),
 	)
 	if err != nil {
 		return diag.FromErr(err)
