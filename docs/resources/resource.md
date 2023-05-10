@@ -1,8 +1,8 @@
 ---
-
 page_title: "adaptive_resource Resource - terraform-provider-adaptive"
 subcategory: ""
 description: |-
+  Provide settings for Adaptive Resources
 ---
 
 # adaptive_resource (Resource)
@@ -72,7 +72,7 @@ The following arguments are supported by each individual adaptive-resource:
   - `domain` - (Optional) A domain to restrict the Google OAuth integration to. Defaults to https://accounts.google.com.
   - `client_id` - (Required) The client ID for the Google OAuth integration.
   - `client_secret` - (Required) The client secret for the Google OAuth integration.
-- `mongo`
+- `mongodb`
   - `uri` - (Required) MongoDB Connection URI
 - `mysql`
   - `name` - (Required) The name of the MySQL database to create.

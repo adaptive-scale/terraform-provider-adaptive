@@ -1,8 +1,8 @@
 ---
-
 page_title: "adaptive_endpoint Resource - terraform-provider-adaptive"
 subcategory: ""
 description: |-
+  Settings for Adaptive Endpoints
 ---
 
 # adaptive_endpoint (Resource)
