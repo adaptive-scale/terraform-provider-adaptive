@@ -1,6 +1,6 @@
 # Terraform Provider for Adaptive
 
-![https://registry.terraform.io/providers/adaptive-scale/adaptive/latest/](<https://img.shields.io/badge/terraform-adaptive_scale-rgb(31%2C%2020%2C%20139)>)
+[![https://registry.terraform.io/providers/adaptive-scale/adaptive/latest/](<https://img.shields.io/badge/terraform-adaptive_scale-rgb(31%2C%2020%2C%20139)>)](https://registry.terraform.io/providers/adaptive-scale/adaptive/latest/)
 
 [Adaptive's terraform provider](https://registry.terraform.io/providers/adaptive-scale/adaptive/latest/) can used to configure and manage your resource on Adaptive.
 
