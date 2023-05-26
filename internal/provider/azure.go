@@ -9,14 +9,7 @@ resource "adaptive_azure" "azure1" {
 }
 */
 import (
-	"context"
-	"errors"
-	"time"
-
-	adaptive "github.com/adaptive-scale/terraform-provider-adaptive/internal/terraform-client"
-	"github.com/hashicorp/terraform-plugin-sdk/v2/diag"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
-	"gopkg.in/yaml.v2"
 )
 
 type AzureIntegrationConfiguration struct {
@@ -25,43 +18,6 @@ type AzureIntegrationConfiguration struct {
 	TenantID      string `yaml:"tenantID"`
 	ApplicationID string `yaml:"applicationID"`
 	ClientSecret  string `yaml:"clientSecret"`
-}
-
-func resourceAdaptiveAzure() *schema.Resource {
-	return &schema.Resource{
-		CreateContext: resourceAdaptiveAzureCreate,
-		ReadContext:   resourceAdaptiveAzureRead,
-		UpdateContext: resourceAdaptiveAzureUpdate,
-		DeleteContext: resourceAdaptiveAzureDelete,
-
-		Schema: map[string]*schema.Schema{
-			"name": {
-				Type:        schema.TypeString,
-				Required:    true,
-				Description: "The name of the Azure integration to create.",
-			},
-			"tenant_id": {
-				Type:        schema.TypeString,
-				Required:    true,
-				Description: "The Azure tenant ID.",
-			},
-			"application_id": {
-				Type:        schema.TypeString,
-				Required:    true,
-				Description: "The Azure application ID.",
-			},
-			"client_secret": {
-				Type:        schema.TypeString,
-				Required:    true,
-				Description: "The Azure client secret.",
-			},
-			"last_updated": {
-				Type:     schema.TypeString,
-				Optional: true,
-				Computed: true,
-			},
-		},
-	}
 }
 
 // schemaToAzureIntegrationConfiguration converts the Terraform schema to an
@@ -77,62 +33,99 @@ func schemaToAzureIntegrationConfiguration(d *schema.ResourceData) AzureIntegrat
 	}
 }
 
-func resourceAdaptiveAzureCreate(ctx context.Context, d *schema.ResourceData, m interface{}) diag.Diagnostics {
-	client := m.(*adaptive.Client)
+// func resourceAdaptiveAzure() *schema.Resource {
+// 	return &schema.Resource{
+// 		CreateContext: resourceAdaptiveAzureCreate,
+// 		ReadContext:   resourceAdaptiveAzureRead,
+// 		UpdateContext: resourceAdaptiveAzureUpdate,
+// 		DeleteContext: resourceAdaptiveAzureDelete,
 
-	obj := schemaToAzureIntegrationConfiguration(d)
-	config, err := yaml.Marshal(obj)
-	if err != nil {
-		err := errors.New("provider error, could not marshal")
-		return diag.FromErr(err)
-	}
+// 		Schema: map[string]*schema.Schema{
+// 			"name": {
+// 				Type:        schema.TypeString,
+// 				Required:    true,
+// 				Description: "The name of the Azure integration to create.",
+// 			},
+// 			"tenant_id": {
+// 				Type:        schema.TypeString,
+// 				Required:    true,
+// 				Description: "The Azure tenant ID.",
+// 			},
+// 			"application_id": {
+// 				Type:        schema.TypeString,
+// 				Required:    true,
+// 				Description: "The Azure application ID.",
+// 			},
+// 			"client_secret": {
+// 				Type:        schema.TypeString,
+// 				Required:    true,
+// 				Description: "The Azure client secret.",
+// 			},
+// 			"last_updated": {
+// 				Type:     schema.TypeString,
+// 				Optional: true,
+// 				Computed: true,
+// 			},
+// 		},
+// 	}
+// }
 
-	rName, err := nameFromSchema(d)
-	if err != nil {
-		return diag.FromErr(err)
-	}
-	resp, err := client.CreateResource(ctx, rName, "azure", config)
-	if err != nil {
-		return diag.FromErr(err)
-	}
+// func resourceAdaptiveAzureCreate(ctx context.Context, d *schema.ResourceData, m interface{}) diag.Diagnostics {
+// 	client := m.(*adaptive.Client)
 
-	d.SetId(resp.ID)
-	resourceAdaptiveAzureRead(ctx, d, m)
-	return nil
-}
+// 	obj := schemaToAzureIntegrationConfiguration(d)
+// 	config, err := yaml.Marshal(obj)
+// 	if err != nil {
+// 		err := errors.New("provider error, could not marshal")
+// 		return diag.FromErr(err)
+// 	}
 
-func resourceAdaptiveAzureRead(ctx context.Context, d *schema.ResourceData, m interface{}) diag.Diagnostics {
-	return nil
-}
+// 	rName, err := nameFromSchema(d)
+// 	if err != nil {
+// 		return diag.FromErr(err)
+// 	}
+// 	resp, err := client.CreateResource(ctx, rName, "azure", config)
+// 	if err != nil {
+// 		return diag.FromErr(err)
+// 	}
 
-func resourceAdaptiveAzureUpdate(ctx context.Context, d *schema.ResourceData, m interface{}) diag.Diagnostics {
-	client := m.(*adaptive.Client)
-	resourceID := d.Id()
+// 	d.SetId(resp.ID)
+// 	resourceAdaptiveAzureRead(ctx, d, m)
+// 	return nil
+// }
 
-	obj := schemaToAzureIntegrationConfiguration(d)
-	config, err := yaml.Marshal(obj)
-	if err != nil {
-		err := errors.New("provider error, could not marshal")
-		return diag.FromErr(err)
-	}
+// func resourceAdaptiveAzureRead(ctx context.Context, d *schema.ResourceData, m interface{}) diag.Diagnostics {
+// 	return nil
+// }
 
-	_, err = client.UpdateResource(resourceID, "azure", config)
-	if err != nil {
-		return diag.FromErr(err)
-	}
+// func resourceAdaptiveAzureUpdate(ctx context.Context, d *schema.ResourceData, m interface{}) diag.Diagnostics {
+// 	client := m.(*adaptive.Client)
+// 	resourceID := d.Id()
 
-	d.Set("last_updated", time.Now())
-	return resourceAdaptiveAzureRead(ctx, d, m)
-}
+// 	obj := schemaToAzureIntegrationConfiguration(d)
+// 	config, err := yaml.Marshal(obj)
+// 	if err != nil {
+// 		err := errors.New("provider error, could not marshal")
+// 		return diag.FromErr(err)
+// 	}
 
-func resourceAdaptiveAzureDelete(ctx context.Context, d *schema.ResourceData, m interface{}) diag.Diagnostics {
-	resourceID := d.Id()
-	client := m.(*adaptive.Client)
-	_, err := client.DeleteResource(resourceID, d.Get("name").(string))
-	if err != nil {
-		return diag.FromErr(err)
-	}
+// 	_, err = client.UpdateResource(resourceID, "azure", config)
+// 	if err != nil {
+// 		return diag.FromErr(err)
+// 	}
 
-	d.SetId("")
-	return nil
-}
+// 	d.Set("last_updated", time.Now())
+// 	return resourceAdaptiveAzureRead(ctx, d, m)
+// }
+
+// func resourceAdaptiveAzureDelete(ctx context.Context, d *schema.ResourceData, m interface{}) diag.Diagnostics {
+// 	resourceID := d.Id()
+// 	client := m.(*adaptive.Client)
+// 	_, err := client.DeleteResource(resourceID, d.Get("name").(string))
+// 	if err != nil {
+// 		return diag.FromErr(err)
+// 	}
+
+// 	d.SetId("")
+// 	return nil
+// }

@@ -3,6 +3,7 @@ package client
 type CreateResourceRequest struct {
 	IntegrationType string `json:"integrationType"`
 	Name            string `json:"name"`
+	SecretStoreName string `json:"secretStoreName"`
 	Configuration   string `json:"config"`
 }
 

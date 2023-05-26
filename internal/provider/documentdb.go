@@ -4,15 +4,15 @@ import (
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
 )
 
-type MongoIntegrationConfiguration struct {
+type DocumentDBIntegrationConfiguration struct {
 	Name          string `yaml:"name"`
 	URI           string `yaml:"uri"`
 	URISecretPath string `yaml:"uriSecretPath"`
 }
 
 // TODO: .(string) is assumption will cause problems
-func schemaToMongoIntegrationConfiguration(d *schema.ResourceData) MongoIntegrationConfiguration {
-	return MongoIntegrationConfiguration{
+func schemaToDocumentDBIntegrationConfiguration(d *schema.ResourceData) DocumentDBIntegrationConfiguration {
+	return DocumentDBIntegrationConfiguration{
 		Name:          d.Get("name").(string),
 		URI:           d.Get("uri").(string),
 		URISecretPath: d.Get("uri_secret_path").(string),

@@ -15,11 +15,13 @@ import (
 var (
 	validIntegrationTypes = []string{
 		"aws",
+		"awssecretmanager",
 		"azure",
 		"cockroachdb",
 		"gcp",
 		"google",
 		"mongodb",
+		"documentdb",
 		"mysql",
 		"okta",
 		"postgres",
@@ -64,6 +66,11 @@ func resourceAdaptiveResource() *schema.Resource {
 				Optional:    true,
 				Description: "Connection string to a resource. Used by MongoDB",
 			},
+			"uri_secret_path": {
+				Type:        schema.TypeString,
+				Optional:    true,
+				Description: "Connection string to a resource. Used by MongoDB",
+			},
 			"host": {
 				Type:        schema.TypeString,
 				Optional:    true,
@@ -82,7 +89,12 @@ func resourceAdaptiveResource() *schema.Resource {
 			"password": {
 				Type:        schema.TypeString,
 				Optional:    true,
-				Description: "Password for the adaptive integration authentication.Used by CockroachDB, Postgres, Mysql, SSH resources",
+				Description: "Password for the adaptive integration authentication. Used by CockroachDB, Postgres, Mysql, SSH resources",
+			},
+			"password_secret_path": {
+				Type:        schema.TypeString,
+				Optional:    true,
+				Description: "Password Secret path for the adaptive integration authentication. Used by CockroachDB, Postgres, Mysql, SSH resources",
 			},
 			"database_name": {
 				Type:        schema.TypeString,
@@ -94,11 +106,11 @@ func resourceAdaptiveResource() *schema.Resource {
 				Optional:    true,
 				Description: "The root certificate to use for the CockroachDB instance.",
 			},
-			// "ssl_mode": {
-			// 	Type:        schema.TypeString,
-			// 	Optional:    true,
-			// 	Description: "The SSL mode to use when connecting to the database. Used by CockroachDB, Postgres, Mysql resources",
-			// },
+			"root_cert_secret_path": {
+				Type:        schema.TypeString,
+				Optional:    true,
+				Description: "The root certificate to use for the CockroachDB instance.",
+			},
 			"api_server": {
 				Type:        schema.TypeString,
 				Optional:    true,
@@ -174,6 +186,11 @@ func resourceAdaptiveResource() *schema.Resource {
 				Optional:    true,
 				Description: "The SSH key to use when connecting to the instance. If not specified, password authentication will be used. Used by SSH resource",
 			},
+			"secret_store": {
+				Type:        schema.TypeString,
+				Optional:    true,
+				Description: "",
+			},
 		},
 	}
 }
@@ -181,6 +198,8 @@ func resourceAdaptiveResource() *schema.Resource {
 // Returns a YAML marshallable struct for the integration configuration
 func schemaToResourceIntegrationConfiguration(d *schema.ResourceData, intType string) (any, error) {
 	switch intType {
+	case "awssecretmanager":
+		return schemaToAWSIntegrationConfiguration(d), nil
 	case "aws":
 		return schemaToAWSIntegrationConfiguration(d), nil
 	case "azure":
@@ -193,6 +212,8 @@ func schemaToResourceIntegrationConfiguration(d *schema.ResourceData, intType st
 		return schemaToGoogleOAuthIntegrationConfiguration(d), nil
 	case "mongodb":
 		return schemaToMongoIntegrationConfiguration(d), nil
+	case "documentdb":
+		return schemaToDocumentDBIntegrationConfiguration(d), nil
 	case "mysql":
 		return schemaToMySQLIntegrationConfiguration(d), nil
 	case "okta":
@@ -228,14 +249,22 @@ func resourceAdaptiveResourceCreate(ctx context.Context, d *schema.ResourceData,
 		return diag.FromErr(fmt.Errorf("could not marshal resource configuration %w", err))
 	}
 
-	rName, err := nameFromSchema(d)
+	rName, err := attrFromSchema[string](d, "name", true)
 	if err != nil {
 		return diag.FromErr(err)
 	}
 	if iType == "services" {
 		iType = "servicelist"
 	}
-	resp, err := client.CreateResource(ctx, rName, iType, config)
+
+	// _name, ok := d.GetOk("secret_store", )
+	// return diag.FromErr(fmt.Errorf("%s and %v", _name, ok))
+	secretStoreName, err := attrFromSchema[string](d, "secret_store", false)
+	if err != nil {
+		return diag.FromErr(err)
+	}
+
+	resp, err := client.CreateResource(ctx, *rName, iType, *secretStoreName, config)
 	if err != nil {
 		return diag.FromErr(err)
 	}
@@ -252,6 +281,11 @@ func resourceAdaptiveResourceRead(ctx context.Context, d *schema.ResourceData, m
 func resourceAdaptiveResourceUpdate(ctx context.Context, d *schema.ResourceData, m interface{}) diag.Diagnostics {
 	client := m.(*adaptive.Client)
 	resourceID := d.Id()
+
+	// TODO: should
+	// if d.HasChange("secret_store") {
+	// 	return diag.Errorf("Cannot change type after creation")
+	// }
 
 	iType := d.Get("type").(string)
 	if !isValidIntegrationType(iType) {

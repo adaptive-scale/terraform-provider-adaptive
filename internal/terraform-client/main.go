@@ -422,10 +422,11 @@ func (c *Client) DeleteSession(sessionID string) (bool, error) {
 }
 
 // Resources / Integrations
-func (c *Client) CreateResource(ctx context.Context, name, rType string, yamlRConfig []byte) (*CreateResourceResponse, error) {
+func (c *Client) CreateResource(ctx context.Context, name, rType, secretStoreName string, yamlRConfig []byte) (*CreateResourceResponse, error) {
 	req := CreateResourceRequest{
 		IntegrationType: rType,
 		Name:            name,
+		SecretStoreName: secretStoreName,
 		Configuration:   string(yamlRConfig),
 	}
 
