@@ -8,15 +8,9 @@ resource "adaptive_gcp" "example" {
 */
 
 import (
-	"context"
-	"errors"
 	"strings"
-	"time"
 
-	adaptive "github.com/adaptive-scale/terraform-provider-adaptive/internal/terraform-client"
-	"github.com/hashicorp/terraform-plugin-sdk/v2/diag"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
-	"gopkg.in/yaml.v2"
 )
 
 type GCPIntegrationConfiguration struct {
@@ -24,37 +18,6 @@ type GCPIntegrationConfiguration struct {
 	Name      string `yaml:"name"`
 	ProjectID string `yaml:"project_id"`
 	KeyFile   string `yaml:"key_file"`
-}
-
-func resourceAdaptiveGCP() *schema.Resource {
-	return &schema.Resource{
-		CreateContext: resourceAdaptiveGCPCreate,
-		ReadContext:   resourceAdaptiveGCPRead,
-		UpdateContext: resourceAdaptiveGCPUpdate,
-		DeleteContext: resourceAdaptiveGCPDelete,
-		Schema: map[string]*schema.Schema{
-			"name": {
-				Type:        schema.TypeString,
-				Required:    true,
-				Description: "The name of the GCP instance to create.",
-			},
-			"project_id": {
-				Type:        schema.TypeString,
-				Required:    true,
-				Description: "The GCP project ID.",
-			},
-			"key_file": {
-				Type:        schema.TypeString,
-				Required:    true,
-				Description: "The path to the GCP service account key file.",
-			},
-			"last_updated": {
-				Type:     schema.TypeString,
-				Optional: true,
-				Computed: true,
-			},
-		},
-	}
 }
 
 func schemaToGCPIntegrationConfiguration(d *schema.ResourceData) GCPIntegrationConfiguration {
@@ -66,62 +29,93 @@ func schemaToGCPIntegrationConfiguration(d *schema.ResourceData) GCPIntegrationC
 	}
 }
 
-func resourceAdaptiveGCPCreate(ctx context.Context, d *schema.ResourceData, m interface{}) diag.Diagnostics {
-	client := m.(*adaptive.Client)
+// func resourceAdaptiveGCP() *schema.Resource {
+// 	return &schema.Resource{
+// 		CreateContext: resourceAdaptiveGCPCreate,
+// 		ReadContext:   resourceAdaptiveGCPRead,
+// 		UpdateContext: resourceAdaptiveGCPUpdate,
+// 		DeleteContext: resourceAdaptiveGCPDelete,
+// 		Schema: map[string]*schema.Schema{
+// 			"name": {
+// 				Type:        schema.TypeString,
+// 				Required:    true,
+// 				Description: "The name of the GCP instance to create.",
+// 			},
+// 			"project_id": {
+// 				Type:        schema.TypeString,
+// 				Required:    true,
+// 				Description: "The GCP project ID.",
+// 			},
+// 			"key_file": {
+// 				Type:        schema.TypeString,
+// 				Required:    true,
+// 				Description: "The path to the GCP service account key file.",
+// 			},
+// 			"last_updated": {
+// 				Type:     schema.TypeString,
+// 				Optional: true,
+// 				Computed: true,
+// 			},
+// 		},
+// 	}
+// }
 
-	obj := schemaToGCPIntegrationConfiguration(d)
-	config, err := yaml.Marshal(obj)
-	if err != nil {
-		err := errors.New("provider error, could not marshal")
-		return diag.FromErr(err)
-	}
+// func resourceAdaptiveGCPCreate(ctx context.Context, d *schema.ResourceData, m interface{}) diag.Diagnostics {
+// 	client := m.(*adaptive.Client)
 
-	rName, err := nameFromSchema(d)
-	if err != nil {
-		return diag.FromErr(err)
-	}
-	resp, err := client.CreateResource(ctx, rName, "gcp", config)
-	if err != nil {
-		return diag.FromErr(err)
-	}
+// 	obj := schemaToGCPIntegrationConfiguration(d)
+// 	config, err := yaml.Marshal(obj)
+// 	if err != nil {
+// 		err := errors.New("provider error, could not marshal")
+// 		return diag.FromErr(err)
+// 	}
 
-	d.SetId(resp.ID)
-	resourceAdaptiveGCPRead(ctx, d, m)
-	return nil
-}
+// 	rName, err := nameFromSchema(d)
+// 	if err != nil {
+// 		return diag.FromErr(err)
+// 	}
+// 	resp, err := client.CreateResource(ctx, rName, "gcp", config)
+// 	if err != nil {
+// 		return diag.FromErr(err)
+// 	}
 
-func resourceAdaptiveGCPRead(ctx context.Context, d *schema.ResourceData, m interface{}) diag.Diagnostics {
-	return nil
-}
+// 	d.SetId(resp.ID)
+// 	resourceAdaptiveGCPRead(ctx, d, m)
+// 	return nil
+// }
 
-func resourceAdaptiveGCPUpdate(ctx context.Context, d *schema.ResourceData, m interface{}) diag.Diagnostics {
-	client := m.(*adaptive.Client)
-	resourceID := d.Id()
+// func resourceAdaptiveGCPRead(ctx context.Context, d *schema.ResourceData, m interface{}) diag.Diagnostics {
+// 	return nil
+// }
 
-	obj := schemaToGCPIntegrationConfiguration(d)
-	config, err := yaml.Marshal(obj)
-	if err != nil {
-		err := errors.New("provider error, could not marshal")
-		return diag.FromErr(err)
-	}
+// func resourceAdaptiveGCPUpdate(ctx context.Context, d *schema.ResourceData, m interface{}) diag.Diagnostics {
+// 	client := m.(*adaptive.Client)
+// 	resourceID := d.Id()
 
-	_, err = client.UpdateResource(resourceID, "gcp", config)
-	if err != nil {
-		return diag.FromErr(err)
-	}
+// 	obj := schemaToGCPIntegrationConfiguration(d)
+// 	config, err := yaml.Marshal(obj)
+// 	if err != nil {
+// 		err := errors.New("provider error, could not marshal")
+// 		return diag.FromErr(err)
+// 	}
 
-	d.Set("last_updated", time.Now())
-	return resourceAdaptiveGCPRead(ctx, d, m)
-}
+// 	_, err = client.UpdateResource(resourceID, "gcp", config)
+// 	if err != nil {
+// 		return diag.FromErr(err)
+// 	}
 
-func resourceAdaptiveGCPDelete(ctx context.Context, d *schema.ResourceData, m interface{}) diag.Diagnostics {
-	resourceID := d.Id()
-	client := m.(*adaptive.Client)
-	_, err := client.DeleteResource(resourceID, d.Get("name").(string))
-	if err != nil {
-		return diag.FromErr(err)
-	}
+// 	d.Set("last_updated", time.Now())
+// 	return resourceAdaptiveGCPRead(ctx, d, m)
+// }
 
-	d.SetId("")
-	return nil
-}
+// func resourceAdaptiveGCPDelete(ctx context.Context, d *schema.ResourceData, m interface{}) diag.Diagnostics {
+// 	resourceID := d.Id()
+// 	client := m.(*adaptive.Client)
+// 	_, err := client.DeleteResource(resourceID, d.Get("name").(string))
+// 	if err != nil {
+// 		return diag.FromErr(err)
+// 	}
+
+// 	d.SetId("")
+// 	return nil
+// }
