@@ -9,7 +9,6 @@ resource "adaptive_postgres" "example" {
   port          = "5433"
   username      = "myuser"
   password      = "mypasswor2"
-  ssl_mode      = "require"
   database_name = ""
 }
 
