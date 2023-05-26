@@ -10,7 +10,6 @@ Example resource usage:
 		port          = "5433"
 		username      = "myuser"
 		password      = "mypasswor2"
-		ssl_mode      = "require"
 		database_name = ""
 		root_cert	 =  ""
 	}
@@ -108,8 +107,8 @@ func schemaToCockroachDBIntegrationConfiguration(d *schema.ResourceData) Cockroa
 		DatabaseName: d.Get("database_name").(string),
 		HostName:     d.Get("host").(string),
 		Port:         d.Get("port").(string),
-		SSLMode:      d.Get("ssl_mode").(string),
-		RootCert:     strings.TrimSpace(d.Get("root_cert").(string)),
+		// SSLMode:      d.Get("ssl_mode").(string),
+		RootCert: strings.TrimSpace(d.Get("root_cert").(string)),
 	}
 }
 
