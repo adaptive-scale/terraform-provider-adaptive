@@ -26,6 +26,7 @@ var (
 		"services",
 		"ssh",
 		"kubernetes",
+		"awsdocumentdb",
 	}
 )
 
@@ -205,6 +206,8 @@ func schemaToResourceIntegrationConfiguration(d *schema.ResourceData, intType st
 		return schemaToSSHIntegrationConfiguration(d), nil
 	case "kubernetes":
 		return schemaToKubernetesIntegrationConfiguration(d), nil
+	case "awsdocumentdb":
+		return schemaToAWSDocumentDBIntegrationConfiguration(d), nil
 	default:
 		return nil, fmt.Errorf("invalid adaptive resource type %s", intType)
 	}
