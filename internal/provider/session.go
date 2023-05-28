@@ -71,6 +71,15 @@ func resourceAdaptiveSession() *schema.Resource {
 				Optional:    true,
 				Description: "The cluster in which this session should be created. If not provided will be set to default cluster set in workspace settings	of user's workspace",
 			},
+			"users": {
+				Type:     schema.TypeList,
+				Computed: true,
+				Optional: true,
+				Elem: &schema.Schema{
+					Type: schema.TypeString,
+				},
+				Description: "The list of users associated with the adaptive endpoint.",
+			},
 			"last_updated": {
 				Type:     schema.TypeString,
 				Optional: true,
@@ -87,6 +96,13 @@ func resourceAdaptiveSessionCreate(ctx context.Context, d *schema.ResourceData, 
 	if err != nil {
 		return diag.FromErr(err)
 	}
+
+	users := d.Get("users").([]interface{})
+	userEmails := make([]string, len(users))
+	for i, u := range users {
+		userEmails[i] = u.(string)
+	}
+
 	resp, err := client.CreateSession(
 		ctx,
 		sName,
@@ -95,6 +111,7 @@ func resourceAdaptiveSessionCreate(ctx context.Context, d *schema.ResourceData, 
 		d.Get("cluster").(string),
 		d.Get("ttl").(string),
 		d.Get("type").(string),
+		userEmails,
 	)
 	if err != nil {
 		return diag.FromErr(err)
@@ -127,6 +144,12 @@ func resourceAdaptiveSessionUpdate(ctx context.Context, d *schema.ResourceData, 
 		return diag.Errorf("Cannot change cluster after creation")
 	}
 
+	users := d.Get("users").([]interface{})
+	userEmails := make([]string, len(users))
+	for i, u := range users {
+		userEmails[i] = u.(string)
+	}
+
 	resp, err := client.UpdateSession(
 		sessionID,
 		d.Get("name").(string),
@@ -135,6 +158,7 @@ func resourceAdaptiveSessionUpdate(ctx context.Context, d *schema.ResourceData, 
 		d.Get("cluster").(string),
 		d.Get("ttl").(string),
 		d.Get("type").(string),
+		userEmails,
 	)
 	if err != nil {
 		return diag.FromErr(err)
