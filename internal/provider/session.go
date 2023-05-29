@@ -2,6 +2,7 @@ package provider
 
 import (
 	"context"
+	"fmt"
 
 	adaptive "github.com/adaptive-scale/terraform-provider-adaptive/internal/terraform-client"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/diag"
@@ -78,7 +79,7 @@ func resourceAdaptiveSession() *schema.Resource {
 				Elem: &schema.Schema{
 					Type: schema.TypeString,
 				},
-				Description: "The list of users associated with the adaptive endpoint.",
+				Description: "The list of users associated with the adaptive endpoint",
 			},
 			"last_updated": {
 				Type:     schema.TypeString,
@@ -100,7 +101,14 @@ func resourceAdaptiveSessionCreate(ctx context.Context, d *schema.ResourceData, 
 	users := d.Get("users").([]interface{})
 	userEmails := make([]string, len(users))
 	for i, u := range users {
-		userEmails[i] = u.(string)
+		if val, ok := u.(string); !ok {
+			return diag.FromErr(fmt.Errorf("email must be a string"))
+		} else {
+			if len(val) == 0 {
+				return diag.FromErr(fmt.Errorf("email cannot be empty"))
+			}
+			userEmails[i] = val
+		}
 	}
 
 	resp, err := client.CreateSession(
@@ -146,8 +154,23 @@ func resourceAdaptiveSessionUpdate(ctx context.Context, d *schema.ResourceData, 
 
 	users := d.Get("users").([]interface{})
 	userEmails := make([]string, len(users))
+	if len(users) == 0 {
+		var diags diag.Diagnostics
+		diags = append(diags, diag.Diagnostic{
+			Severity: diag.Error,
+			Summary:  "No endpoint users provided",
+			Detail:   "Since no endpoint users were provided, the creator of the session will be the only user.",
+		})
+	}
 	for i, u := range users {
-		userEmails[i] = u.(string)
+		if val, ok := u.(string); !ok {
+			return diag.FromErr(fmt.Errorf("email must be a string"))
+		} else {
+			if len(val) == 0 {
+				return diag.FromErr(fmt.Errorf("email cannot be empty"))
+			}
+			userEmails[i] = val
+		}
 	}
 
 	resp, err := client.UpdateSession(
