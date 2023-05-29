@@ -24,7 +24,7 @@ resource "adaptive_resource" "postgres_test" {
 
 resource "adaptive_endpoint" "session" {
   name         = "session"
-  session_type = "direct"
+  type = "direct"
   ttl          = "3h"
   resource = adaptive_resource.postgres_test.name
 }
