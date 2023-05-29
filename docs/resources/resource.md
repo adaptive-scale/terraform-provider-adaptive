@@ -88,6 +88,14 @@ The following arguments are supported by each individual adaptive-resource:
   - `domain` - (Required) The Okta domain to use for authentication.
   - `client_id` - (Required) The client ID of the Okta OAuth application.
   - `client_secret` - (Required) The client secret of the Okta OAuth application.
+- `redshift`
+  - `name` - (Required) The name of the Redshift database to create.
+  - `host` - (Required) The hostname of the Redshift instance to connect to.
+  - `port` - (Required) The port number of the Redshift instance to connect to.
+  - `username` - (Required) The username to authenticate with the Redshift instance.
+  - `password` - (Required) The password to authenticate with the Redshift instance.
+  <!-- - `ssl_mode` - (Required) The SSL mode to use when connecting to the Postgres instance. -->
+  - `database_name` - (Optional) The name of the Postgres database to create. If not specified, the default database will be used.
 - `postgres`
   - `name` - (Required) The name of the Postgres database to create.
   - `host` - (Required) The hostname of the Postgres instance to connect to.
@@ -103,6 +111,10 @@ The following arguments are supported by each individual adaptive-resource:
   - `port` - (Required) The port number of the SSH instance to connect to.
   - `password` - (Optional) The password to use when connecting to the SSH instance. If not specified, the default value is an empty string.
   - `key` - (Optional) The SSH key to use when connecting to the instance. If not specified, password authentication will be used.
+- `zerotier`
+  - `name` - (Required) The name of the SSH instance to create.
+  - `network_id` (Required) - The 16 character id of the Zerotier network you want to connect to
+  - `api_token` (Required) - The API Access Token from Zerotier > Account
 
 ### Read-Only
 
