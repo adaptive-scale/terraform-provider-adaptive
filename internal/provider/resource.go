@@ -29,6 +29,7 @@ var (
 		"awsdocumentdb",
 		"awsredshift",
 		"zerotier",
+		"mongodb_atlas",
 	}
 )
 
