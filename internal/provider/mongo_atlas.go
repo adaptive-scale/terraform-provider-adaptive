@@ -97,7 +97,7 @@ func resourceAdaptiveMongoAtlasUpdate(ctx context.Context, d *schema.ResourceDat
 		return diag.FromErr(err)
 	}
 
-	_, err = client.UpdateResource(resourceID, "mongodb", config)
+	_, err = client.UpdateResource(resourceID, "mongodb_atlas", config)
 	if err != nil {
 		return diag.FromErr(err)
 	}
