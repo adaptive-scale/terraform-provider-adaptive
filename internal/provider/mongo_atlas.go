@@ -55,6 +55,7 @@ func schemaToMongoAtlasIntegrationConfiguration(d *schema.ResourceData) MongoAtl
 		OrganisationID: d.Get("organization_id").(string),
 		PublicKey:      d.Get("public_key").(string),
 		PrivateKey:     d.Get("private_key").(string),
+		ProjectID:      d.Get("project_id").(string),
 	}
 }
 
