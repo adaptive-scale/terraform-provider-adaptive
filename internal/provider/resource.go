@@ -230,7 +230,7 @@ func schemaToResourceIntegrationConfiguration(d *schema.ResourceData, intType st
 		return schemaToAWSDocumentDBIntegrationConfiguration(d), nil
 	case "zerotier":
 		return schemaToZeroTierIntegrationConfiguration(d), nil
-	case "mongo_atlas":
+	case "mongodb_atlas":
 		return schemaToMongoAtlasIntegrationConfiguration(d), nil
 	default:
 		return nil, fmt.Errorf("invalid adaptive resource type %s", intType)

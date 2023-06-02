@@ -55,6 +55,7 @@ func schemaToMongoAtlasIntegrationConfiguration(d *schema.ResourceData) MongoAtl
 		OrganisationID: d.Get("organization_id").(string),
 		PublicKey:      d.Get("public_key").(string),
 		PrivateKey:     d.Get("private_key").(string),
+		ProjectID:      d.Get("project_id").(string),
 	}
 }
 
@@ -97,7 +98,7 @@ func resourceAdaptiveMongoAtlasUpdate(ctx context.Context, d *schema.ResourceDat
 		return diag.FromErr(err)
 	}
 
-	_, err = client.UpdateResource(resourceID, "mongodb", config)
+	_, err = client.UpdateResource(resourceID, "mongodb_atlas", config)
 	if err != nil {
 		return diag.FromErr(err)
 	}
