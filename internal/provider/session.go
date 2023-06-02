@@ -94,6 +94,26 @@ func isValidSessionType(t string) bool {
 	return t == SessionTypeDirect || t == SessionTypeClient
 }
 
+func getSessionType(t string) (string, bool) {
+	if t == "" {
+		return "cli", true
+	}
+
+	if isValidSessionType(t) {
+		switch t {
+		case SessionTypeDirect:
+			return "cli", true
+		case SessionTypeClient:
+			return "client", true
+		default:
+			return "", false
+		}
+	}
+
+	return "", false
+
+}
+
 func resourceAdaptiveSessionCreate(ctx context.Context, d *schema.ResourceData, m interface{}) diag.Diagnostics {
 	client := m.(*adaptive.Client)
 
@@ -115,10 +135,12 @@ func resourceAdaptiveSessionCreate(ctx context.Context, d *schema.ResourceData, 
 		}
 	}
 
-	seshType := d.Get("type").(string)
-	if !isValidSessionType(seshType) {
-		return diag.Errorf("Invalid session type: %s", seshType)
+	sType := d.Get("type").(string)
+	validSessionType, valid := getSessionType(sType)
+	if !valid {
+		return diag.Errorf("Invalid session type: %s", sType)
 	}
+
 	resp, err := client.CreateSession(
 		ctx,
 		sName,
@@ -126,7 +148,7 @@ func resourceAdaptiveSessionCreate(ctx context.Context, d *schema.ResourceData, 
 		d.Get("authorization").(string),
 		d.Get("cluster").(string),
 		d.Get("ttl").(string),
-		seshType,
+		validSessionType,
 		userEmails,
 	)
 	if err != nil {
