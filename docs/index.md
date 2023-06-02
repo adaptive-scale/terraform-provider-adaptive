@@ -81,11 +81,14 @@ Current list of supported adaptive resources:
 - [gcp](https://docs.adaptive.live/integrations/gcp)
 - [google](https://docs.adaptive.live/integrations/google)
 - [mongo](https://docs.adaptive.live/integrations/mongo)
+- [aws documentdb](https://docs.adaptive.live/integrations/documentdb)
 - [mysql](https://docs.adaptive.live/integrations/mysql)
 - [okta](https://docs.adaptive.live/integrations/okta)
+- [aws redshift](https://docs.adaptive.live/integrations/redshift)
 - [postgres](https://docs.adaptive.live/integrations/postgres)
 - [services](https://docs.adaptive.live/integrations/services)
 - [ssh](https://docs.adaptive.live/integrations/ssh)
+- [zerotier](https://docs.adaptive.live/integrations/zerotier)
 
 ## Schema
 

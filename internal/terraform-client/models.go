@@ -31,6 +31,8 @@ type CreateSessionRequest struct {
 	AuthorizationName string `json:"authorizationName"`
 	SessionTTL        string `json:"sessionTTL"`
 	SessionType       string `json:"sessionType"`
+	// List of user emails to add to the endpoint
+	SessionUsers []string `json:"sessionUsers"`
 }
 
 type CreateSessionResponse struct {

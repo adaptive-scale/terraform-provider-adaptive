@@ -2,6 +2,7 @@ package provider
 
 import (
 	"context"
+	"fmt"
 
 	adaptive "github.com/adaptive-scale/terraform-provider-adaptive/internal/terraform-client"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/diag"
@@ -71,6 +72,15 @@ func resourceAdaptiveSession() *schema.Resource {
 				Optional:    true,
 				Description: "The cluster in which this session should be created. If not provided will be set to default cluster set in workspace settings	of user's workspace",
 			},
+			"users": {
+				Type:     schema.TypeList,
+				Computed: true,
+				Optional: true,
+				Elem: &schema.Schema{
+					Type: schema.TypeString,
+				},
+				Description: "The list of users associated with the adaptive endpoint",
+			},
 			"last_updated": {
 				Type:     schema.TypeString,
 				Optional: true,
@@ -91,6 +101,20 @@ func resourceAdaptiveSessionCreate(ctx context.Context, d *schema.ResourceData, 
 	if err != nil {
 		return diag.FromErr(err)
 	}
+
+	users := d.Get("users").([]interface{})
+	userEmails := make([]string, len(users))
+	for i, u := range users {
+		if val, ok := u.(string); !ok {
+			return diag.FromErr(fmt.Errorf("email must be a string"))
+		} else {
+			if len(val) == 0 {
+				return diag.FromErr(fmt.Errorf("email cannot be empty"))
+			}
+			userEmails[i] = val
+		}
+	}
+
 	seshType := d.Get("type").(string)
 	if !isValidSessionType(seshType) {
 		return diag.Errorf("Invalid session type: %s", seshType)
@@ -103,6 +127,7 @@ func resourceAdaptiveSessionCreate(ctx context.Context, d *schema.ResourceData, 
 		d.Get("cluster").(string),
 		d.Get("ttl").(string),
 		seshType,
+		userEmails,
 	)
 	if err != nil {
 		return diag.FromErr(err)
@@ -135,11 +160,32 @@ func resourceAdaptiveSessionUpdate(ctx context.Context, d *schema.ResourceData, 
 		return diag.Errorf("Cannot change cluster after creation")
 	}
 
+	users := d.Get("users").([]interface{})
+	userEmails := make([]string, len(users))
+	if len(users) == 0 {
+		var diags diag.Diagnostics
+		diags = append(diags, diag.Diagnostic{
+			Severity: diag.Error,
+			Summary:  "No endpoint users provided",
+			Detail:   "Since no endpoint users were provided, the creator of the session will be the only user.",
+		})
+	}
+	for i, u := range users {
+		if val, ok := u.(string); !ok {
+			return diag.FromErr(fmt.Errorf("email must be a string"))
+		} else {
+			if len(val) == 0 {
+				return diag.FromErr(fmt.Errorf("email cannot be empty"))
+			}
+			userEmails[i] = val
+		}
+
+	}
+
 	seshType := d.Get("type").(string)
 	if !isValidSessionType(seshType) {
 		return diag.Errorf("Invalid session type: %s", seshType)
 	}
-
 	resp, err := client.UpdateSession(
 		sessionID,
 		d.Get("name").(string),
@@ -148,6 +194,7 @@ func resourceAdaptiveSessionUpdate(ctx context.Context, d *schema.ResourceData, 
 		d.Get("cluster").(string),
 		d.Get("ttl").(string),
 		seshType,
+		userEmails,
 	)
 	if err != nil {
 		return diag.FromErr(err)
