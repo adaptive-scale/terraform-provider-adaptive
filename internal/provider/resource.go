@@ -178,6 +178,21 @@ func resourceAdaptiveResource() *schema.Resource {
 				Optional:    true,
 				Description: "The SSH key to use when connecting to the instance. If not specified, password authentication will be used. Used by SSH resource",
 			},
+			"private_key": {
+				Type:        schema.TypeString,
+				Optional:    true,
+				Description: "",
+			},
+			"public_key": {
+				Type:        schema.TypeString,
+				Optional:    true,
+				Description: "",
+			},
+			"organization_id": {
+				Type:        schema.TypeString,
+				Optional:    true,
+				Description: "",
+			},
 		},
 	}
 }
@@ -215,6 +230,8 @@ func schemaToResourceIntegrationConfiguration(d *schema.ResourceData, intType st
 		return schemaToAWSDocumentDBIntegrationConfiguration(d), nil
 	case "zerotier":
 		return schemaToZeroTierIntegrationConfiguration(d), nil
+	case "mongo_atlas":
+		return schemaToMongoAtlasIntegrationConfiguration(d), nil
 	default:
 		return nil, fmt.Errorf("invalid adaptive resource type %s", intType)
 	}
