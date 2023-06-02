@@ -25,8 +25,8 @@ const (
 )
 
 const (
-	SessionTypeDefault = "cli"
-	SessionTypeCLI     = "cli"
+	SessionTypeDefault = "direct"
+	SessionTypeDirect  = "direct"
 	SessionTypeClient  = "client"
 	// TODO: Support scripts too?
 )
@@ -90,6 +90,10 @@ func resourceAdaptiveSession() *schema.Resource {
 	}
 }
 
+func isValidSessionType(t string) bool {
+	return t == SessionTypeDirect || t == SessionTypeClient
+}
+
 func resourceAdaptiveSessionCreate(ctx context.Context, d *schema.ResourceData, m interface{}) diag.Diagnostics {
 	client := m.(*adaptive.Client)
 
@@ -111,6 +115,10 @@ func resourceAdaptiveSessionCreate(ctx context.Context, d *schema.ResourceData, 
 		}
 	}
 
+	seshType := d.Get("type").(string)
+	if !isValidSessionType(seshType) {
+		return diag.Errorf("Invalid session type: %s", seshType)
+	}
 	resp, err := client.CreateSession(
 		ctx,
 		sName,
@@ -118,7 +126,7 @@ func resourceAdaptiveSessionCreate(ctx context.Context, d *schema.ResourceData, 
 		d.Get("authorization").(string),
 		d.Get("cluster").(string),
 		d.Get("ttl").(string),
-		d.Get("type").(string),
+		seshType,
 		userEmails,
 	)
 	if err != nil {
@@ -171,8 +179,13 @@ func resourceAdaptiveSessionUpdate(ctx context.Context, d *schema.ResourceData, 
 			}
 			userEmails[i] = val
 		}
+
 	}
 
+	seshType := d.Get("type").(string)
+	if !isValidSessionType(seshType) {
+		return diag.Errorf("Invalid session type: %s", seshType)
+	}
 	resp, err := client.UpdateSession(
 		sessionID,
 		d.Get("name").(string),
@@ -180,7 +193,7 @@ func resourceAdaptiveSessionUpdate(ctx context.Context, d *schema.ResourceData, 
 		d.Get("authorization").(string),
 		d.Get("cluster").(string),
 		d.Get("ttl").(string),
-		d.Get("type").(string),
+		seshType,
 		userEmails,
 	)
 	if err != nil {

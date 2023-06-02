@@ -24,7 +24,7 @@ resource "adaptive_resource" "postgres_test" {
 
 resource "adaptive_endpoint" "session" {
   name         = "session"
-  session_type = "cli"
+  type = "direct"
   ttl          = "3h"
   resource = adaptive_resource.postgres_test.name
   users = ["qa@adaptive.live", "sales@adaptive.live"]
@@ -37,7 +37,7 @@ The following arguments are supported by each individual adaptive-endpoints:
 
 - `name` - (Required) The name of this endpoint.
 - `resource` - (Required) The adaptive resource used to create the endpoint.
-- `type` - (Optional) The type of endpoint to create. Defaults to "cli".
+- `type` - (Optional) The type of endpoint to create. Defaults to "direct".
 - `ttl` - (Required) Duration for which endpoint will remain active.
 - `authorization` - (Optional) Name of authorization to assign to the created endpoint. Currently authorizations are only supported by Postgres and Kubernetes resources.
 - `cluster` - (Optional) Name of adaptive-resource cluster in which this endpoint should be created. If not provided, default cluster set in workspace settings of the user's workspace would be used.
