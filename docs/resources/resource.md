@@ -60,7 +60,7 @@ The following arguments are supported by each individual adaptive-resource:
   - `port` - (Required) The port number of the CockroachDB instance to connect to.
   - `username` - (Required) The username to authenticate with the CockroachDB instance.
   - `password` - (Required) The password to authenticate with the CockroachDB instance.
-  - `ssl_mode` - (Optional) The SSL mode to use when connecting to the CockroachDB instance. Defaults to "verify-full".
+  <!-- - `ssl_mode` - (Optional) The SSL mode to use when connecting to the CockroachDB instance. Defaults to "verify-full". -->
   - `database_name` - (Optional) The name of the CockroachDB database to create. If not specified, the default database will be used.
   - `root_cert` - (Optional) The root certificate to use for the CockroachDB instance.
 - `gcp_instance`
@@ -92,7 +92,7 @@ The following arguments are supported by each individual adaptive-resource:
   - `port` - (Required) The port number of the Postgres instance to connect to.
   - `username` - (Required) The username to authenticate with the Postgres instance.
   - `password` - (Required) The password to authenticate with the Postgres instance.
-  - `ssl_mode` - (Required) The SSL mode to use when connecting to the Postgres instance.
+  <!-- - `ssl_mode` - (Required) The SSL mode to use when connecting to the Postgres instance. -->
   - `database_name` - (Optional) The name of the Postgres database to create. If not specified, the default database will be used.
 - `ssh`
   - `name` - (Required) The name of the SSH instance to create.
