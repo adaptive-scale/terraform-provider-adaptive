@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"log"
 	"net/http"
 	"strings"
@@ -256,11 +257,11 @@ func (c *Client) CreateSession(ctx context.Context, sessionName, resourceName, a
 	if _response.StatusCode == 409 {
 		return nil, fmt.Errorf("duplicate session with name %s", sessionName)
 	}
+
 	if _response.StatusCode != 200 {
-		var errReason string
-		err := json.NewDecoder(_response.Body).Decode(&errReason)
+		errReason, err := io.ReadAll(_response.Body)
 		if err != nil {
-			log.Printf("decode error: %s", err)
+			return nil, fmt.Errorf("error decoding response %s", err)
 		}
 		return nil, fmt.Errorf("error creating session %s, reason %s", req.SessionName, errReason)
 	}

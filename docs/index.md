@@ -28,10 +28,7 @@ terraform {
   }
 }
 
-
-provider "adaptive" {
-  service_token = "<service_token>"
-}
+provider "adaptive" {}
 ```
 
 ## Configuration
@@ -40,36 +37,14 @@ To configure the provider for use, you must add [Service Token](https://docs.ada
 
 Now you can you that token like so:
 
-1. Export to environment variable
-
-   ```bash
-   # set env vars
-   $ export ADAPTIVE_SVC_TOKEN="<service_token>"
-   $ terraform init
-   ```
-
-2. Plain text secret
-
-   ```bash
-   provider "adaptive" {
-     service_token = "<service_token>"
-   }
-   ```
-
-3. if you want to use adaptive-cli token instead:
-
    ```bash
    # this will store the token in ~/.adaptive/token
    $ adaptive login
    ```
 
    ```hcl
-   provider "adaptive" {
-     service_token = file("~/.adaptive/token")
-   }
+   provider "adaptive" {}
    ```
-
-   You can also login with by leaving the field empty, in such case the provider will default to reading service-token from ~/.adaptive/token
 
 ## Features
 
@@ -81,6 +56,7 @@ Current list of supported adaptive resources:
 - [gcp](https://docs.adaptive.live/integrations/gcp)
 - [google](https://docs.adaptive.live/integrations/google)
 - [mongo](https://docs.adaptive.live/integrations/mongo)
+- [mongodb atlas](https://docs.adaptive.live/integrations/mongodb_atlas)
 - [aws documentdb](https://docs.adaptive.live/integrations/documentdb)
 - [mysql](https://docs.adaptive.live/integrations/mysql)
 - [okta](https://docs.adaptive.live/integrations/okta)
@@ -92,5 +68,4 @@ Current list of supported adaptive resources:
 
 ## Schema
 
-- `service_token` (String) Service account token for authenticating with the Adaptive service. If not provided, provider will default to reading token from adaptive-cli token.
 - `workspace_url` (String) The workspace to use for the provider. If not set, the default workspace will be used app.adaptive.live
