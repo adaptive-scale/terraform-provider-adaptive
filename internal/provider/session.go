@@ -27,8 +27,8 @@ const (
 const (
 	SessionTypeDefault = "direct"
 	SessionTypeDirect  = "direct"
+	SessionTypeScript  = "script"
 	SessionTypeClient  = "client"
-	// TODO: Support scripts too?
 )
 
 func resourceAdaptiveSession() *schema.Resource {
@@ -91,7 +91,7 @@ func resourceAdaptiveSession() *schema.Resource {
 }
 
 func isValidSessionType(t string) bool {
-	return t == SessionTypeDirect || t == SessionTypeClient
+	return t == SessionTypeDirect || t == SessionTypeClient || t == SessionTypeScript
 }
 
 func resourceAdaptiveSessionCreate(ctx context.Context, d *schema.ResourceData, m interface{}) diag.Diagnostics {

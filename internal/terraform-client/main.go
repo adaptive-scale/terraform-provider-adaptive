@@ -41,6 +41,10 @@ func (c *Client) authorizationAPI() string {
 	return fmt.Sprintf("%s/terraform/authorization", c.workspaceURL)
 }
 
+func (c *Client) scriptAPI() string {
+	return fmt.Sprintf("%s/terraform/script", c.workspaceURL)
+}
+
 func (c *Client) resourceAPI() string {
 	return fmt.Sprintf("%s/terraform/resource", c.workspaceURL)
 }
@@ -505,6 +509,90 @@ func (c *Client) DeleteResource(resourceID, resourceName string) (bool, error) {
 		var errReason string
 		_ = json.NewDecoder(_response.Body).Decode(&errReason)
 		msg := fmt.Sprintf("error deleting resource %s", resourceName)
+		if len(errReason) > 0 {
+			msg += fmt.Sprintf(". reason %s", errReason)
+		}
+		return false, errors.New(msg)
+	}
+	return true, nil
+}
+
+func (c *Client) CreateScript(ctx context.Context, name, command, endpoint string) (*CreateResourceResponse, error) {
+	payloadBuf := bytes.NewBuffer([]byte{})
+	if err := json.NewEncoder(payloadBuf).Encode(map[string]interface{}{
+		"Name":     name,
+		"Command":  command,
+		"Endpoint": endpoint,
+	}); err != nil {
+		err = fmt.Errorf("failed to json encode request body. err %w", err)
+		return nil, err
+	}
+
+	request, err := http.NewRequest("POST", fmt.Sprintf("%s/create", c.scriptAPI()), payloadBuf)
+	if err != nil {
+		return nil, err
+	}
+
+	response, err := c.do(request)
+	if err != nil {
+		return nil, err
+	}
+	if response.StatusCode == 409 {
+		return nil, fmt.Errorf("duplicate script with name %s", name)
+	}
+	if response.StatusCode != 200 {
+		return nil, fmt.Errorf("error creating script %s", name)
+	}
+	var resp CreateResourceResponse
+	if err := json.NewDecoder(response.Body).Decode(&resp); err != nil {
+		return nil, fmt.Errorf("failed to decode response body. err %w", err)
+	}
+	return &resp, nil
+}
+
+func (c *Client) UpdateScript(ctx context.Context, id, name, command, endpoint *string) (any, error) {
+	payloadBuf := bytes.NewBuffer([]byte{})
+	if err := json.NewEncoder(payloadBuf).Encode(map[string]interface{}{
+		"Name":     name,
+		"Command":  command,
+		"Endpoint": endpoint,
+	}); err != nil {
+		err = fmt.Errorf("failed to json encode request body. err %w", err)
+		return nil, err
+	}
+
+	request, err := http.NewRequest("POST", fmt.Sprintf("%s/update/%s", c.scriptAPI(), *id), payloadBuf)
+	if err != nil {
+		return nil, err
+	}
+
+	response, err := c.do(request)
+	if err != nil {
+		return nil, err
+	}
+	if response.StatusCode == 409 {
+		return nil, fmt.Errorf("duplicate script with name %s", *name)
+	}
+	if response.StatusCode != 200 {
+		return nil, fmt.Errorf("error updating script %s", *name)
+	}
+	return nil, nil
+}
+
+func (c *Client) DeleteScript(ctx context.Context, id, name string) (bool, error) {
+	request, err := http.NewRequest("POST", fmt.Sprintf("%s/delete/%s", c.scriptAPI(), id), nil)
+	if err != nil {
+		return false, err
+	}
+
+	_response, err := c.do(request)
+	if err != nil {
+		return false, err
+	}
+	if _response.StatusCode != 200 {
+		var errReason string
+		_ = json.NewDecoder(_response.Body).Decode(&errReason)
+		msg := fmt.Sprintf("error deleting script %s", name)
 		if len(errReason) > 0 {
 			msg += fmt.Sprintf(". reason %s", errReason)
 		}
