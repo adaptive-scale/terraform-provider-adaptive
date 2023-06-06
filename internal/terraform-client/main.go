@@ -37,6 +37,10 @@ func NewClient(serviceToken, workspaceURL string) *Client {
 	}
 }
 
+func (c *Client) teamAPI() string {
+	return fmt.Sprintf("%s/terraform/team", c.workspaceURL)
+}
+
 func (c *Client) authorizationAPI() string {
 	return fmt.Sprintf("%s/terraform/authorization", c.workspaceURL)
 }
@@ -503,6 +507,105 @@ func (c *Client) DeleteResource(resourceID, resourceName string) (bool, error) {
 		var errReason string
 		_ = json.NewDecoder(_response.Body).Decode(&errReason)
 		msg := fmt.Sprintf("error deleting resource %s", resourceName)
+		if len(errReason) > 0 {
+			msg += fmt.Sprintf(". reason %s", errReason)
+		}
+		return false, errors.New(msg)
+	}
+	return true, nil
+}
+
+func (c *Client) CreateTeam(ctx context.Context, name *string, members *[]string) (*CreateResourceResponse, error) {
+	payloadBuf := bytes.NewBuffer([]byte{})
+	if err := json.NewEncoder(payloadBuf).Encode(map[string]interface{}{
+		"Name":    name,
+		"Members": members,
+	}); err != nil {
+		err = fmt.Errorf("failed to json encode request body. err %w", err)
+		return nil, err
+	}
+
+	request, err := http.NewRequest("POST", fmt.Sprintf("%s/create", c.teamAPI()), payloadBuf)
+	if err != nil {
+		return nil, err
+	}
+
+	response, err := c.do(request)
+	if err != nil {
+		return nil, err
+	}
+	if response.StatusCode == 409 {
+		return nil, fmt.Errorf("duplicate team with name %s", *name)
+	}
+	if response.StatusCode != 200 {
+		return nil, fmt.Errorf("error creating team %s", *name)
+	}
+	var resp CreateResourceResponse
+	if err := json.NewDecoder(response.Body).Decode(&resp); err != nil {
+		return nil, fmt.Errorf("failed to decode response body. err %w", err)
+	}
+	return &resp, nil
+}
+
+func (c *Client) GetTeam(ctx context.Context, id string) (*CreateResourceResponse, error) {
+	request, err := http.NewRequest("GET", fmt.Sprintf("%s/%s", c.teamAPI(), id), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	response, err := c.do(request)
+	if err != nil {
+		return nil, err
+	}
+	if response.StatusCode != 200 {
+		return nil, fmt.Errorf("error getting team %s", id)
+	}
+
+	var resp CreateResourceResponse
+	if err := json.NewDecoder(response.Body).Decode(&resp); err != nil {
+		return nil, fmt.Errorf("failed to decode response body. err %w", err)
+	}
+	return &resp, nil
+}
+
+func (c *Client) UpdateTeam(ctx context.Context, id *string, members *[]string) (any, error) {
+	payloadBuf := bytes.NewBuffer([]byte{})
+	if err := json.NewEncoder(payloadBuf).Encode(map[string]interface{}{
+		"Members": members,
+	}); err != nil {
+		err = fmt.Errorf("failed to json encode request body. err %w", err)
+		return nil, err
+	}
+
+	request, err := http.NewRequest("POST", fmt.Sprintf("%s/update/%s", c.teamAPI(), *id), payloadBuf)
+	if err != nil {
+		return nil, err
+	}
+
+	response, err := c.do(request)
+	if err != nil {
+		return nil, err
+	}
+	if response.StatusCode != 200 {
+		return nil, fmt.Errorf("error updating team with id %s", *id)
+	}
+	return nil, nil
+}
+
+func (c *Client) DeleteTeam(ctx context.Context, id string) (bool, error) {
+	request, err := http.NewRequest("POST", fmt.Sprintf("%s/delete/%s", c.teamAPI(), id), nil)
+	if err != nil {
+		return false, err
+	}
+
+	response, err := c.do(request)
+	if err != nil {
+		return false, err
+	}
+	if response.StatusCode != 200 {
+		var errReason string
+		_ = json.NewDecoder(response.Body).Decode(&errReason)
+		msg := fmt.Sprintf("error deleting team with id %s", id)
 		if len(errReason) > 0 {
 			msg += fmt.Sprintf(". reason %s", errReason)
 		}
