@@ -541,7 +541,11 @@ func (c *Client) CreateTeam(ctx context.Context, name *string, members *[]string
 		return nil, fmt.Errorf("duplicate team with name %s", *name)
 	}
 	if response.StatusCode != 200 {
-		return nil, fmt.Errorf("error creating team %s", *name)
+		decodedMsg, err := decodeError(response)
+		if err != nil {
+			return nil, fmt.Errorf("error creating team %s", *name)
+		}
+		return nil, errors.New(decodedMsg)
 	}
 	var resp CreateResourceResponse
 	if err := json.NewDecoder(response.Body).Decode(&resp); err != nil {
@@ -571,9 +575,10 @@ func (c *Client) GetTeam(ctx context.Context, id string) (*CreateResourceRespons
 	return &resp, nil
 }
 
-func (c *Client) UpdateTeam(ctx context.Context, id *string, members *[]string) (any, error) {
+func (c *Client) UpdateTeam(ctx context.Context, id, name *string, members *[]string) (any, error) {
 	payloadBuf := bytes.NewBuffer([]byte{})
 	if err := json.NewEncoder(payloadBuf).Encode(map[string]interface{}{
+		"Name":    name,
 		"Members": members,
 	}); err != nil {
 		err = fmt.Errorf("failed to json encode request body. err %w", err)
@@ -590,7 +595,11 @@ func (c *Client) UpdateTeam(ctx context.Context, id *string, members *[]string) 
 		return nil, err
 	}
 	if response.StatusCode != 200 {
-		return nil, fmt.Errorf("error updating team with id %s", *id)
+		decodedMsg, err := decodeError(response)
+		if err != nil {
+			return nil, fmt.Errorf("error updating team %s", *name)
+		}
+		return nil, errors.New(decodedMsg)
 	}
 	return nil, nil
 }
@@ -615,4 +624,14 @@ func (c *Client) DeleteTeam(ctx context.Context, id string) (bool, error) {
 		return false, errors.New(msg)
 	}
 	return true, nil
+}
+
+func decodeError(response *http.Response) (reason string, decodeErr error) {
+	var errReason ErrorResponse
+	if err := json.NewDecoder(response.Body).Decode(&errReason); err != nil {
+		return "", fmt.Errorf("failed to decode response body. err %w", err)
+	} else {
+		reason = errReason.Error
+		return
+	}
 }

@@ -76,3 +76,12 @@ type UpdateAuthorizationRequest struct {
 type UpdateAuthorizationResponse struct {
 	ID string `json:"id"`
 }
+
+type ErrorResponse struct {
+	Error string
+	Msg   string `json:",omitempty"`
+}
+
+type DefaultResponse struct {
+	Status string
+}
