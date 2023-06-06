@@ -115,7 +115,7 @@ func resourceAdaptiveTeamDelete(ctx context.Context, d *schema.ResourceData, m i
 	client := m.(*adaptive.Client)
 	teamID := d.Id()
 
-	if _, err := client.DeleteTeam(ctx, teamID); err != nil {
+	if _, err := client.DeleteTeam(ctx, teamID, d.Get("name").(string)); err != nil {
 		return diag.FromErr(err)
 	}
 

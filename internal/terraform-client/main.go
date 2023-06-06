@@ -604,7 +604,7 @@ func (c *Client) UpdateTeam(ctx context.Context, id, name *string, members *[]st
 	return nil, nil
 }
 
-func (c *Client) DeleteTeam(ctx context.Context, id string) (bool, error) {
+func (c *Client) DeleteTeam(ctx context.Context, id, name string) (bool, error) {
 	request, err := http.NewRequest("POST", fmt.Sprintf("%s/delete/%s", c.teamAPI(), id), nil)
 	if err != nil {
 		return false, err
@@ -615,13 +615,11 @@ func (c *Client) DeleteTeam(ctx context.Context, id string) (bool, error) {
 		return false, err
 	}
 	if response.StatusCode != 200 {
-		var errReason string
-		_ = json.NewDecoder(response.Body).Decode(&errReason)
-		msg := fmt.Sprintf("error deleting team with id %s", id)
-		if len(errReason) > 0 {
-			msg += fmt.Sprintf(". reason %s", errReason)
+		decodedMsg, err := decodeError(response)
+		if err != nil {
+			return false, fmt.Errorf("error deleting team %s", name)
 		}
-		return false, errors.New(msg)
+		return false, errors.New(decodedMsg)
 	}
 	return true, nil
 }
