@@ -26,6 +26,10 @@ var (
 		"services",
 		"ssh",
 		"kubernetes",
+		"awsdocumentdb",
+		"awsredshift",
+		"zerotier",
+		"mongodb_atlas",
 	}
 )
 
@@ -174,6 +178,21 @@ func resourceAdaptiveResource() *schema.Resource {
 				Optional:    true,
 				Description: "The SSH key to use when connecting to the instance. If not specified, password authentication will be used. Used by SSH resource",
 			},
+			"private_key": {
+				Type:        schema.TypeString,
+				Optional:    true,
+				Description: "",
+			},
+			"public_key": {
+				Type:        schema.TypeString,
+				Optional:    true,
+				Description: "",
+			},
+			"organization_id": {
+				Type:        schema.TypeString,
+				Optional:    true,
+				Description: "",
+			},
 		},
 	}
 }
@@ -183,6 +202,8 @@ func schemaToResourceIntegrationConfiguration(d *schema.ResourceData, intType st
 	switch intType {
 	case "aws":
 		return schemaToAWSIntegrationConfiguration(d), nil
+	case "awsredshift":
+		return schemaToAWSRedshiftIntegrationConfiguration(d), nil
 	case "azure":
 		return schemaToAzureIntegrationConfiguration(d), nil
 	case "cockroachdb":
@@ -205,6 +226,12 @@ func schemaToResourceIntegrationConfiguration(d *schema.ResourceData, intType st
 		return schemaToSSHIntegrationConfiguration(d), nil
 	case "kubernetes":
 		return schemaToKubernetesIntegrationConfiguration(d), nil
+	case "awsdocumentdb":
+		return schemaToAWSDocumentDBIntegrationConfiguration(d), nil
+	case "zerotier":
+		return schemaToZeroTierIntegrationConfiguration(d), nil
+	case "mongodb_atlas":
+		return schemaToMongoAtlasIntegrationConfiguration(d), nil
 	default:
 		return nil, fmt.Errorf("invalid adaptive resource type %s", intType)
 	}

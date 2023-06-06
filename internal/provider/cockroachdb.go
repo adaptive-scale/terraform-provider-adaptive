@@ -10,7 +10,6 @@ Example resource usage:
 		port          = "5433"
 		username      = "myuser"
 		password      = "mypasswor2"
-		ssl_mode      = "require"
 		database_name = ""
 		root_cert	 =  ""
 	}
