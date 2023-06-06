@@ -56,6 +56,7 @@ func New(version string) func() *schema.Provider {
 				"adaptive_resource":      resourceAdaptiveResource(),
 				"adaptive_authorization": resourceAdaptiveAuthorization(),
 				"adaptive_team":          resourceAdaptiveTeam(),
+				"adaptive_script":        resourceAdaptiveScript(),
 			},
 			ConfigureContextFunc: providerConfigure,
 		}
