@@ -47,6 +47,7 @@ func New(version string) func() *schema.Provider {
 				"workspace_url": {
 					Type:        schema.TypeString,
 					Optional:    true,
+					DefaultFunc: schema.EnvDefaultFunc("ADAPTIVE_WS_URL", "https://app.adaptive.live"),
 					Description: "The workspace to use for the provider. If not set, the default workspace will be used app.adaptive.live",
 					DefaultFunc: schema.EnvDefaultFunc("ADAPTIVE_URL", "https://app.adaptive.live"),
 				},
@@ -55,6 +56,7 @@ func New(version string) func() *schema.Provider {
 				"adaptive_endpoint":      resourceAdaptiveSession(),
 				"adaptive_resource":      resourceAdaptiveResource(),
 				"adaptive_authorization": resourceAdaptiveAuthorization(),
+				"adaptive_team":          resourceAdaptiveTeam(),
 				"adaptive_script":        resourceAdaptiveScript(),
 			},
 			ConfigureContextFunc: providerConfigure,
