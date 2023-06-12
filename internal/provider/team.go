@@ -20,7 +20,7 @@ func resourceAdaptiveTeam() *schema.Resource {
 			"name": {
 				Type:        schema.TypeString,
 				Required:    true,
-				Description: "",
+				Description: "Name of the group. Must be unique.",
 			},
 			"members": {
 				Type: schema.TypeList,
@@ -28,7 +28,15 @@ func resourceAdaptiveTeam() *schema.Resource {
 					Type: schema.TypeString,
 				},
 				Optional:    true,
-				Description: "List of emails to add to the team. They should be  . If empty, the team will be created without members. ",
+				Description: "List of emails to add to the team. If empty, the group will be created without members. ",
+			},
+			"endpoints": {
+				Type: schema.TypeList,
+				Elem: &schema.Schema{
+					Type: schema.TypeString,
+				},
+				Optional:    true,
+				Description: "List of names of endpoints to add to this group. If empty, the group will be created without endpoints.",
 			},
 		},
 	}
@@ -55,7 +63,20 @@ func resourceAdaptiveTeamCreate(ctx context.Context, d *schema.ResourceData, m i
 		}
 	}
 
-	resp, err := client.CreateTeam(ctx, name, &members)
+	_endpoints := d.Get("endpoints").([]interface{})
+	endpoints := make([]string, len(_endpoints))
+	for i, u := range _endpoints {
+		if val, ok := u.(string); !ok {
+			return diag.FromErr(fmt.Errorf("endpoint name must be a string"))
+		} else {
+			if len(val) == 0 {
+				return diag.FromErr(fmt.Errorf("endpoint name cannot be empty"))
+			}
+			endpoints[i] = val
+		}
+	}
+
+	resp, err := client.CreateTeam(ctx, name, &members, &endpoints)
 	if err != nil {
 		return diag.FromErr(err)
 	}
@@ -104,7 +125,20 @@ func resourceAdaptiveTeamUpdate(ctx context.Context, d *schema.ResourceData, m i
 		}
 	}
 
-	if _, err := client.UpdateTeam(ctx, &teamID, name, &members); err != nil {
+	_endpoints := d.Get("endpoints").([]interface{})
+	endpoints := make([]string, len(_endpoints))
+	for i, u := range _endpoints {
+		if val, ok := u.(string); !ok {
+			return diag.FromErr(fmt.Errorf("endpoint name must be a string"))
+		} else {
+			if len(val) == 0 {
+				return diag.FromErr(fmt.Errorf("endpoint name cannot be empty"))
+			}
+			endpoints[i] = val
+		}
+	}
+
+	if _, err := client.UpdateTeam(ctx, &teamID, name, &members, &endpoints); err != nil {
 		return diag.FromErr(err)
 	}
 
