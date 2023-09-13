@@ -52,7 +52,9 @@ func resourceAdaptiveResource() *schema.Resource {
 		ReadContext:   resourceAdaptiveResourceRead,
 		UpdateContext: resourceAdaptiveResourceUpdate,
 		DeleteContext: resourceAdaptiveResourceDelete,
-
+		Timeouts: &schema.ResourceTimeout{
+			Create: schema.DefaultTimeout(10 * time.Minute),
+		},
 		Schema: map[string]*schema.Schema{
 			"type": {
 				Type:        schema.TypeString,
