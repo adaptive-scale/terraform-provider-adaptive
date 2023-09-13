@@ -307,10 +307,10 @@ func _readSession(c *Client, sessionID string) (map[string]interface{}, error) {
 waitForStatus: if true, will wait for session to be active/fail before returning
 */
 func (c *Client) ReadSession(sessionID string, waitForStatus bool) (map[string]interface{}, error) {
-	timeout := time.Second * 3
-	retryForStatus := 2
+	timeout := time.Second * 5
+	retryForStatus := 5
 	if waitForStatus {
-		retryForStatus = 10
+		retryForStatus = 15
 	}
 
 	resp, err := Do(
