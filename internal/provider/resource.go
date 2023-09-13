@@ -54,6 +54,8 @@ func resourceAdaptiveResource() *schema.Resource {
 		DeleteContext: resourceAdaptiveResourceDelete,
 		Timeouts: &schema.ResourceTimeout{
 			Create: schema.DefaultTimeout(10 * time.Minute),
+			Update: schema.DefaultTimeout(10 * time.Minute),
+			Delete: schema.DefaultTimeout(10 * time.Minute),
 		},
 		Schema: map[string]*schema.Schema{
 			"type": {
