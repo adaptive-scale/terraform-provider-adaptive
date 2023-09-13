@@ -92,8 +92,8 @@ func _readAuthorization(c *Client, authID string) (map[string]interface{}, error
 }
 
 func (c *Client) ReadAuthorization(authID string, waitForStatus bool) (any, error) {
-	timeout := time.Second * 5
-	retryForStatus := 2
+	timeout := time.Second * 10
+	retryForStatus := 20
 	if waitForStatus {
 		retryForStatus = 20
 	}
@@ -307,10 +307,10 @@ func _readSession(c *Client, sessionID string) (map[string]interface{}, error) {
 waitForStatus: if true, will wait for session to be active/fail before returning
 */
 func (c *Client) ReadSession(sessionID string, waitForStatus bool) (map[string]interface{}, error) {
-	timeout := time.Second * 5
-	retryForStatus := 5
+	timeout := time.Second * 10
+	retryForStatus := 20
 	if waitForStatus {
-		retryForStatus = 15
+		retryForStatus = 30
 	}
 
 	resp, err := Do(
@@ -396,7 +396,7 @@ func (c *Client) DeleteSession(sessionID string) (bool, error) {
 		return false, fmt.Errorf("error deleting session %s", sessionID)
 	}
 	// Once delete request is succesful, we check for status of session
-	timeout := time.Second * 5
+	timeout := time.Second * 10
 	retryForStatus := 20
 
 	resp, err := Do(

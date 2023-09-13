@@ -29,6 +29,7 @@ var (
 		"awsdocumentdb",
 		"awsredshift",
 		"zerotier",
+		"rdp_windows",
 		"mongodb_atlas",
 	}
 )
@@ -69,6 +70,11 @@ func resourceAdaptiveResource() *schema.Resource {
 				Description: "Connection string to a resource. Used by MongoDB",
 			},
 			"host": {
+				Type:        schema.TypeString,
+				Optional:    true,
+				Description: "Hostname of the adaptive resource. Used by CockroachDB, Postgres, Mysql, SSH resources",
+			},
+			"hostname": {
 				Type:        schema.TypeString,
 				Optional:    true,
 				Description: "Hostname of the adaptive resource. Used by CockroachDB, Postgres, Mysql, SSH resources",
@@ -232,10 +238,11 @@ func schemaToResourceIntegrationConfiguration(d *schema.ResourceData, intType st
 		return schemaToZeroTierIntegrationConfiguration(d), nil
 	case "mongodb_atlas":
 		return schemaToMongoAtlasIntegrationConfiguration(d), nil
+	case "rdp_windows":
+		return schemaToRDPWindowsIntegrationConfiguration(d), nil
 	default:
 		return nil, fmt.Errorf("invalid adaptive resource type %s", intType)
 	}
-
 }
 
 func resourceAdaptiveResourceCreate(ctx context.Context, d *schema.ResourceData, m interface{}) diag.Diagnostics {
