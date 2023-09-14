@@ -7,8 +7,8 @@ import (
 )
 
 const (
-	DefaultFunctionMaxRetry   = 5
-	DefaultFunctionMaxTimeout = time.Duration(time.Minute * 1)
+	DefaultFunctionMaxRetry   = 10
+	DefaultFunctionMaxTimeout = time.Duration(time.Minute * 5)
 )
 
 var (

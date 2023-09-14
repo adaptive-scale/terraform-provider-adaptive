@@ -161,6 +161,21 @@ func resourceAdaptiveSessionCreate(ctx context.Context, d *schema.ResourceData, 
 	}
 
 	d.SetId(resp.ID)
+
+	// stateConf := &resource.StateChangeConf{
+	// 	Pending:    []string{"creating", "backing-up", "modifying"},
+	// 	Target:     []string{"available"},
+	// 	Refresh:    resourceAwsRDSClusterStateRefreshFunc(d, meta),
+	// 	Timeout:    120 * time.Minute,
+	// 	MinTimeout: 3 * time.Second,
+	// }
+
+	// // Wait, catching any errors
+	// _, err := stateConf.WaitForState()
+	// if err != nil {
+	// 	return fmt.Errorf("[WARN] Error waiting for RDS Cluster state to be \"available\": %s", err)
+	// }
+
 	resourceAdaptiveSessionRead(ctx, d, m)
 	return nil
 }
