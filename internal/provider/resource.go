@@ -224,12 +224,18 @@ func schemaToResourceIntegrationConfiguration(d *schema.ResourceData, intType st
 		return schemaToGoogleOAuthIntegrationConfiguration(d), nil
 	case "mongodb":
 		return schemaToMongoIntegrationConfiguration(d), nil
+	case "mongodb_aws_secrets_manager":
+		return schemaToMongoAWSIntegrationConfiguration(d), nil
 	case "mysql":
 		return schemaToMySQLIntegrationConfiguration(d), nil
+	case "mysql_aws_secrets_manager":
+		return schemaToMySQLAWSIntegrationConfiguration(d), nil
 	case "okta":
 		return schemaToOktaIntegrationConfiguration(d), nil
 	case "postgres":
 		return schemaToPostgresIntegrationConfiguration(d), nil
+	case "postgres_aws_secrets_manager":
+		return schemaToPostgresAWSIntegrationConfiguration(d), nil
 	case "services":
 		return schemaToServiceListIntegrationConfiguration(d), nil
 	case "ssh":
