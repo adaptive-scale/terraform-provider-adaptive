@@ -50,21 +50,25 @@ Now you can you that token like so:
 
 Current list of supported adaptive resources:
 
-- [aws](https://docs.adaptive.live/integrations/aws)
-- [azure](https://docs.adaptive.live/integrations/azure)
-- [cockroachdb](https://docs.adaptive.live/integrations/cockroachdb)
-- [gcp](https://docs.adaptive.live/integrations/gcp)
-- [google](https://docs.adaptive.live/integrations/google)
-- [mongo](https://docs.adaptive.live/integrations/mongo)
-- [mongodb atlas](https://docs.adaptive.live/integrations/mongodb_atlas)
-- [aws documentdb](https://docs.adaptive.live/integrations/documentdb)
-- [mysql](https://docs.adaptive.live/integrations/mysql)
-- [okta](https://docs.adaptive.live/integrations/okta)
-- [aws redshift](https://docs.adaptive.live/integrations/redshift)
-- [postgres](https://docs.adaptive.live/integrations/postgres)
-- [services](https://docs.adaptive.live/integrations/services)
-- [ssh](https://docs.adaptive.live/integrations/ssh)
-- [zerotier](https://docs.adaptive.live/integrations/zerotier)
+- [aws](https://github.com/adaptive-scale/adaptive-terraform-examples/tree/master/aws)
+- [azure](https://github.com/adaptive-scale/adaptive-terraform-examples/tree/master/azure)
+- [cockroachdb](https://github.com/adaptive-scale/adaptive-terraform-examples/tree/master/cockroachdb)
+- [gcp](https://github.com/adaptive-scale/adaptive-terraform-examples/tree/mastergcp)
+- [google](https://github.com/adaptive-scale/adaptive-terraform-examples/tree/master/google)
+- [mongo](https://github.com/adaptive-scale/adaptive-terraform-examples/tree/master/mongo)
+- [mongodb atlas](https://github.com/adaptive-scale/adaptive-terraform-examples/tree/master/mongodb_atlas)
+- [aws documentdb](https://github.com/adaptive-scale/adaptive-terraform-examples/tree/master/documentdb)
+- [mysql](https://github.com/adaptive-scale/adaptive-terraform-examples/tree/master/mysql)
+- [okta](https://github.com/adaptive-scale/adaptive-terraform-examples/tree/master/okta)
+- [aws redshift](https://github.com/adaptive-scale/adaptive-terraform-examples/tree/master/redshift)
+- [postgres](https://github.com/adaptive-scale/adaptive-terraform-examples/tree/master/postgres)
+- [services](https://github.com/adaptive-scale/adaptive-terraform-examples/tree/master/services)
+- [ssh](https://github.com/adaptive-scale/adaptive-terraform-examples/tree/master/ssh)
+- [zerotier](https://github.com/adaptive-scale/adaptive-terraform-examples/tree/master/zerotier)
+- [mysql_aws_secrets_manager](https://github.com/adaptive-scale/adaptive-terraform-examples/tree/master/mysql_aws_secrets_manager)
+- [postgres_aws_secrets_manager](https://github.com/adaptive-scale/adaptive-terraform-examples/tree/master/postgres_aws_secrets_manager)
+- [mongodb_aws_secrets_manager](https://github.com/adaptive-scale/adaptive-terraform-examples/tree/master/mongodb_aws_secrets_manager)
+
 
 ## Schema
 
