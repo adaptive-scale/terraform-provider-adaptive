@@ -203,6 +203,21 @@ func resourceAdaptiveResource() *schema.Resource {
 				Optional:    true,
 				Description: "",
 			},
+			"arn": {
+				Type:        schema.TypeString,
+				Optional:    true,
+				Description: "The ARN of the AWS IAM role to assume to access AWS Secrets Manager secret",
+			},
+			"region": {
+				Type:        schema.TypeString,
+				Optional:    true,
+				Description: "The AWS region of the AWS Secrets Manager secret",
+			},
+			"secret_id": {
+				Type:        schema.TypeString,
+				Optional:    true,
+				Description: "The AWS Secrets Manager secret ID",
+			},
 		},
 	}
 }
