@@ -34,6 +34,7 @@ var (
 		"zerotier",
 		"rdp_windows",
 		"mongodb_atlas",
+		"awssecretsmanager",
 	}
 )
 
@@ -268,6 +269,8 @@ func schemaToResourceIntegrationConfiguration(d *schema.ResourceData, intType st
 		return schemaToMongoAtlasIntegrationConfiguration(d), nil
 	case "rdp_windows":
 		return schemaToRDPWindowsIntegrationConfiguration(d), nil
+	case "awssecretsmanager":
+		return schemaToAWSSecretsManagerConfiguration(d), nil
 	default:
 		return nil, fmt.Errorf("invalid adaptive resource type %s", intType)
 	}
