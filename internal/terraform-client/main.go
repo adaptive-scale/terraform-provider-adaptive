@@ -176,10 +176,12 @@ func (c *Client) CreateAuthorization(ctx context.Context, aName, description, pe
 	return &response, nil
 }
 
-func (c *Client) UpdateAuthorization(ctx context.Context, authID, newName, newDescription string) (*UpdateAuthorizationResponse, error) {
+func (c *Client) UpdateAuthorization(ctx context.Context, authID, newName, newDescription, permission, resourceType string) (*UpdateAuthorizationResponse, error) {
 	req := UpdateAuthorizationRequest{
 		AuthorizationName:        newName,
 		AuthorizationDescription: newDescription,
+		Permissions:              permission,
+		ResourceType:             resourceType,
 	}
 	payloadBuf := bytes.NewBuffer([]byte{})
 	if err := json.NewEncoder(payloadBuf).Encode(req); err != nil {

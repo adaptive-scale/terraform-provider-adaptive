@@ -20,8 +20,10 @@ import (
 type AuthorizationConfiguration struct {
 	Name        string `json:"name"`
 	Description string `json:"description"`
-	Resource    string `json:"resource"`
-	Permission  string `json:"permission"`
+	// Authorization model has changed since v0.4.0
+	//Resource    string `json:"resource"`
+	ResourceType string `json:"resource_type"`
+	Permission   string `json:"permission"`
 }
 
 func resourceAdaptiveAuthorization() *schema.Resource {
@@ -43,12 +45,12 @@ func resourceAdaptiveAuthorization() *schema.Resource {
 				Default:     "",
 				Description: "An optional description of the authorization object.",
 			},
-			"resource": {
+			"resource_type": {
 				Type:        schema.TypeString,
 				Required:    true,
-				Description: "The name of the resource to apply the permission to.",
+				Description: "Resource type to grant permission on. Eg. kubernetes, postgres, mysql, mongodb",
 			},
-			"permission": {
+			"permissions": {
 				Type:        schema.TypeString,
 				Required:    true,
 				Description: "The permission to grant or revoke on the specified resource.",
@@ -59,10 +61,10 @@ func resourceAdaptiveAuthorization() *schema.Resource {
 
 func schemaToAuthorizationConfiguration(d *schema.ResourceData) AuthorizationConfiguration {
 	return AuthorizationConfiguration{
-		Name:        d.Get("name").(string),
-		Description: d.Get("description").(string),
-		Resource:    d.Get("resource").(string),
-		Permission:  d.Get("permission").(string),
+		Name:         d.Get("name").(string),
+		Description:  d.Get("description").(string),
+		ResourceType: d.Get("resource_type").(string),
+		Permission:   d.Get("permissions").(string),
 	}
 }
 
@@ -75,7 +77,7 @@ func resourceAdaptiveAuthorizationCreate(ctx context.Context, d *schema.Resource
 	// 	return diag.FromErr(fmt.Errorf("could not marshal resource configuration %w", err))
 	// }
 
-	resp, err := client.CreateAuthorization(ctx, obj.Name, obj.Description, obj.Permission, obj.Resource)
+	resp, err := client.CreateAuthorization(ctx, obj.Name, obj.Description, obj.Permission, obj.ResourceType)
 	if err != nil {
 		return diag.FromErr(err)
 	}
@@ -93,14 +95,16 @@ func resourceAdaptiveAuthorizationUpdate(ctx context.Context, d *schema.Resource
 	client := m.(*adaptive.Client)
 	authID := d.Id()
 
-	if d.HasChange("permission") {
-		return diag.Errorf("Cannot change permission of authorization after published")
-	}
-	if d.HasChange("resource") {
-		return diag.Errorf("Cannot change resource of authorization after published")
-	}
+	//if d.HasChange("permissions") {
+	//	return diag.Errorf("Cannot change permission of authorization after published")
+	//}
+	//if d.HasChange("resource_type") {
+	//	return diag.Errorf("Cannot change resource of authorization after published")
+	//}
 
-	_, err := client.UpdateAuthorization(ctx, authID, d.Get("name").(string), d.Get("description").(string))
+	obj := schemaToAuthorizationConfiguration(d)
+
+	_, err := client.UpdateAuthorization(ctx, authID, obj.Name, obj.Description, obj.Permission, obj.ResourceType)
 	if err != nil {
 		return diag.FromErr(err)
 	}

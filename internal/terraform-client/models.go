@@ -71,6 +71,8 @@ type CreateAuthorizationResponse struct {
 type UpdateAuthorizationRequest struct {
 	AuthorizationName        string `json:"name"`
 	AuthorizationDescription string `json:"description"`
+	ResourceType             string `json:"resourceType"`
+	Permissions              string `json:"permissions"`
 }
 
 type UpdateAuthorizationResponse struct {
