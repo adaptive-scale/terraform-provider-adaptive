@@ -86,6 +86,27 @@ func resourceAdaptiveSession() *schema.Resource {
 				},
 				Description: "The list of users associated with the adaptive endpoint",
 			},
+			"is_jit_enabled": {
+				Type:        schema.TypeBool,
+				Optional:    true,
+				Default:     false,
+				Description: "Option to select whether the endpoint is JIT endpoint or not",
+			},
+			"access_approvers": {
+				Type:     schema.TypeList,
+				Computed: true,
+				Optional: true,
+				Elem: &schema.Schema{
+					Type: schema.TypeString,
+				},
+				Description: "List of approvers when JIT endpoint connection is attempted",
+			},
+			"timeout": {
+				Type:        schema.TypeString,
+				Optional:    true,
+				Default:     "",
+				Description: "Time after which endpoint would be paused",
+			},
 			"last_updated": {
 				Type:     schema.TypeString,
 				Optional: true,
@@ -140,6 +161,28 @@ func resourceAdaptiveSessionCreate(ctx context.Context, d *schema.ResourceData, 
 		}
 	}
 
+	isJITEnabled, ok := d.Get("is_jit_enabled").(bool)
+	if !ok {
+		return diag.FromErr(fmt.Errorf("incorrect is_jit_enabled value"))
+	}
+	accessApprovers := d.Get("access_approvers").([]interface{})
+	accessApproversEmails := make([]string, len(accessApprovers))
+	for i, accessApprover := range accessApprovers {
+		if val, ok := accessApprover.(string); !ok {
+			return diag.FromErr(fmt.Errorf("email must be a string"))
+		} else {
+			if len(val) == 0 {
+				return diag.FromErr(fmt.Errorf("email cannot be empty"))
+			}
+			accessApproversEmails[i] = val
+		}
+	}
+
+	timeout, ok := d.Get("timeout").(string)
+	if !ok {
+		return diag.FromErr(fmt.Errorf("incorrect timeout value"))
+	}
+
 	sType := d.Get("type").(string)
 	validSessionType, valid := getSessionType(sType)
 	if !valid {
@@ -155,6 +198,9 @@ func resourceAdaptiveSessionCreate(ctx context.Context, d *schema.ResourceData, 
 		d.Get("ttl").(string),
 		validSessionType,
 		userEmails,
+		isJITEnabled,
+		accessApproversEmails,
+		timeout,
 	)
 	if err != nil {
 		return diag.FromErr(err)
@@ -224,6 +270,36 @@ func resourceAdaptiveSessionUpdate(ctx context.Context, d *schema.ResourceData, 
 
 	}
 
+	isJITEnabled, ok := d.Get("is_jit_enabled").(bool)
+	if !ok {
+		return diag.FromErr(fmt.Errorf("incorrect is_jit_enabled value"))
+	}
+	accessApprovers := d.Get("access_approvers").([]interface{})
+	accessApproversEmails := make([]string, len(accessApprovers))
+	if len(accessApprovers) == 0 {
+		var diags diag.Diagnostics
+		diags = append(diags, diag.Diagnostic{
+			Severity: diag.Error,
+			Summary:  "No endpoint access approvers provided for JIT",
+			Detail:   "Since no endpoint access approvers were provided for JIT, the admins of the workspace would be the default approvers.",
+		})
+	}
+	for i, accessApprover := range accessApprovers {
+		if val, ok := accessApprover.(string); !ok {
+			return diag.FromErr(fmt.Errorf("email must be a string"))
+		} else {
+			if len(val) == 0 {
+				return diag.FromErr(fmt.Errorf("email cannot be empty"))
+			}
+			accessApproversEmails[i] = val
+		}
+	}
+
+	timeout, ok := d.Get("timeout").(string)
+	if !ok {
+		return diag.FromErr(fmt.Errorf("incorrect timeout value"))
+	}
+
 	seshType := d.Get("type").(string)
 	if !isValidSessionType(seshType) {
 		return diag.Errorf("Invalid session type: %s", seshType)
@@ -237,6 +313,9 @@ func resourceAdaptiveSessionUpdate(ctx context.Context, d *schema.ResourceData, 
 		d.Get("ttl").(string),
 		seshType,
 		userEmails,
+		isJITEnabled,
+		accessApproversEmails,
+		timeout,
 	)
 	if err != nil {
 		return diag.FromErr(err)

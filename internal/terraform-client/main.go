@@ -234,7 +234,7 @@ func (c *Client) DeleteAuthorization(ctx context.Context, authID string) (bool, 
 }
 
 // Sessions
-func (c *Client) CreateSession(ctx context.Context, sessionName, resourceName, authorizationName, clusterName, ttl, sessionType string, users []string) (*CreateSessionResponse, error) {
+func (c *Client) CreateSession(ctx context.Context, sessionName, resourceName, authorizationName, clusterName, ttl, sessionType string, users []string, isJITEnabled bool, accessApprovers []string, timeout string) (*CreateSessionResponse, error) {
 	req := CreateSessionRequest{
 		SessionName:       sessionName,
 		ResourceName:      resourceName,
@@ -243,6 +243,9 @@ func (c *Client) CreateSession(ctx context.Context, sessionName, resourceName, a
 		SessionTTL:        ttl,
 		SessionType:       sessionType,
 		SessionUsers:      users,
+		IsJITEnabled:      isJITEnabled,
+		AccessApprovers:   accessApprovers,
+		Timeout:           timeout,
 	}
 
 	payloadBuf := bytes.NewBuffer([]byte{})
@@ -344,7 +347,7 @@ func (c *Client) ReadSession(sessionID string, waitForStatus bool) (map[string]i
 	return resp, nil
 }
 
-func (c *Client) UpdateSession(sessionID, sessionName, resourceName, authorizationName, clusterName, ttl, sessionType string, users []string) (*UpdateSessionResponse, error) {
+func (c *Client) UpdateSession(sessionID, sessionName, resourceName, authorizationName, clusterName, ttl, sessionType string, users []string, isJITEnabled bool, accessApprovers []string, timeout string) (*UpdateSessionResponse, error) {
 	req := UpdateSessionRequest{
 		SessionName:       sessionName,
 		ResourceName:      resourceName,
@@ -353,6 +356,9 @@ func (c *Client) UpdateSession(sessionID, sessionName, resourceName, authorizati
 		AuthorizationName: authorizationName,
 		SessionTTL:        ttl,
 		SessionUsers:      users,
+		IsJITEnabled:      isJITEnabled,
+		AccessApprovers:   accessApprovers,
+		Timeout:           timeout,
 	}
 	payloadBuf := bytes.NewBuffer([]byte{})
 	if err := json.NewEncoder(payloadBuf).Encode(req); err != nil {

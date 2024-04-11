@@ -31,8 +31,16 @@ type CreateSessionRequest struct {
 	AuthorizationName string `json:"authorizationName"`
 	SessionTTL        string `json:"sessionTTL"`
 	SessionType       string `json:"sessionType"`
+
 	// List of user emails to add to the endpoint
 	SessionUsers []string `json:"sessionUsers"`
+
+	// endpoint JIT access mode
+	IsJITEnabled    bool     `json:"is_jit_enabled"`
+	AccessApprovers []string `json:"access_approvers"`
+
+	// pause endpoint timeout
+	Timeout string `json:"timeout"`
 }
 
 type CreateSessionResponse struct {
