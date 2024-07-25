@@ -90,7 +90,7 @@ func resourceAdaptiveAWSCreate(ctx context.Context, d *schema.ResourceData, m in
 	if err != nil {
 		return diag.FromErr(err)
 	}
-	resp, err := client.CreateResource(ctx, rName, "aws", config)
+	resp, err := client.CreateResource(ctx, rName, "aws", config, []string{})
 	if err != nil {
 		return diag.FromErr(err)
 	}
@@ -115,7 +115,7 @@ func resourceAdaptiveAWSUpdate(ctx context.Context, d *schema.ResourceData, m in
 		return diag.FromErr(err)
 	}
 
-	_, err = client.UpdateResource(resourceID, "aws", config)
+	_, err = client.UpdateResource(resourceID, "aws", config, []string{})
 	if err != nil {
 		return diag.FromErr(err)
 	}

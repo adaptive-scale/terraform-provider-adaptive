@@ -46,3 +46,20 @@ func attrFromSchema[T any](d *schema.ResourceData, attr string, required bool) (
 		return &value, nil
 	}
 }
+
+func tagsFromSchema(d *schema.ResourceData) ([]string, error) {
+	var userTags []string
+	tags := d.Get("tags")
+	if tags != nil {
+		// Convert the tags to a slice of strings
+		if val, ok := tags.([]interface{}); !ok {
+			return nil, fmt.Errorf("tags must be a list of strings, got %T", tags)
+		} else {
+			for _, tag := range val {
+				userTags = append(userTags, tag.(string))
+			}
+		}
+	}
+
+	return userTags, nil
+}

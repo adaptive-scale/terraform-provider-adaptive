@@ -1,14 +1,16 @@
 package client
 
 type CreateResourceRequest struct {
-	IntegrationType string `json:"integrationType"`
-	Name            string `json:"name"`
-	Configuration   string `json:"config"`
+	IntegrationType string   `json:"integrationType"`
+	Name            string   `json:"name"`
+	Configuration   string   `json:"config"`
+	UserTags        []string `json:"userTags"`
 }
 
 type UpdateResourceRequest struct {
-	IntegrationType string `json:"integrationType"`
-	Configuration   string `json:"config"`
+	IntegrationType string   `json:"integrationType"`
+	Configuration   string   `json:"config"`
+	UserTags        []string `json:"userTags"`
 }
 
 type CreateResourceResponse struct {
@@ -36,6 +38,10 @@ type CreateSessionRequest struct {
 	// endpoint JIT access mode
 	IsJITEnabled    bool     `json:"is_jit_enabled"`
 	AccessApprovers []string `json:"access_approvers"`
+
+	Memory    string   `json:"memory"`
+	CPU       string   `json:"cpu"`
+	UsersTags []string `json:"usertags"`
 
 	// pause endpoint timeout
 	Timeout string `json:"timeout"`

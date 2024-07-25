@@ -90,7 +90,7 @@ func resourceAdaptiveMySQLAWSCreate(ctx context.Context, d *schema.ResourceData,
 	if err != nil {
 		return diag.FromErr(err)
 	}
-	resp, err := client.CreateResource(ctx, rName, "mysql", config)
+	resp, err := client.CreateResource(ctx, rName, "mysql", config, []string{})
 	if err != nil {
 		return diag.FromErr(err)
 	}
@@ -115,7 +115,7 @@ func resourceAdaptiveMySQLAWSUpdate(ctx context.Context, d *schema.ResourceData,
 		return diag.FromErr(err)
 	}
 
-	_, err = client.UpdateResource(resourceID, "mysql", config)
+	_, err = client.UpdateResource(resourceID, "mysql", config, []string{})
 	if err != nil {
 		return diag.FromErr(err)
 	}

@@ -75,7 +75,7 @@ func resourceAdaptiveServiceListCreate(ctx context.Context, d *schema.ResourceDa
 	if err != nil {
 		return diag.FromErr(err)
 	}
-	resp, err := client.CreateResource(ctx, rName, "servicelist", config)
+	resp, err := client.CreateResource(ctx, rName, "servicelist", config, []string{})
 	if err != nil {
 		return diag.FromErr(err)
 	}
@@ -100,7 +100,7 @@ func resourceAdaptiveServiceListUpdate(ctx context.Context, d *schema.ResourceDa
 		return diag.FromErr(err)
 	}
 
-	_, err = client.UpdateResource(resourceID, "servicelist", config)
+	_, err = client.UpdateResource(resourceID, "servicelist", config, []string{})
 	if err != nil {
 		return diag.FromErr(err)
 	}

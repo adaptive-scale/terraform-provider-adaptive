@@ -72,6 +72,14 @@ func resourceAdaptiveResource() *schema.Resource {
 				Required:    true,
 				Description: "Name of the Adaptive resource",
 			},
+			"tags": {
+				Type:     schema.TypeList,
+				Optional: true,
+				Elem: &schema.Schema{
+					Type: schema.TypeString,
+				},
+				Description: "Optional tags",
+			},
 			"uri": {
 				Type:        schema.TypeString,
 				Optional:    true,
@@ -310,7 +318,13 @@ func resourceAdaptiveResourceCreate(ctx context.Context, d *schema.ResourceData,
 	if iType == "services" {
 		iType = "servicelist"
 	}
-	resp, err := client.CreateResource(ctx, rName, iType, config)
+
+	userTags, err := tagsFromSchema(d)
+	if err != nil {
+		return diag.FromErr(err)
+	}
+
+	resp, err := client.CreateResource(ctx, rName, iType, config, userTags)
 	if err != nil {
 		return diag.FromErr(err)
 	}
@@ -346,7 +360,13 @@ func resourceAdaptiveResourceUpdate(ctx context.Context, d *schema.ResourceData,
 	if iType == "services" {
 		iType = "servicelist"
 	}
-	_, err = client.UpdateResource(resourceID, iType, config)
+
+	userTags, err := tagsFromSchema(d)
+	if err != nil {
+		return diag.FromErr(err)
+	}
+
+	_, err = client.UpdateResource(resourceID, iType, config, userTags)
 	if err != nil {
 		return diag.FromErr(err)
 	}

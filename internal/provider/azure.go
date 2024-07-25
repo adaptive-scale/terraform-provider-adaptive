@@ -91,7 +91,7 @@ func resourceAdaptiveAzureCreate(ctx context.Context, d *schema.ResourceData, m 
 	if err != nil {
 		return diag.FromErr(err)
 	}
-	resp, err := client.CreateResource(ctx, rName, "azure", config)
+	resp, err := client.CreateResource(ctx, rName, "azure", config, []string{})
 	if err != nil {
 		return diag.FromErr(err)
 	}
@@ -116,7 +116,7 @@ func resourceAdaptiveAzureUpdate(ctx context.Context, d *schema.ResourceData, m 
 		return diag.FromErr(err)
 	}
 
-	_, err = client.UpdateResource(resourceID, "azure", config)
+	_, err = client.UpdateResource(resourceID, "azure", config, []string{})
 	if err != nil {
 		return diag.FromErr(err)
 	}

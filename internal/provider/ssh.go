@@ -109,7 +109,7 @@ func resourceAdaptiveSSHCreate(ctx context.Context, d *schema.ResourceData, m in
 	if err != nil {
 		return diag.FromErr(err)
 	}
-	resp, err := client.CreateResource(ctx, rName, "ssh", config)
+	resp, err := client.CreateResource(ctx, rName, "ssh", config, []string{})
 	if err != nil {
 		return diag.FromErr(err)
 	}
@@ -134,7 +134,7 @@ func resourceAdaptiveSSHUpdate(ctx context.Context, d *schema.ResourceData, m in
 		return diag.FromErr(err)
 	}
 
-	_, err = client.UpdateResource(resourceID, "ssh", config)
+	_, err = client.UpdateResource(resourceID, "ssh", config, []string{})
 	if err != nil {
 		return diag.FromErr(err)
 	}

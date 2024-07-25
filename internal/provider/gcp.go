@@ -80,7 +80,7 @@ func resourceAdaptiveGCPCreate(ctx context.Context, d *schema.ResourceData, m in
 	if err != nil {
 		return diag.FromErr(err)
 	}
-	resp, err := client.CreateResource(ctx, rName, "gcp", config)
+	resp, err := client.CreateResource(ctx, rName, "gcp", config, []string{})
 	if err != nil {
 		return diag.FromErr(err)
 	}
@@ -105,7 +105,7 @@ func resourceAdaptiveGCPUpdate(ctx context.Context, d *schema.ResourceData, m in
 		return diag.FromErr(err)
 	}
 
-	_, err = client.UpdateResource(resourceID, "gcp", config)
+	_, err = client.UpdateResource(resourceID, "gcp", config, []string{})
 	if err != nil {
 		return diag.FromErr(err)
 	}

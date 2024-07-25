@@ -91,7 +91,7 @@ func resourceAdaptiveGoogleCreate(ctx context.Context, d *schema.ResourceData, m
 		return diag.FromErr(err)
 	}
 
-	resp, err := client.CreateResource(ctx, rName, "google", config)
+	resp, err := client.CreateResource(ctx, rName, "google", config, []string{})
 	if err != nil {
 		return diag.FromErr(err)
 	}
@@ -116,7 +116,7 @@ func resourceAdaptiveGoogleUpdate(ctx context.Context, d *schema.ResourceData, m
 		return diag.FromErr(err)
 	}
 
-	_, err = client.UpdateResource(resourceID, "google", config)
+	_, err = client.UpdateResource(resourceID, "google", config, []string{})
 	if err != nil {
 		return diag.FromErr(err)
 	}

@@ -8,6 +8,7 @@ import (
 	adaptive "github.com/adaptive-scale/terraform-provider-adaptive/internal/terraform-client"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/diag"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
+	"golang.org/x/exp/slices"
 )
 
 const (
@@ -21,6 +22,7 @@ const (
 	SessionTTLOption7days   = "7d"
 	SessionTTLOption30days  = "30d"
 	SessionTTLOption60days  = "60d"
+	SessionTTLOption90days  = "90d"
 	SessionTTLOption180days = "180d"
 	SessionTTLOption360days = "360d"
 )
@@ -31,6 +33,48 @@ const (
 	SessionTypeScript  = "script"
 	SessionTypeClient  = "client"
 )
+
+const (
+	EndpointMemoryDefault = "256Mi"
+	EndpointMemory128     = "128Mi"
+	EndpointMemory256     = "256Mi"
+	EndpointMemory512     = "512Mi"
+	EndpointMemory1024    = "1024Mi"
+	EndpointMemory2048    = "2048Mi"
+	EndpointMemory4096    = "4096Mi"
+	EndpointMemory8192    = "8192Mi"
+)
+
+var validMemoryValues = []string{
+	EndpointMemory128,
+	EndpointMemory256,
+	EndpointMemory512,
+	EndpointMemory1024,
+	EndpointMemory2048,
+	EndpointMemory4096,
+	EndpointMemory8192,
+}
+
+const (
+	EndpointCPUDefault = "0.5"
+	EndpointCPU0125    = "0.125"
+	EndpointCPU025     = "0.25"
+	EndpointCPU050     = "0.5"
+	EndpointCPU100     = "1"
+	EndpointCPU200     = "2"
+	EndpointCPU400     = "4"
+	EndpointCPU800     = "8"
+)
+
+var validCPUValues = []string{
+	EndpointCPU0125,
+	EndpointCPU025,
+	EndpointCPU050,
+	EndpointCPU100,
+	EndpointCPU200,
+	EndpointCPU400,
+	EndpointCPU800,
+}
 
 func resourceAdaptiveSession() *schema.Resource {
 	return &schema.Resource{
@@ -63,7 +107,7 @@ func resourceAdaptiveSession() *schema.Resource {
 			"ttl": {
 				Type:        schema.TypeString,
 				Optional:    true,
-				Default:     "3h",
+				Default:     SessionTTLOption90days,
 				Description: "The port number of the Postgres instance to connect to.",
 			},
 			"authorization": {
@@ -73,7 +117,7 @@ func resourceAdaptiveSession() *schema.Resource {
 			},
 			"cluster": {
 				Type:        schema.TypeString,
-				Default:     "default",
+				Default:     "",
 				Optional:    true,
 				Description: "The cluster in which this session should be created. If not provided will be set to default cluster set in workspace settings	of user's workspace",
 			},
@@ -107,6 +151,52 @@ func resourceAdaptiveSession() *schema.Resource {
 				Default:     "99999d",
 				Elem:        &schema.Schema{Type: schema.TypeString},
 				Description: "The time after which the session will be paused if no user has connected to it. Defaults to never pause.",
+			},
+			"memory": {
+				Type:    schema.TypeString,
+				Default: "default",
+				ValidateFunc: func(i interface{}, k string) (ws []string, es []error) {
+					if _, ok := i.(string); !ok {
+						es = append(es, fmt.Errorf("memory must be a string"))
+					}
+
+					// make sure it's valid value
+					if !slices.Contains(
+						validMemoryValues, i.(string)) {
+						es = append(es, fmt.Errorf("memory must be one of %v", validMemoryValues))
+					}
+
+					return
+				},
+				Optional:    true,
+				Description: "Memory of endpoint pod",
+			},
+			"cpu": {
+				Type:    schema.TypeString,
+				Default: "default",
+				ValidateFunc: func(i interface{}, k string) (ws []string, es []error) {
+					if _, ok := i.(string); !ok {
+						es = append(es, fmt.Errorf("cpu must be a string"))
+					}
+
+					// make sure it's valid value
+					if !slices.Contains(
+						validCPUValues, i.(string)) {
+						es = append(es, fmt.Errorf("cpu must be one of %v", validCPUValues))
+					}
+
+					return
+				},
+				Optional:    true,
+				Description: "CPU of endpoint pod",
+			},
+			"tags": {
+				Type:     schema.TypeList,
+				Optional: true,
+				Elem: &schema.Schema{
+					Type: schema.TypeString,
+				},
+				Description: "Optional tags",
 			},
 			"last_updated": {
 				Type:     schema.TypeString,
@@ -197,6 +287,39 @@ func resourceAdaptiveSessionCreate(ctx context.Context, d *schema.ResourceData, 
 		return diag.FromErr(fmt.Errorf("pause_timeout must be a string"))
 	}
 
+	// var tags []string
+	// _tags := d.Get("tags")
+	// if tags == nil {
+	// 	_tags = []string{}
+	// }
+
+	// if _, ok := _tags.([]interface{}); !ok {
+	// 	return diag.FromErr(fmt.Errorf("tags must be a list of strings"))
+	// }
+	// for _, t := range _tags.([]interface{}) {
+	// 	if val, ok := t.(string); !ok {
+	// 		return diag.FromErr(fmt.Errorf("tag must be a string"))
+	// 	} else {
+	// 		tags = append(tags, val)
+	// 	}
+
+	// }
+
+	userTags, err := tagsFromSchema(d)
+	if err != nil {
+		return diag.FromErr(err)
+	}
+
+	mem := d.Get("memory")
+	if _, ok := mem.(string); !ok {
+		return diag.FromErr(fmt.Errorf("memory must be a string"))
+	}
+
+	cpu := d.Get("cpu")
+	if _, ok := cpu.(string); !ok {
+		return diag.FromErr(fmt.Errorf("cpu must be a string"))
+	}
+
 	resp, err := client.CreateSession(
 		ctx,
 		sName,
@@ -209,6 +332,8 @@ func resourceAdaptiveSessionCreate(ctx context.Context, d *schema.ResourceData, 
 		jitApproversEmails,
 		pauseTimeout.(string),
 		userEmails,
+		mem.(string), cpu.(string),
+		userTags,
 	)
 	if err != nil {
 		return diag.FromErr(err)
@@ -313,6 +438,21 @@ func resourceAdaptiveSessionUpdate(ctx context.Context, d *schema.ResourceData, 
 		return diag.FromErr(fmt.Errorf("pause_timeout must be a string"))
 	}
 
+	mem := d.Get("memory")
+	if _, ok := mem.(string); !ok {
+		return diag.FromErr(fmt.Errorf("memory must be a string"))
+	}
+
+	cpu := d.Get("cpu")
+	if _, ok := cpu.(string); !ok {
+		return diag.FromErr(fmt.Errorf("cpu must be a string"))
+	}
+
+	userTags, err := tagsFromSchema(d)
+	if err != nil {
+		return diag.FromErr(err)
+	}
+
 	resp, err := client.UpdateSession(
 		sessionID,
 		d.Get("name").(string),
@@ -325,6 +465,8 @@ func resourceAdaptiveSessionUpdate(ctx context.Context, d *schema.ResourceData, 
 		jitApproversEmails,
 		pauseTimeout.(string),
 		userEmails,
+		mem.(string), cpu.(string),
+		userTags,
 	)
 	if err != nil {
 		return diag.FromErr(err)

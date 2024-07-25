@@ -65,7 +65,7 @@ func resourceAdaptiveAWSDocumentDBCreate(ctx context.Context, d *schema.Resource
 	if err != nil {
 		return diag.FromErr(err)
 	}
-	resp, err := client.CreateResource(ctx, rName, "awsdocumentdb", config)
+	resp, err := client.CreateResource(ctx, rName, "awsdocumentdb", config, []string{})
 	if err != nil {
 		return diag.FromErr(err)
 	}
@@ -90,7 +90,7 @@ func resourceAdaptiveAWSDocumentDBUpdate(ctx context.Context, d *schema.Resource
 		return diag.FromErr(err)
 	}
 
-	_, err = client.UpdateResource(resourceID, "awsdocumentdb", config)
+	_, err = client.UpdateResource(resourceID, "awsdocumentdb", config, []string{})
 	if err != nil {
 		return diag.FromErr(err)
 	}

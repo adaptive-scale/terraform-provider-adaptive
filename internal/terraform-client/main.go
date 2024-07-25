@@ -246,6 +246,8 @@ func (c *Client) CreateSession(
 	accessApprovers []string,
 	pauseTimeout string,
 	users []string,
+	memory, cpu string,
+	tags []string,
 ) (*CreateSessionResponse, error) {
 	req := CreateSessionRequest{
 		SessionName:       sessionName,
@@ -258,6 +260,9 @@ func (c *Client) CreateSession(
 		IsJITEnabled:      isJITEnabled,
 		AccessApprovers:   accessApprovers,
 		Timeout:           pauseTimeout,
+		Memory:            memory,
+		CPU:               cpu,
+		UsersTags:         tags,
 	}
 
 	payloadBuf := bytes.NewBuffer([]byte{})
@@ -371,6 +376,8 @@ func (c *Client) UpdateSession(
 	accessApprovers []string,
 	pauseTimeout string,
 	users []string,
+	memory, cpu string,
+	tags []string,
 ) (*UpdateSessionResponse, error) {
 	req := UpdateSessionRequest{
 		SessionName:       sessionName,
@@ -383,6 +390,9 @@ func (c *Client) UpdateSession(
 		IsJITEnabled:      isJITEnabled,
 		AccessApprovers:   accessApprovers,
 		Timeout:           pauseTimeout,
+		Memory:            memory,
+		CPU:               cpu,
+		UsersTags:         tags,
 	}
 	payloadBuf := bytes.NewBuffer([]byte{})
 	if err := json.NewEncoder(payloadBuf).Encode(req); err != nil {
@@ -465,11 +475,17 @@ func (c *Client) DeleteSession(sessionID string) (bool, error) {
 }
 
 // Resources / Integrations
-func (c *Client) CreateResource(ctx context.Context, name, rType string, yamlRConfig []byte) (*CreateResourceResponse, error) {
+func (c *Client) CreateResource(
+	ctx context.Context,
+	name, rType string,
+	yamlRConfig []byte,
+	tags []string,
+) (*CreateResourceResponse, error) {
 	req := CreateResourceRequest{
 		IntegrationType: rType,
 		Name:            name,
 		Configuration:   string(yamlRConfig),
+		UserTags:        tags,
 	}
 
 	payloadBuf := bytes.NewBuffer([]byte{})
@@ -500,10 +516,16 @@ func (c *Client) CreateResource(ctx context.Context, name, rType string, yamlRCo
 	return &resp, nil
 }
 
-func (c *Client) UpdateResource(resourceID string, rType string, yamlRConfig []byte) (*UpdateResourceResponse, error) {
+func (c *Client) UpdateResource(
+	resourceID string,
+	rType string,
+	yamlRConfig []byte,
+	tags []string,
+) (*UpdateResourceResponse, error) {
 	req := UpdateResourceRequest{
 		IntegrationType: rType,
 		Configuration:   string(yamlRConfig),
+		UserTags:        tags,
 	}
 
 	payloadBuf := bytes.NewBuffer([]byte{})

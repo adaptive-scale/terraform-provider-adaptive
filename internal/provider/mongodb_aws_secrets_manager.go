@@ -72,7 +72,7 @@ func resourceAdaptiveMongoAWSCreate(ctx context.Context, d *schema.ResourceData,
 	if err != nil {
 		return diag.FromErr(err)
 	}
-	resp, err := client.CreateResource(ctx, rName, "mongodb", config)
+	resp, err := client.CreateResource(ctx, rName, "mongodb", config, []string{})
 	if err != nil {
 		return diag.FromErr(err)
 	}
@@ -97,7 +97,7 @@ func resourceAdaptiveMongoAWSUpdate(ctx context.Context, d *schema.ResourceData,
 		return diag.FromErr(err)
 	}
 
-	_, err = client.UpdateResource(resourceID, "mongodb", config)
+	_, err = client.UpdateResource(resourceID, "mongodb", config, []string{})
 	if err != nil {
 		return diag.FromErr(err)
 	}

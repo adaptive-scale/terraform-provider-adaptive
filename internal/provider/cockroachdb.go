@@ -126,7 +126,7 @@ func resourceAdaptiveCockroachDBCreate(ctx context.Context, d *schema.ResourceDa
 	if err != nil {
 		return diag.FromErr(err)
 	}
-	resp, err := client.CreateResource(ctx, rName, "cockroachdb", config)
+	resp, err := client.CreateResource(ctx, rName, "cockroachdb", config, []string{})
 	if err != nil {
 		return diag.FromErr(err)
 	}
@@ -151,7 +151,7 @@ func resourceAdaptiveCockroachDBUpdate(ctx context.Context, d *schema.ResourceDa
 		return diag.FromErr(err)
 	}
 
-	_, err = client.UpdateResource(resourceID, "cockroachdb", config)
+	_, err = client.UpdateResource(resourceID, "cockroachdb", config, []string{})
 	if err != nil {
 		return diag.FromErr(err)
 	}

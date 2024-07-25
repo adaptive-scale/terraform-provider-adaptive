@@ -91,7 +91,7 @@ func resourceAdaptiveOktaCreate(ctx context.Context, d *schema.ResourceData, m i
 	if err != nil {
 		return diag.FromErr(err)
 	}
-	resp, err := client.CreateResource(ctx, rName, "okta", config)
+	resp, err := client.CreateResource(ctx, rName, "okta", config, []string{})
 	if err != nil {
 		return diag.FromErr(err)
 	}
@@ -116,7 +116,7 @@ func resourceAdaptiveOktaUpdate(ctx context.Context, d *schema.ResourceData, m i
 		return diag.FromErr(err)
 	}
 
-	_, err = client.UpdateResource(resourceID, "okta", config)
+	_, err = client.UpdateResource(resourceID, "okta", config, []string{})
 	if err != nil {
 		return diag.FromErr(err)
 	}

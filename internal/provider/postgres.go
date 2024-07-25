@@ -115,7 +115,7 @@ func resourceAdaptivePostgresCreate(ctx context.Context, d *schema.ResourceData,
 	if err != nil {
 		return diag.FromErr(err)
 	}
-	resp, err := client.CreateResource(ctx, rName, "postgres", config)
+	resp, err := client.CreateResource(ctx, rName, "postgres", config, []string{})
 	if err != nil {
 		return diag.FromErr(err)
 	}
@@ -140,7 +140,7 @@ func resourceAdaptivePostgresUpdate(ctx context.Context, d *schema.ResourceData,
 		return diag.FromErr(err)
 	}
 
-	_, err = client.UpdateResource(resourceID, "postgres", config)
+	_, err = client.UpdateResource(resourceID, "postgres", config, []string{})
 	if err != nil {
 		return diag.FromErr(err)
 	}

@@ -73,7 +73,7 @@ func resourceAdaptiveMongoAtlasCreate(ctx context.Context, d *schema.ResourceDat
 	if err != nil {
 		return diag.FromErr(err)
 	}
-	resp, err := client.CreateResource(ctx, rName, "mongodb_atlas", config)
+	resp, err := client.CreateResource(ctx, rName, "mongodb_atlas", config, []string{})
 	if err != nil {
 		return diag.FromErr(err)
 	}
@@ -98,7 +98,7 @@ func resourceAdaptiveMongoAtlasUpdate(ctx context.Context, d *schema.ResourceDat
 		return diag.FromErr(err)
 	}
 
-	_, err = client.UpdateResource(resourceID, "mongodb_atlas", config)
+	_, err = client.UpdateResource(resourceID, "mongodb_atlas", config, []string{})
 	if err != nil {
 		return diag.FromErr(err)
 	}
