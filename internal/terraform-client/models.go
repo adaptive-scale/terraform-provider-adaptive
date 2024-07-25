@@ -27,12 +27,18 @@ const (
 type CreateSessionRequest struct {
 	SessionName       string `json:"sessionName"`
 	ResourceName      string `json:"resourceName"`
-	ClusterName       string `json:"clusterName"`
-	AuthorizationName string `json:"authorizationName"`
-	SessionTTL        string `json:"sessionTTL"`
+	ClusterName       string `json:"clusterName,omitempty"`
+	AuthorizationName string `json:"authorizationName,omitempty"`
+	SessionTTL        string `json:"sessionTTL,omitempty"`
 	SessionType       string `json:"sessionType"`
 	// List of user emails to add to the endpoint
-	SessionUsers []string `json:"sessionUsers"`
+	SessionUsers []string `json:"sessionUsers,omitempty"`
+	// endpoint JIT access mode
+	IsJITEnabled    bool     `json:"is_jit_enabled"`
+	AccessApprovers []string `json:"access_approvers"`
+
+	// pause endpoint timeout
+	Timeout string `json:"timeout"`
 }
 
 type CreateSessionResponse struct {
