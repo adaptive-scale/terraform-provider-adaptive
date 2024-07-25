@@ -76,6 +76,25 @@ var validCPUValues = []string{
 	EndpointCPU800,
 }
 
+var validPauseTimeoutValues = []string{
+	"15m",
+	"30m",
+	"1h",
+	"2h",
+	"3h",
+	"6h",
+	"1d",
+	"3d",
+	"7d",
+	"15d",
+	"30d",
+	"60d",
+	"90d",
+	"180d",
+	"365d",
+	"99999d",
+}
+
 func resourceAdaptiveSession() *schema.Resource {
 	return &schema.Resource{
 		CreateContext: resourceAdaptiveSessionCreate,
@@ -151,6 +170,19 @@ func resourceAdaptiveSession() *schema.Resource {
 				Default:     "99999d",
 				Elem:        &schema.Schema{Type: schema.TypeString},
 				Description: "The time after which the session will be paused if no user has connected to it. Defaults to never pause.",
+				ValidateFunc: func(i interface{}, k string) (ws []string, es []error) {
+					if _, ok := i.(string); !ok {
+						es = append(es, fmt.Errorf("pause_timeout must be a string"))
+					}
+
+					// make sure it's valid value
+					if !slices.Contains(
+						validPauseTimeoutValues, i.(string)) {
+						es = append(es, fmt.Errorf("pause_timeout must be one of %v", validPauseTimeoutValues))
+					}
+
+					return
+				},
 			},
 			"memory": {
 				Type:    schema.TypeString,
