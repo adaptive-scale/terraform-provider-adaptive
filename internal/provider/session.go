@@ -86,6 +86,28 @@ func resourceAdaptiveSession() *schema.Resource {
 				},
 				Description: "The list of users associated with the adaptive endpoint",
 			},
+			"is_jit_enabled": {
+				Type:        schema.TypeBool,
+				Optional:    true,
+				Default:     false,
+				Elem:        &schema.Schema{Type: schema.TypeBool},
+				Description: "Whether Just-In-Time access is enabled for the session",
+			},
+			"jit_approvers": {
+				Type:     schema.TypeList,
+				Optional: true,
+				Elem: &schema.Schema{
+					Type: schema.TypeString,
+				},
+				Description: "The list of users emails who can approve Just-In-Time access requests",
+			},
+			"pause_timeout": {
+				Type:        schema.TypeString,
+				Optional:    true,
+				Default:     "99999d",
+				Elem:        &schema.Schema{Type: schema.TypeString},
+				Description: "The time after which the session will be paused if no user has connected to it. Defaults to never pause.",
+			},
 			"last_updated": {
 				Type:     schema.TypeString,
 				Optional: true,
@@ -146,6 +168,35 @@ func resourceAdaptiveSessionCreate(ctx context.Context, d *schema.ResourceData, 
 		return diag.Errorf("Invalid session type: %s", sType)
 	}
 
+	isJitEnabled := d.Get("is_jit_enabled")
+	if _, ok := isJitEnabled.(bool); !ok {
+		return diag.FromErr(fmt.Errorf("is_jit_enabled must be a boolean"))
+	}
+
+	jitApprovers := d.Get("jit_approvers")
+	if jitApprovers == nil {
+		jitApprovers = []string{}
+	}
+	if _, ok := jitApprovers.([]interface{}); !ok {
+		return diag.FromErr(fmt.Errorf("jit_approvers must be a list of strings"))
+	}
+	jitApproversEmails := make([]string, len(jitApprovers.([]interface{})))
+	for i, u := range jitApprovers.([]interface{}) {
+		if val, ok := u.(string); !ok {
+			return diag.FromErr(fmt.Errorf("email must be a string"))
+		} else {
+			if len(val) == 0 {
+				return diag.FromErr(fmt.Errorf("email cannot be empty"))
+			}
+			jitApproversEmails[i] = val
+		}
+	}
+
+	pauseTimeout := d.Get("pause_timeout")
+	if _, ok := pauseTimeout.(string); !ok {
+		return diag.FromErr(fmt.Errorf("pause_timeout must be a string"))
+	}
+
 	resp, err := client.CreateSession(
 		ctx,
 		sName,
@@ -154,6 +205,9 @@ func resourceAdaptiveSessionCreate(ctx context.Context, d *schema.ResourceData, 
 		d.Get("cluster").(string),
 		d.Get("ttl").(string),
 		validSessionType,
+		isJitEnabled.(bool),
+		jitApproversEmails,
+		pauseTimeout.(string),
 		userEmails,
 	)
 	if err != nil {
@@ -225,9 +279,40 @@ func resourceAdaptiveSessionUpdate(ctx context.Context, d *schema.ResourceData, 
 	}
 
 	seshType := d.Get("type").(string)
-	if !isValidSessionType(seshType) {
+	validSessionType, valid := getSessionType(seshType)
+	if !valid {
 		return diag.Errorf("Invalid session type: %s", seshType)
 	}
+
+	isJitEnabled := d.Get("is_jit_enabled")
+	if _, ok := isJitEnabled.(bool); !ok {
+		return diag.FromErr(fmt.Errorf("is_jit_enabled must be a boolean"))
+	}
+
+	jitApprovers := d.Get("jit_approvers")
+	if jitApprovers == nil {
+		jitApprovers = []string{}
+	}
+	if _, ok := jitApprovers.([]interface{}); !ok {
+		return diag.FromErr(fmt.Errorf("jit_approvers must be a list of strings"))
+	}
+	jitApproversEmails := make([]string, len(jitApprovers.([]interface{})))
+	for i, u := range jitApprovers.([]interface{}) {
+		if val, ok := u.(string); !ok {
+			return diag.FromErr(fmt.Errorf("email must be a string"))
+		} else {
+			if len(val) == 0 {
+				return diag.FromErr(fmt.Errorf("email cannot be empty"))
+			}
+			jitApproversEmails[i] = val
+		}
+	}
+
+	pauseTimeout := d.Get("pause_timeout")
+	if _, ok := pauseTimeout.(string); !ok {
+		return diag.FromErr(fmt.Errorf("pause_timeout must be a string"))
+	}
+
 	resp, err := client.UpdateSession(
 		sessionID,
 		d.Get("name").(string),
@@ -235,7 +320,10 @@ func resourceAdaptiveSessionUpdate(ctx context.Context, d *schema.ResourceData, 
 		d.Get("authorization").(string),
 		d.Get("cluster").(string),
 		d.Get("ttl").(string),
-		seshType,
+		validSessionType,
+		isJitEnabled.(bool),
+		jitApproversEmails,
+		pauseTimeout.(string),
 		userEmails,
 	)
 	if err != nil {
