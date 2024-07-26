@@ -167,7 +167,7 @@ func resourceAdaptiveSession() *schema.Resource {
 			"pause_timeout": {
 				Type:        schema.TypeString,
 				Optional:    true,
-				Default:     "99999d",
+				Default:     "",
 				Elem:        &schema.Schema{Type: schema.TypeString},
 				Description: "The time after which the session will be paused if no user has connected to it. Defaults to never pause.",
 				ValidateFunc: func(i interface{}, k string) (ws []string, es []error) {
