@@ -412,6 +412,15 @@ func resourceAdaptiveSessionUpdate(ctx context.Context, d *schema.ResourceData, 
 	if d.HasChange("cluster") {
 		return diag.Errorf("Cannot change cluster after creation")
 	}
+	if d.HasChange("ttl") {
+		return diag.Errorf("Cannot change ttl after creation")
+	}
+	if d.HasChange("memory") {
+		return diag.Errorf("Cannot change memory after creation")
+	}
+	if d.HasChange("cpu") {
+		return diag.Errorf("Cannot change cpu after creation")
+	}
 
 	users := d.Get("users").([]interface{})
 	userEmails := make([]string, len(users))
