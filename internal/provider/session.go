@@ -186,7 +186,7 @@ func resourceAdaptiveSession() *schema.Resource {
 			},
 			"memory": {
 				Type:    schema.TypeString,
-				Default: EndpointMemoryDefault,
+				Default: "",
 				ValidateFunc: func(i interface{}, k string) (ws []string, es []error) {
 					if _, ok := i.(string); !ok {
 						es = append(es, fmt.Errorf("memory must be a string"))
@@ -205,7 +205,7 @@ func resourceAdaptiveSession() *schema.Resource {
 			},
 			"cpu": {
 				Type:    schema.TypeString,
-				Default: EndpointCPUDefault,
+				Default: "",
 				ValidateFunc: func(i interface{}, k string) (ws []string, es []error) {
 					if _, ok := i.(string); !ok {
 						es = append(es, fmt.Errorf("cpu must be a string"))
