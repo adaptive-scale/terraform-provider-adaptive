@@ -23,7 +23,7 @@ terraform {
   required_providers {
     adaptive = {
       source = "adaptive-scale/adaptive"
-      version = "0.0.5"
+      version = "0.1.3"
     }
   }
 }
@@ -37,14 +37,14 @@ To configure the provider for use, you must add [Service Token](https://docs.ada
 
 Now you can you that token like so:
 
-   ```bash
-   # this will store the token in ~/.adaptive/token
-   $ adaptive login
-   ```
+```bash
+# this will store the token in ~/.adaptive/token
+$ adaptive login
+```
 
-   ```hcl
-   provider "adaptive" {}
-   ```
+```hcl
+provider "adaptive" {}
+```
 
 ## Features
 
@@ -68,7 +68,6 @@ Current list of supported adaptive resources:
 - [mysql_aws_secrets_manager](https://github.com/adaptive-scale/adaptive-terraform-examples/tree/master/mysql_aws_secrets_manager)
 - [postgres_aws_secrets_manager](https://github.com/adaptive-scale/adaptive-terraform-examples/tree/master/postgres_aws_secrets_manager)
 - [mongodb_aws_secrets_manager](https://github.com/adaptive-scale/adaptive-terraform-examples/tree/master/mongodb_aws_secrets_manager)
-
 
 ## Schema
 
