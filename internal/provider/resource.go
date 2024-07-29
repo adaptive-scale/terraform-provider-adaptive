@@ -85,7 +85,7 @@ func resourceAdaptiveResource() *schema.Resource {
 				Optional:    true,
 				Description: "Connection string to a resource. Used by MongoDB",
 			},
-			"namepsace": {
+			"namespace": {
 				Type:        schema.TypeString,
 				Optional:    true,
 				Description: "Namespace where pods will be created. Used by Kubernetes resource",
