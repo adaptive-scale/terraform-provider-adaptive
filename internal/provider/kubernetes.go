@@ -11,6 +11,7 @@ type KubernetesIntegrationConfiguration struct {
 	ApiServer    string `yaml:"apiserver"`
 	ClusterToken string `yaml:"token"`
 	ClusterCerts string `yaml:"cacrt"`
+	Namespace    string `yaml:"namespace,omitempty"`
 }
 
 func schemaToKubernetesIntegrationConfiguration(d *schema.ResourceData) KubernetesIntegrationConfiguration {
@@ -19,5 +20,6 @@ func schemaToKubernetesIntegrationConfiguration(d *schema.ResourceData) Kubernet
 		ApiServer:    d.Get("api_server").(string),
 		ClusterCerts: strings.TrimSpace(d.Get("cluster_cert").(string)),
 		ClusterToken: strings.TrimSpace(d.Get("cluster_token").(string)),
+		Namespace:    d.Get("namespace").(string),
 	}
 }
