@@ -100,6 +100,22 @@ func resourceAdaptiveCockroachDB() *schema.Resource {
 }
 
 func schemaToCockroachDBIntegrationConfiguration(d *schema.ResourceData) CockroachDBIntegrationConfiguration {
+	sslMode := ""
+	if d.Get("ssl_mode") != nil {
+		if _sslMode, ok := d.Get("ssl_mode").(string); ok {
+			sslMode = _sslMode
+		} else if !ok {
+			sslMode = ""
+		}
+	}
+
+	tlsRootCert := ""
+	if d.Get("root_cert") != nil {
+		if _tlsRootCert, ok := d.Get("tls_root_cert").(string); ok {
+			tlsRootCert = _tlsRootCert
+		}
+	}
+
 	return CockroachDBIntegrationConfiguration{
 		Name:         d.Get("name").(string),
 		Username:     d.Get("username").(string),
@@ -107,8 +123,8 @@ func schemaToCockroachDBIntegrationConfiguration(d *schema.ResourceData) Cockroa
 		DatabaseName: d.Get("database_name").(string),
 		HostName:     d.Get("host").(string),
 		Port:         d.Get("port").(string),
-		// SSLMode:      d.Get("ssl_mode").(string),
-		RootCert: strings.TrimSpace(d.Get("root_cert").(string)),
+		SSLMode:      sslMode,
+		RootCert:     strings.TrimSpace(tlsRootCert),
 	}
 }
 

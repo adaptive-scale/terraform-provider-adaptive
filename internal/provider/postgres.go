@@ -86,10 +86,43 @@ type PostgresIntegrationConfiguration struct {
 	HostName     string `yaml:"hostname"`
 	Port         string `yaml:"port"`
 	SSLMode      string `yaml:"sslMode"`
+	TLSRootCert  string `yaml:"rootCert"`
+	TLSCertFile  string `yaml:"crtText"`
+	TLSKeyFile   string `yaml:"keyText"`
 }
 
 // TODO: .(string) is assumption will cause problems
 func schemaToPostgresIntegrationConfiguration(d *schema.ResourceData) PostgresIntegrationConfiguration {
+	sslMode := ""
+	if d.Get("ssl_mode") != nil {
+		if _sslMode, ok := d.Get("ssl_mode").(string); ok {
+			sslMode = _sslMode
+		} else if !ok {
+			sslMode = ""
+		}
+	}
+
+	tlsRootCert := ""
+	if d.Get("tls_root_cert") != nil {
+		if _tlsRootCert, ok := d.Get("tls_root_cert").(string); ok {
+			tlsRootCert = _tlsRootCert
+		}
+	}
+
+	tlsCertFile := ""
+	if d.Get("tls_cert_file") != nil {
+		if _tlsCertFile, ok := d.Get("tls_cert_file").(string); ok {
+			tlsCertFile = _tlsCertFile
+		}
+	}
+
+	tlsKeyFile := ""
+	if d.Get("tls_key_file") != nil {
+		if _tlsKeyFile, ok := d.Get("tls_key_file").(string); ok {
+			tlsKeyFile = _tlsKeyFile
+		}
+	}
+
 	return PostgresIntegrationConfiguration{
 		Name:         d.Get("name").(string),
 		Username:     d.Get("username").(string),
@@ -97,7 +130,10 @@ func schemaToPostgresIntegrationConfiguration(d *schema.ResourceData) PostgresIn
 		DatabaseName: d.Get("database_name").(string),
 		HostName:     d.Get("host").(string),
 		Port:         d.Get("port").(string),
-		// SSLMode:      d.Get("ssl_mode").(string),
+		SSLMode:      sslMode,
+		TLSRootCert:  tlsRootCert,
+		TLSCertFile:  tlsCertFile,
+		TLSKeyFile:   tlsKeyFile,
 	}
 }
 

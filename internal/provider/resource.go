@@ -9,6 +9,7 @@ import (
 	adaptive "github.com/adaptive-scale/terraform-provider-adaptive/internal/terraform-client"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/diag"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
+	"golang.org/x/exp/slices"
 	"gopkg.in/yaml.v2"
 )
 
@@ -125,11 +126,25 @@ func resourceAdaptiveResource() *schema.Resource {
 				Optional:    true,
 				Description: "The root certificate to use for the CockroachDB instance.",
 			},
-			// "ssl_mode": {
-			// 	Type:        schema.TypeString,
-			// 	Optional:    true,
-			// 	Description: "The SSL mode to use when connecting to the database. Used by CockroachDB, Postgres, Mysql resources",
-			// },
+			"ssl_mode": {
+				Type:     schema.TypeString,
+				Optional: true,
+				ValidateFunc: func(i interface{}, s string) ([]string, []error) {
+					if i == "" {
+						return nil, nil
+					}
+					validValues := []string{
+						"prefer", "allow", "require", "verify-ca", "verify-full", "disable",
+					}
+
+					if !slices.Contains(validValues, i.(string)) {
+						return nil, []error{fmt.Errorf("invalid value for ssl_mode: %s", i)}
+					}
+
+					return nil, nil
+				},
+				Description: "The SSL mode to use when connecting to the database. Used by CockroachDB, Postgres, Mysql resources",
+			},
 			"api_server": {
 				Type:        schema.TypeString,
 				Optional:    true,
@@ -245,6 +260,31 @@ func resourceAdaptiveResource() *schema.Resource {
 				Optional:    true,
 				Description: "The AWS region of the AWS Secrets Manager secret",
 			},
+			"api_token": {
+				Type:        schema.TypeString,
+				Optional:    true,
+				Description: "The API token for ZeroTier network",
+			},
+			"network_id": {
+				Type:        schema.TypeString,
+				Optional:    true,
+				Description: "The network ID for ZeroTier network",
+			},
+			"tls_root_cert": {
+				Type:        schema.TypeString,
+				Optional:    true,
+				Description: "The root certificate to use for the Postgres-like resources.",
+			},
+			"tls_cert_file": {
+				Type:        schema.TypeString,
+				Optional:    true,
+				Description: "The certificate file to use for the Postgres-like resources.",
+			},
+			"tls_key_file": {
+				Type:        schema.TypeString,
+				Optional:    true,
+				Description: "The key file to use for the Postgres-like resources.",
+			},
 		},
 	}
 }
@@ -309,6 +349,8 @@ func resourceAdaptiveResourceCreate(ctx context.Context, d *schema.ResourceData,
 	obj, err := schemaToResourceIntegrationConfiguration(d, iType)
 	if err != nil {
 		return diag.FromErr(err)
+	} else if obj == nil {
+		return diag.FromErr(fmt.Errorf("invalid resource config, please use correct attributes"))
 	}
 
 	config, err := yaml.Marshal(obj)
@@ -354,6 +396,8 @@ func resourceAdaptiveResourceUpdate(ctx context.Context, d *schema.ResourceData,
 	obj, err := schemaToResourceIntegrationConfiguration(d, iType)
 	if err != nil {
 		return diag.FromErr(err)
+	} else if obj == nil {
+		return diag.FromErr(fmt.Errorf("invalid resource config, please use correct attributes"))
 	}
 
 	config, err := yaml.Marshal(obj)
