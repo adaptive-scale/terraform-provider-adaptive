@@ -27,6 +27,20 @@ const (
 	SessionTTLOption360days = "360d"
 )
 
+var validTTLOptions = []string{
+	SessionTTLOptionNone,
+	SessionTTLOption3Hours,
+	SessionTTLOption6Hours,
+	SessionTTLOption1days,
+	SessionTTLOption3days,
+	SessionTTLOption7days,
+	SessionTTLOption30days,
+	SessionTTLOption60days,
+	SessionTTLOption90days,
+	SessionTTLOption180days,
+	SessionTTLOption360days,
+}
+
 const (
 	SessionTypeDefault = "direct"
 	SessionTypeDirect  = "direct"
@@ -124,9 +138,22 @@ func resourceAdaptiveSession() *schema.Resource {
 				Description: "The type of session to create.",
 			},
 			"ttl": {
-				Type:        schema.TypeString,
-				Optional:    true,
-				Default:     SessionTTLOption90days,
+				Type:     schema.TypeString,
+				Optional: true,
+				Default:  SessionTTLOption90days,
+				ValidateFunc: func(i interface{}, s string) ([]string, []error) {
+					if _, ok := i.(string); !ok {
+						return nil, []error{fmt.Errorf("ttl must be a string")}
+					}
+
+					// make sure it's valid value
+					if !slices.Contains(
+						validTTLOptions, i.(string)) {
+						return nil, []error{fmt.Errorf("ttl must be one of %v", validTTLOptions)}
+					}
+
+					return nil, nil
+				},
 				Description: "The port number of the Postgres instance to connect to.",
 			},
 			"authorization": {
