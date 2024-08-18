@@ -215,6 +215,20 @@ func resourceAdaptiveResource() *schema.Resource {
 				Optional:    true,
 				Description: "Comma-separated list of URLs. Used by Services resource",
 			},
+			"hosts": {
+				Type:     schema.TypeList,
+				Optional: true,
+				Elem: &schema.Schema{
+					Type: schema.TypeString,
+				},
+				Description: "List of hosts. Used by Services resource",
+			},
+			"default_user": {
+				Type:        schema.TypeString,
+				Optional:    true,
+				Description: "Default user for the Services resource",
+			},
+
 			"key": {
 				Type:        schema.TypeString,
 				Optional:    true,
@@ -319,7 +333,7 @@ func schemaToResourceIntegrationConfiguration(d *schema.ResourceData, intType st
 	case "postgres_aws_secrets_manager":
 		return schemaToPostgresAWSIntegrationConfiguration(d), nil
 	case "services":
-		return schemaToServiceListIntegrationConfiguration(d), nil
+		return schemaToServiceListIntegrationConfiguration(d)
 	case "ssh":
 		return schemaToSSHIntegrationConfiguration(d), nil
 	case "kubernetes":

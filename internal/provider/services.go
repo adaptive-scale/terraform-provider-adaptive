@@ -29,6 +29,46 @@ type ServerListIntegrationConfiguration struct {
 	Password    string `yaml:"password"`
 }
 
+func schemaToServiceListIntegrationConfiguration(d *schema.ResourceData) (ServerListIntegrationConfiguration, error) {
+
+	var hosts []string
+	if _hosts, ok := d.GetOk("hosts"); ok {
+		if _, ok = _hosts.([]interface{}); !ok {
+			// TODO: instead attempting to parse, should we just error out?
+			return ServerListIntegrationConfiguration{}, errors.New("could not parse hosts")
+		} else {
+			for _, __host := range _hosts.([]interface{}) {
+				hosts = append(hosts, __host.(string))
+			}
+		}
+	}
+
+	hostsNSV := strings.Join(hosts, "\n")
+
+	var sshKey string
+	if v, ok := d.GetOk("key"); ok {
+		sshKey = v.(string)
+	}
+
+	var password string
+	if v, ok := d.GetOk("password"); ok {
+		password = v.(string)
+	}
+
+	var defaultUser string
+	if v, ok := d.GetOk("default_user"); ok {
+		defaultUser = v.(string)
+	}
+
+	return ServerListIntegrationConfiguration{
+		Version:     "1",
+		Hosts:       hostsNSV,
+		SshKey:      sshKey,
+		Password:    password,
+		DefaultUser: defaultUser,
+	}, nil
+}
+
 func resourceAdaptiveServiceList() *schema.Resource {
 	return &schema.Resource{
 		CreateContext: resourceAdaptiveServiceListCreate,
@@ -56,39 +96,10 @@ func resourceAdaptiveServiceList() *schema.Resource {
 	}
 }
 
-func schemaToServiceListIntegrationConfiguration(d *schema.ResourceData) ServerListIntegrationConfiguration {
-
-	var hosts []string
-	hostsNSV := strings.Join(hosts, ",")
-
-	var sshKey string
-	if v, ok := d.GetOk("ssh_key"); ok {
-		sshKey = v.(string)
-	}
-
-	var password string
-	if v, ok := d.GetOk("password"); ok {
-		password = v.(string)
-	}
-
-	var defaultUser string
-	if v, ok := d.GetOk("default_user"); ok {
-		defaultUser = v.(string)
-	}
-
-	return ServerListIntegrationConfiguration{
-		Version:     "1",
-		Hosts:       hostsNSV,
-		SshKey:      sshKey,
-		Password:    password,
-		DefaultUser: defaultUser,
-	}
-}
-
 func resourceAdaptiveServiceListCreate(ctx context.Context, d *schema.ResourceData, m interface{}) diag.Diagnostics {
 	client := m.(*adaptive.Client)
 
-	obj := schemaToServiceListIntegrationConfiguration(d)
+	obj, _ := schemaToServiceListIntegrationConfiguration(d)
 	config, err := yaml.Marshal(obj)
 	if err != nil {
 		err := errors.New("provider error, could not marshal")
@@ -117,7 +128,7 @@ func resourceAdaptiveServiceListUpdate(ctx context.Context, d *schema.ResourceDa
 	client := m.(*adaptive.Client)
 	resourceID := d.Id()
 
-	obj := schemaToServiceListIntegrationConfiguration(d)
+	obj, _ := schemaToServiceListIntegrationConfiguration(d)
 	config, err := yaml.Marshal(obj)
 	if err != nil {
 		err := errors.New("provider error, could not marshal")
