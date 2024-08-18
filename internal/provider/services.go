@@ -12,6 +12,7 @@ resource "adaptive_servicelist" "example" {
 import (
 	"context"
 	"errors"
+	"strings"
 	"time"
 
 	adaptive "github.com/adaptive-scale/terraform-provider-adaptive/internal/terraform-client"
@@ -20,10 +21,12 @@ import (
 	"gopkg.in/yaml.v2"
 )
 
-type ServiceListIntegrationConfiguration struct {
-	Name    string `yaml:"name"`
-	Version string `yaml:"version"`
-	URLs    string `yaml:"urls"`
+type ServerListIntegrationConfiguration struct {
+	Version     string `yaml:"version"`
+	Hosts       string `yaml:"hosts"`
+	DefaultUser string `yaml:"user"`
+	SshKey      string `yaml:"sshKey"`
+	Password    string `yaml:"password"`
 }
 
 func resourceAdaptiveServiceList() *schema.Resource {
@@ -53,11 +56,32 @@ func resourceAdaptiveServiceList() *schema.Resource {
 	}
 }
 
-func schemaToServiceListIntegrationConfiguration(d *schema.ResourceData) ServiceListIntegrationConfiguration {
-	return ServiceListIntegrationConfiguration{
-		Version: "1",
-		Name:    d.Get("name").(string),
-		URLs:    d.Get("urls").(string),
+func schemaToServiceListIntegrationConfiguration(d *schema.ResourceData) ServerListIntegrationConfiguration {
+
+	var hosts []string
+	hostsNSV := strings.Join(hosts, ",")
+
+	var sshKey string
+	if v, ok := d.GetOk("ssh_key"); ok {
+		sshKey = v.(string)
+	}
+
+	var password string
+	if v, ok := d.GetOk("password"); ok {
+		password = v.(string)
+	}
+
+	var defaultUser string
+	if v, ok := d.GetOk("default_user"); ok {
+		defaultUser = v.(string)
+	}
+
+	return ServerListIntegrationConfiguration{
+		Version:     "1",
+		Hosts:       hostsNSV,
+		SshKey:      sshKey,
+		Password:    password,
+		DefaultUser: defaultUser,
 	}
 }
 
