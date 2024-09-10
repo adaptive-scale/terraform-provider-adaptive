@@ -64,7 +64,7 @@ func resourceAdaptiveServiceList() *schema.Resource {
 func resourceAdaptiveServiceListCreate(ctx context.Context, d *schema.ResourceData, m interface{}) diag.Diagnostics {
 	client := m.(*adaptive.Client)
 
-	obj, _ := schemaToServiceListIntegrationConfiguration(d)
+	obj := schemaToServiceListIntegrationConfiguration(d)
 	config, err := yaml.Marshal(obj)
 	if err != nil {
 		err := errors.New("provider error, could not marshal")
@@ -93,7 +93,7 @@ func resourceAdaptiveServiceListUpdate(ctx context.Context, d *schema.ResourceDa
 	client := m.(*adaptive.Client)
 	resourceID := d.Id()
 
-	obj, _ := schemaToServiceListIntegrationConfiguration(d)
+	obj := schemaToServiceListIntegrationConfiguration(d)
 	config, err := yaml.Marshal(obj)
 	if err != nil {
 		err := errors.New("provider error, could not marshal")
