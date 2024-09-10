@@ -28,6 +28,7 @@ var (
 		"postgres",
 		"postgres_aws_secrets_manager",
 		"services",
+		"serverlist",
 		"ssh",
 		"kubernetes",
 		"awsdocumentdb",
@@ -333,7 +334,9 @@ func schemaToResourceIntegrationConfiguration(d *schema.ResourceData, intType st
 	case "postgres_aws_secrets_manager":
 		return schemaToPostgresAWSIntegrationConfiguration(d), nil
 	case "services":
-		return schemaToServiceListIntegrationConfiguration(d)
+		return schemaToServiceListIntegrationConfiguration(d), nil
+	case "serverlist":
+		return schemaToServerListIntegrationConfiguration(d)
 	case "ssh":
 		return schemaToSSHIntegrationConfiguration(d), nil
 	case "kubernetes":
