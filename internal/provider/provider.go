@@ -5,7 +5,15 @@ package provider
 
 import (
 	"context"
+	"encoding/json"
+	"errors"
+	"fmt"
+	"io/ioutil"
+	"log"
+	"os"
+	"path"
 
+	client "github.com/adaptive-scale/terraform-provider-adaptive/internal/terraform-client"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/diag"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
 )
@@ -29,32 +37,75 @@ func init() {
 func New(version string) func() *schema.Provider {
 	return func() *schema.Provider {
 		p := &schema.Provider{
-			DataSourcesMap: map[string]*schema.Resource{
-				"scaffolding_data_source": dataSourceScaffolding(),
+			Schema: map[string]*schema.Schema{
+				"service_token": {
+					Type:        schema.TypeString,
+					Optional:    true,
+					Description: "Service account token for authenticating with the Adaptive service. If not provided, provider will default to reading token from default adaptive-cli",
+					DefaultFunc: schema.EnvDefaultFunc("ADAPTIVE_SVC_TOKEN", ""),
+				},
+				"workspace_url": {
+					Type:        schema.TypeString,
+					Optional:    true,
+					DefaultFunc: schema.EnvDefaultFunc("ADAPTIVE_URL", "https://app.adaptive.live"),
+					Description: "The workspace to use for the provider. If not set, the default workspace will be used app.adaptive.live",
+				},
 			},
 			ResourcesMap: map[string]*schema.Resource{
-				"scaffolding_resource": resourceScaffolding(),
+				"adaptive_endpoint":      resourceAdaptiveSession(),
+				"adaptive_resource":      resourceAdaptiveResource(),
+				"adaptive_authorization": resourceAdaptiveAuthorization(),
+				"adaptive_group":         resourceAdaptiveTeam(),
+				"adaptive_script":        resourceAdaptiveScript(),
 			},
+			ConfigureContextFunc: providerConfigure,
 		}
-
-		p.ConfigureContextFunc = configure(version, p)
-
 		return p
 	}
 }
 
-type apiClient struct {
-	// Add whatever fields, client or connection info, etc. here
-	// you would need to setup to communicate with the upstream
-	// API.
+type AdaptiveCLISVCToken struct {
+	Token        string `json:"token"`
+	WorkspaceURL string `json:"url"`
 }
 
-func configure(version string, p *schema.Provider) func(context.Context, *schema.ResourceData) (any, diag.Diagnostics) {
-	return func(context.Context, *schema.ResourceData) (any, diag.Diagnostics) {
-		// Setup a User-Agent for your API client (replace the provider name for yours):
-		// userAgent := p.UserAgent("terraform-provider-scaffolding", version)
-		// TODO: myClient.UserAgent = userAgent
-
-		return &apiClient{}, nil
+func tryReadingServiceToken(potentialToken, workspaceURL string) (string, string, error) {
+	if potentialToken == "" {
+		return "", "", errors.New("'serviceToken' field cannot be empty")
 	}
+	// check if json marshallable
+	var _token AdaptiveCLISVCToken
+	if _err := json.Unmarshal([]byte(potentialToken), &_token); _err == nil {
+		return _token.Token, _token.WorkspaceURL, nil
+	}
+	return potentialToken, workspaceURL, nil
+
+}
+
+func providerConfigure(ctx context.Context, d *schema.ResourceData) (interface{}, diag.Diagnostics) {
+	serviceToken := d.Get("service_token").(string)
+	workspaceURL := d.Get("workspace_url").(string)
+	if serviceToken == "" {
+		log.Println("empty token initilization. defaulting to adaptive-cli config folder")
+
+		defaultLocation := "~/.adaptive/token"
+		homeDir, err := os.UserHomeDir()
+		if err != nil {
+			return nil, diag.FromErr(fmt.Errorf("service_token not provided and failed to read token from default location (%s). reason: %w", defaultLocation, err))
+		}
+		serviceTokenJSON, err := ioutil.ReadFile(path.Join(homeDir, ".adaptive", "token"))
+		if err != nil {
+			return nil, diag.FromErr(fmt.Errorf("service_token not provided and failed to read token from default location (%s). reason: %w", defaultLocation, err))
+		}
+		// let tryReadingServiceToken parse the json
+		serviceToken = string(serviceTokenJSON)
+	}
+
+	svcToken, wsURL, err := tryReadingServiceToken(serviceToken, workspaceURL)
+	if err != nil {
+		return nil, diag.Errorf(fmt.Sprintf("bad service token: %s", err))
+	}
+	c := client.NewClient(svcToken, wsURL)
+
+	return c, nil
 }

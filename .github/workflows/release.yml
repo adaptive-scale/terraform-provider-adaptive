@@ -6,45 +6,43 @@
 # secret. If you would rather own your own GPG handling, please fork this action
 # or use an alternative one for key handling.
 #
-# You will need to pass the `--batch` flag to `gpg` in your signing step 
+# You will need to pass the `--batch` flag to `gpg` in your signing step
 # in `goreleaser` to indicate this is being used in a non-interactive mode.
 #
 name: release
 on:
   push:
     tags:
-      - 'v*'
+      - "v*"
 permissions:
   contents: write
 jobs:
   goreleaser:
     runs-on: ubuntu-latest
     steps:
-      -
-        name: Checkout
-        uses: actions/checkout@ac593985615ec2ede58e132d2e21d2b1cbd6127c # v3.3.0
-      -
-        name: Unshallow
+      - name: Checkout
+        uses: actions/checkout@cbb722410c2e876e24abbe8de2cc27693e501dcb # v4.0.0
+      - name: Unshallow
         run: git fetch --prune --unshallow
-      -
-        name: Set up Go
-        uses: actions/setup-go@6edd4406fa81c3da01a34fa6f6343087c207a568 # v3.5.0
+      - name: Set up Go
+        uses: actions/setup-go@3041bf56c941b39c61721a86cd11f3bb1338122a # v5.2.0
         with:
-          go-version-file: 'go.mod'
+          go-version-file: "go.mod"
           cache: true
-      -
-        name: Import GPG key
-        uses: crazy-max/ghaction-import-gpg@111c56156bcc6918c056dbef52164cfa583dc549 # v5.2.0
+      - name: Import GPG key
+        uses: crazy-max/ghaction-import-gpg@cb9bde2e2525e640591a934b1fd28eef1dcaf5e5 # v6.2.0
         id: import_gpg
         with:
           gpg_private_key: ${{ secrets.GPG_PRIVATE_KEY }}
           passphrase: ${{ secrets.PASSPHRASE }}
-      -
-        name: Run GoReleaser
-        uses: goreleaser/goreleaser-action@f82d6c1c344bcacabba2c841718984797f664a6b # v4.2.0
+      - name: Run GoReleaser
+        # uses: goreleaser/goreleaser-action@f82d6c1c344bcacabba2c841718984797f664a6b # v4.2.0
+        uses: goreleaser/goreleaser-action@v6
         with:
-          version: latest
+          # version: latest
+          version: "~> v1.15.0"
           args: release --rm-dist
+          # args: release --clean
         env:
           GPG_FINGERPRINT: ${{ steps.import_gpg.outputs.fingerprint }}
           # GitHub sets this automatically
