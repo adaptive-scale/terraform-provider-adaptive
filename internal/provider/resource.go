@@ -196,37 +196,37 @@ func resourceAdaptiveResource() *schema.Resource {
 			},
 			"access_key_id": {
 				Type:        schema.TypeString,
-				Optional:    false,
+				Optional:    true,
 				Description: "The AWS access key id. Used by AWS resource.",
 			},
 			"secret_access_key": {
 				Type:        schema.TypeString,
-				Optional:    false,
+				Optional:    true,
 				Description: "The AWS secret access key in plaintext. Used by AWS resource.",
 			},
 			"tenant_id": {
 				Type:        schema.TypeString,
-				Optional:    false,
+				Optional:    true,
 				Description: "The Azure tenant ID. Used by Azure resource.",
 			},
 			"application_id": {
 				Type:        schema.TypeString,
-				Optional:    false,
+				Optional:    true,
 				Description: "The Azure application ID. Used by Azure resource.",
 			},
 			"client_secret": {
 				Type:        schema.TypeString,
-				Optional:    false,
+				Optional:    true,
 				Description: "The client secret for a resource. Used by Azure, Google, Okta resources.",
 			},
 			"api_client_id": {
 				Type:        schema.TypeString,
-				Optional:    false,
+				Optional:    true,
 				Description: "The API client ID for a resource. Used by Azure resource.",
 			},
 			"api_client_secret": {
 				Type:        schema.TypeString,
-				Optional:    false,
+				Optional:    true,
 				Description: "The API client secret for a resource. Used by Azure resource.",
 			},
 			"login_url": {
@@ -303,11 +303,6 @@ func resourceAdaptiveResource() *schema.Resource {
 				Optional:    true,
 				Description: "The SSH key to use when connecting to the instance. If not specified, password authentication will be used. Used by SSH resource",
 			},
-			"private_key": {
-				Type:        schema.TypeString,
-				Optional:    true,
-				Description: "",
-			},
 			"public_key": {
 				Type:        schema.TypeString,
 				Optional:    true,
@@ -345,33 +340,33 @@ func resourceAdaptiveResource() *schema.Resource {
 			},
 			"api_token": {
 				Type:        schema.TypeString,
-				Optional:    false,
+				Optional:    true,
 				Description: "The API token for the service",
 			},
 
 			"private_key": {
 				Type:        schema.TypeString,
-				Optional:    false,
+				Optional:    true,
 				Description: "The private key for the service",
 			},
 			"application_name": {
 				Type:        schema.TypeString,
-				Optional:    false,
+				Optional:    true,
 				Description: "The application name for the service",
 			},
 			"sub_system_name": {
 				Type:        schema.TypeString,
-				Optional:    false,
+				Optional:    true,
 				Description: "The sub system name for the service",
 			},
 			"shared_secret": {
 				Type:        schema.TypeString,
-				Optional:    false,
+				Optional:    true,
 				Description: "The shared secret for the integration",
 			},
 			"image": {
 				Type:        schema.TypeString,
-				Optional:    false,
+				Optional:    true,
 				Description: "The Docker image to use for the YugabyteDB resource",
 			},
 			"service_account_name": {
@@ -381,12 +376,12 @@ func resourceAdaptiveResource() *schema.Resource {
 			},
 			"dd_site": {
 				Type:        schema.TypeString,
-				Optional:    false,
+				Optional:    true,
 				Description: "The Datadog site to send data to",
 			},
 			"dd_api_key": {
 				Type:        schema.TypeString,
-				Optional:    false,
+				Optional:    true,
 				Description: "The Datadog API key",
 			},
 			"index": {
@@ -433,6 +428,51 @@ func resourceAdaptiveResource() *schema.Resource {
 				Type:        schema.TypeString,
 				Optional:    true,
 				Description: "The key file to use for the Postgres-like resources.",
+			},
+			"token_id": {
+				Type:        schema.TypeString,
+				Optional:    true,
+				Description: "The token ID for the service",
+			},
+			"url": {
+				Type:        schema.TypeString,
+				Optional:    true,
+				Description: "The URL for the service",
+			},
+			"api_key": {
+				Type:        schema.TypeString,
+				Optional:    true,
+				Description: "The API key",
+			},
+			"app_id": {
+				Type:        schema.TypeString,
+				Optional:    true,
+				Description: "The app ID",
+			},
+			"app_key": {
+				Type:        schema.TypeString,
+				Optional:    true,
+				Description: "The app key",
+			},
+			"version": {
+				Type:        schema.TypeString,
+				Optional:    true,
+				Description: "The version",
+			},
+			"database_account": {
+				Type:        schema.TypeString,
+				Optional:    true,
+				Description: "The database account",
+			},
+			"database_username": {
+				Type:        schema.TypeString,
+				Optional:    true,
+				Description: "The database username",
+			},
+			"database_password": {
+				Type:        schema.TypeString,
+				Optional:    true,
+				Description: "The database password",
 			},
 		},
 	}
