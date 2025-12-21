@@ -37,6 +37,34 @@ var (
 		"rdp_windows",
 		"mongodb_atlas",
 		"awssecretsmanager",
+
+		//new types to be added later
+		"sql_server",
+		"azuresqlserver",
+		"splunk",
+		"datadog",
+		"sqlserver_aws_secrets_manager",
+		"coralogix",
+		"jumpcloud",
+		"msteams",
+		"yugabytedb",
+		"onelogin",
+		"elasticsearch",
+		"paloalto_ngfw",
+		"fortinet_ngfw",
+		"cisco_ngfw",
+		"snowflake",
+		"snowflake_aws_secrets_manager",
+		"custom_siem_webhook",
+		"aruba_sw",
+		"aruba_instant_on",
+		"hpe_switch",
+		"syslog",
+		"customintegration",
+		"clickhouse",
+		"keyspaces",
+		"rabbitmq",
+		"azurecosmosnosql",
 	}
 )
 
@@ -191,6 +219,46 @@ func resourceAdaptiveResource() *schema.Resource {
 				Optional:    true,
 				Description: "The client secret for a resource. Used by Azure, Google, Okta resources.",
 			},
+			"api_client_id": {
+				Type:        schema.TypeString,
+				Optional:    true,
+				Description: "The API client ID for a resource. Used by Azure resource.",
+			},
+			"api_client_secret": {
+				Type:        schema.TypeString,
+				Optional:    true,
+				Description: "The API client secret for a resource. Used by Azure resource.",
+			},
+			"login_url": {
+				Type:        schema.TypeString,
+				Optional:    true,
+				Description: "The login URL for a resource",
+			},
+			"warehouse": {
+				Type:        schema.TypeString,
+				Optional:    true,
+				Description: "The Snowflake warehouse name. Used by Snowflake resource",
+			},
+			"schema": {
+				Type:        schema.TypeString,
+				Optional:    true,
+				Description: "The Snowflake schema name. Used by Snowflake resource",
+			},
+			"clientcert": {
+				Type:        schema.TypeString,
+				Optional:    true,
+				Description: "The Snowflake client certificate. Used by Snowflake resource",
+			},
+			"role": {
+				Type:        schema.TypeString,
+				Optional:    true,
+				Description: "The Snowflake role name. Used by Snowflake resource",
+			},
+			"protocol": {
+				Type:        schema.TypeString,
+				Optional:    true,
+				Description: "The protocol to use when connecting to the resource",
+			},
 			"project_id": {
 				Type:        schema.TypeString,
 				Optional:    true,
@@ -235,11 +303,6 @@ func resourceAdaptiveResource() *schema.Resource {
 				Optional:    true,
 				Description: "The SSH key to use when connecting to the instance. If not specified, password authentication will be used. Used by SSH resource",
 			},
-			"private_key": {
-				Type:        schema.TypeString,
-				Optional:    true,
-				Description: "",
-			},
 			"public_key": {
 				Type:        schema.TypeString,
 				Optional:    true,
@@ -278,7 +341,73 @@ func resourceAdaptiveResource() *schema.Resource {
 			"api_token": {
 				Type:        schema.TypeString,
 				Optional:    true,
-				Description: "The API token for ZeroTier network",
+				Description: "The API token for the service",
+			},
+
+			"private_key": {
+				Type:        schema.TypeString,
+				Optional:    true,
+				Description: "The private key for the service",
+			},
+			"application_name": {
+				Type:        schema.TypeString,
+				Optional:    true,
+				Description: "The application name for the service",
+			},
+			"sub_system_name": {
+				Type:        schema.TypeString,
+				Optional:    true,
+				Description: "The sub system name for the service",
+			},
+			"shared_secret": {
+				Type:        schema.TypeString,
+				Optional:    true,
+				Description: "The shared secret for the integration",
+			},
+			"image": {
+				Type:        schema.TypeString,
+				Optional:    true,
+				Description: "The Docker image to use for the YugabyteDB resource",
+			},
+			"service_account_name": {
+				Type:        schema.TypeString,
+				Optional:    true,
+				Description: "The service account name to use for the YugabyteDB resource",
+			},
+			"dd_site": {
+				Type:        schema.TypeString,
+				Optional:    true,
+				Description: "The Datadog site to send data to",
+			},
+			"dd_api_key": {
+				Type:        schema.TypeString,
+				Optional:    true,
+				Description: "The Datadog API key",
+			},
+			"index": {
+				Type:        schema.TypeString,
+				Optional:    true,
+				Description: "The Elasticsearch index to send data to",
+			},
+			"use_proxy": {
+				Type:        schema.TypeBool,
+				Optional:    true,
+				Description: "Whether to use proxy",
+			},
+			"webui_port": {
+				Type:        schema.TypeString,
+				Optional:    true,
+				Description: "The web UI port",
+			},
+			"use_service_account": {
+				Type:        schema.TypeBool,
+				Optional:    true,
+				Description: "Whether to use service account for authentication. Used by GCP resource",
+			},
+			"create_if_not_exists": {
+				Type:        schema.TypeBool,
+				Optional:    true,
+				Description: "Whether to create the Keyspaces keyspace if it does not exist",
 			},
 			"network_id": {
 				Type:        schema.TypeString,
@@ -299,6 +428,51 @@ func resourceAdaptiveResource() *schema.Resource {
 				Type:        schema.TypeString,
 				Optional:    true,
 				Description: "The key file to use for the Postgres-like resources.",
+			},
+			"token_id": {
+				Type:        schema.TypeString,
+				Optional:    true,
+				Description: "The token ID for the service",
+			},
+			"url": {
+				Type:        schema.TypeString,
+				Optional:    true,
+				Description: "The URL for the service",
+			},
+			"api_key": {
+				Type:        schema.TypeString,
+				Optional:    true,
+				Description: "The API key",
+			},
+			"app_id": {
+				Type:        schema.TypeString,
+				Optional:    true,
+				Description: "The app ID",
+			},
+			"app_key": {
+				Type:        schema.TypeString,
+				Optional:    true,
+				Description: "The app key",
+			},
+			"version": {
+				Type:        schema.TypeString,
+				Optional:    true,
+				Description: "The version",
+			},
+			"database_account": {
+				Type:        schema.TypeString,
+				Optional:    true,
+				Description: "The database account",
+			},
+			"database_username": {
+				Type:        schema.TypeString,
+				Optional:    true,
+				Description: "The database username",
+			},
+			"database_password": {
+				Type:        schema.TypeString,
+				Optional:    true,
+				Description: "The database password",
 			},
 		},
 	}
@@ -351,6 +525,58 @@ func schemaToResourceIntegrationConfiguration(d *schema.ResourceData, intType st
 		return schemaToRDPWindowsIntegrationConfiguration(d), nil
 	case "awssecretsmanager":
 		return schemaToAWSSecretsManagerConfiguration(d), nil
+	case "sql_server":
+		return schemaToSQLServerIntegrationConfiguration(d), nil
+	case "azuresqlserver":
+		return schemaToAzureSQLServerIntegrationConfiguration(d), nil
+	case "splunk":
+		return schemaToSplunkIntegrationConfiguration(d), nil
+	case "datadog":
+		return schemaToDatadogIntegrationConfiguration(d), nil
+	case "sqlserver_aws_secrets_manager":
+		return schemaToSQLServerAWSIntegrationConfiguration(d), nil
+	case "coralogix":
+		return schemaToCoralogixIntegrationConfiguration(d), nil
+	case "jumpcloud":
+		return schemaToJumpCloudIntegrationConfiguration(d), nil
+	case "msteams":
+		return schemaToMSTeamsIntegrationConfiguration(d), nil
+	case "yugabytedb":
+		return schemaToYugabyteDBIntegrationConfiguration(d), nil
+	case "onelogin":
+		return schemaToOneLoginIntegrationConfiguration(d), nil
+	case "elasticsearch":
+		return schemaToElasticsearchIntegrationConfiguration(d), nil
+	case "paloalto_ngfw":
+		return schemaToPaloAltoNGFWIntegrationConfiguration(d), nil
+	case "fortinet_ngfw":
+		return schemaToFortinetNGFWIntegrationConfiguration(d), nil
+	case "cisco_ngfw":
+		return schemaToCiscoNGFWIntegrationConfiguration(d), nil
+	case "snowflake":
+		return schemaToSnowflakeIntegrationConfiguration(d), nil
+	case "snowflake_aws_secrets_manager":
+		return schemaToSnowflakeAWSIntegrationConfiguration(d), nil
+	case "custom_siem_webhook":
+		return schemaToCustomSIEMWebhookIntegrationConfiguration(d), nil
+	case "aruba_sw":
+		return schemaToArubaSWIntegrationConfiguration(d), nil
+	case "aruba_instant_on":
+		return schemaToArubaInstantOnIntegrationConfiguration(d), nil
+	case "hpe_switch":
+		return schemaToHPESwitchIntegrationConfiguration(d), nil
+	case "syslog":
+		return schemaToSyslogIntegrationConfiguration(d), nil
+	case "customintegration":
+		return schemaToCustomIntegrationConfiguration(d), nil
+	case "clickhouse":
+		return schemaToClickHouseIntegrationConfiguration(d), nil
+	case "keyspaces":
+		return schemaToKeyspacesIntegrationConfiguration(d), nil
+	case "rabbitmq":
+		return schemaToRabbitMQIntegrationConfiguration(d), nil
+	case "azurecosmosnosql":
+		return schemaToAzureCosmosNoSQLIntegrationConfiguration(d), nil
 	default:
 		return nil, fmt.Errorf("invalid adaptive resource type %s", intType)
 	}
@@ -366,8 +592,6 @@ func resourceAdaptiveResourceCreate(ctx context.Context, d *schema.ResourceData,
 	obj, err := schemaToResourceIntegrationConfiguration(d, iType)
 	if err != nil {
 		return diag.FromErr(err)
-	} else if obj == nil {
-		return diag.FromErr(fmt.Errorf("invalid resource config, please use correct attributes"))
 	}
 
 	config, err := yaml.Marshal(obj)
@@ -413,8 +637,6 @@ func resourceAdaptiveResourceUpdate(ctx context.Context, d *schema.ResourceData,
 	obj, err := schemaToResourceIntegrationConfiguration(d, iType)
 	if err != nil {
 		return diag.FromErr(err)
-	} else if obj == nil {
-		return diag.FromErr(fmt.Errorf("invalid resource config, please use correct attributes"))
 	}
 
 	config, err := yaml.Marshal(obj)

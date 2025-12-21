@@ -1,7 +1,8 @@
 module github.com/adaptive-scale/terraform-provider-adaptive
 
-go 1.21
-toolchain go1.22.9
+go 1.22.7
+
+toolchain go1.24.2
 
 require (
 	github.com/hashicorp/terraform-plugin-docs v0.21.0
