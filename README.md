@@ -22,6 +22,26 @@ Provider initialization
 provider "adaptive" {}
 ```
 
+## Development
+
+This project includes several shell scripts to automate common development workflows. See the [scripts/README.md](scripts/README.md) for detailed information.
+
+### Quick Start for Developers
+
+```bash
+# Build and install the provider locally
+./scripts/build-install.sh
+
+# Test all examples
+./scripts/test-all-examples.sh
+
+# Or test a specific example
+./scripts/test-example.sh kubernetes
+
+# Run the full development workflow
+./scripts/dev-workflow.sh
+```
+
 ## Useful Links
 
 - [Provider documentation](https://registry.terraform.io/providers/adaptive-scale/adaptive/latest/docs)

@@ -191,17 +191,17 @@ func resourceAdaptiveResource() *schema.Resource {
 			},
 			"tolerations": {
 				Type:        schema.TypeString,
-				Optional:    false,
+				Optional:    true,
 				Description: "The tolerations configuration in YAML format. Used by Kubernetes resource",
 			},
 			"annotations": {
 				Type:        schema.TypeString,
-				Optional:    false,
+				Optional:    true,
 				Description: "The annotations configuration in YAML format. Used by Kubernetes resource",
 			},
 			"node_selector": {
 				Type:        schema.TypeString,
-				Optional:    false,
+				Optional:    true,
 				Description: "The node selector configuration in YAML format. Used by Kubernetes resource",
 			},
 			"region_name": {
