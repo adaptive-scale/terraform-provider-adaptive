@@ -38,6 +38,9 @@ This project includes several shell scripts to automate common development workf
 # Or test a specific example
 ./scripts/test-example.sh kubernetes
 
+# Generate documentation
+./scripts/generate-docs.sh
+
 # Run the full development workflow
 ./scripts/dev-workflow.sh
 ```

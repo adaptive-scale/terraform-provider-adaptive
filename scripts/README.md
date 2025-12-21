@@ -28,6 +28,12 @@ Creates a new example directory with basic `provider.tf` and `main.tf` files.
 ./scripts/create-example.sh new-integration
 ```
 
+### `generate-docs.sh`
+Generates Terraform provider documentation using tfplugindocs.
+```bash
+./scripts/generate-docs.sh
+```
+
 ### `clean.sh`
 Cleans build artifacts, Terraform caches, and Go build cache.
 ```bash
