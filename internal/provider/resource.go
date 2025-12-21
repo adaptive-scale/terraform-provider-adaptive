@@ -189,6 +189,21 @@ func resourceAdaptiveResource() *schema.Resource {
 				Optional:    true,
 				Description: "The cluster token for Kubernetes API server. Used by Kubernetes resource",
 			},
+			"tolerations": {
+				Type:        schema.TypeString,
+				Optional:    false,
+				Description: "The tolerations configuration in YAML format. Used by Kubernetes resource",
+			},
+			"annotations": {
+				Type:        schema.TypeString,
+				Optional:    false,
+				Description: "The annotations configuration in YAML format. Used by Kubernetes resource",
+			},
+			"node_selector": {
+				Type:        schema.TypeString,
+				Optional:    false,
+				Description: "The node selector configuration in YAML format. Used by Kubernetes resource",
+			},
 			"region_name": {
 				Type:        schema.TypeString,
 				Optional:    true,
