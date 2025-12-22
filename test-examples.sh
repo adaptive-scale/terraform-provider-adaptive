@@ -111,7 +111,7 @@ test_example() {
   # Optionally apply
   if [[ "$APPLY" == "true" ]]; then
     log_info "  Running terraform apply..."
-    if ! terraform apply -auto-approve tfplan >/dev/null 2>&1; then
+    if ! terraform apply -auto-approve tfplan; then
       log_error "  terraform apply failed for $example_name"
       cd "$SCRIPT_DIR"
       return 1
