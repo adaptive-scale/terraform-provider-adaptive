@@ -38,3 +38,9 @@ testacc:
 
 docs:
 	go run github.com/hashicorp/terraform-plugin-docs/cmd/tfplugindocs generate
+
+test-examples:
+	./test-examples.sh
+
+test-examples-apply:
+	./test-examples.sh --apply

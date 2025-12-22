@@ -51,6 +51,7 @@ func New(version string) func() *schema.Provider {
 					Description: "The workspace to use for the provider. If not set, the default workspace will be used app.adaptive.live",
 				},
 			},
+
 			ResourcesMap: map[string]*schema.Resource{
 				"adaptive_endpoint":      resourceAdaptiveSession(),
 				"adaptive_resource":      resourceAdaptiveResource(),
@@ -58,6 +59,7 @@ func New(version string) func() *schema.Provider {
 				"adaptive_group":         resourceAdaptiveTeam(),
 				"adaptive_script":        resourceAdaptiveScript(),
 			},
+
 			ConfigureContextFunc: providerConfigure,
 		}
 		return p
@@ -69,17 +71,48 @@ type AdaptiveCLISVCToken struct {
 	WorkspaceURL string `json:"url"`
 }
 
+type AdaptiveDeploymentConfig struct {
+	URL     string `json:"url"`
+	Token   string `json:"token"`
+	Name    string `json:"name,omitempty"`
+	Default bool   `json:"default,omitempty"`
+}
+
+type AdaptiveDeploymentsConfig struct {
+	Deployments map[string]AdaptiveDeploymentConfig `json:"deployments"`
+}
+
 func tryReadingServiceToken(potentialToken, workspaceURL string) (string, string, error) {
 	if potentialToken == "" {
 		return "", "", errors.New("'serviceToken' field cannot be empty")
 	}
-	// check if json marshallable
+
+	fmt.Println("Trying to parse service token...")
+	fmt.Printf("Token content: %s\n", workspaceURL)
+
+	// First, try to parse as deployments config
+	var deploymentsConfig AdaptiveDeploymentsConfig
+	if err := json.Unmarshal([]byte(potentialToken), &deploymentsConfig); err == nil {
+		// Find the default deployment
+		for _, deployment := range deploymentsConfig.Deployments {
+			if deployment.Default {
+				return deployment.Token, deployment.URL, nil
+			}
+		}
+		// If no default found, use the first deployment
+		for _, deployment := range deploymentsConfig.Deployments {
+			return deployment.Token, deployment.URL, nil
+		}
+	}
+
+	// Fallback: try to parse as simple token config
 	var _token AdaptiveCLISVCToken
 	if _err := json.Unmarshal([]byte(potentialToken), &_token); _err == nil {
 		return _token.Token, _token.WorkspaceURL, nil
 	}
-	return potentialToken, workspaceURL, nil
 
+	// Final fallback: treat as plain token string
+	return potentialToken, workspaceURL, nil
 }
 
 func providerConfigure(ctx context.Context, d *schema.ResourceData) (interface{}, diag.Diagnostics) {
