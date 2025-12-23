@@ -454,7 +454,7 @@ func (c *Client) DeleteSession(sessionID string) (bool, error) {
 					if status, okk := res["Status"].(string); !okk {
 						return true
 					} else {
-						return strings.ToLower(status) != "terminated"
+						return strings.ToLower(status) != "terminated" || strings.ToLower(status) != "marked-for-deletion" || strings.ToLower(status) != "does-not-exist"
 					}
 				}
 				return true
