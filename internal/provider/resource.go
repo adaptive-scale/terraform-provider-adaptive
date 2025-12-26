@@ -204,6 +204,11 @@ func resourceAdaptiveResource() *schema.Resource {
 				Optional:    true,
 				Description: "The node selector configuration in YAML format. Used by Kubernetes resource",
 			},
+			"node_affinity": {
+				Type:        schema.TypeString,
+				Optional:    true,
+				Description: "The node affinity configuration in YAML format. Used by Kubernetes resource",
+			},
 			"region_name": {
 				Type:        schema.TypeString,
 				Optional:    true,
