@@ -15,6 +15,7 @@ type KubernetesIntegrationConfiguration struct {
 	TolerationsBytes  string `yaml:"tolerationsBytes,omitempty"`
 	AnnotationsBytes  string `yaml:"annotationsBytes,omitempty"`
 	NodeSelectorBytes string `yaml:"nodeSelectorBytes,omitempty"`
+	NodeAffinityBytes string `yaml:"nodeAffinityBytes,omitempty"`
 }
 
 func schemaToKubernetesIntegrationConfiguration(d *schema.ResourceData) KubernetesIntegrationConfiguration {
@@ -33,6 +34,11 @@ func schemaToKubernetesIntegrationConfiguration(d *schema.ResourceData) Kubernet
 		nodeSelectorBytes = v.(string)
 	}
 
+	nodeAffinityBytes := ""
+	if v, ok := d.GetOk("node_affinity"); ok {
+		nodeAffinityBytes = v.(string)
+	}
+
 	return KubernetesIntegrationConfiguration{
 		Name:              d.Get("name").(string),
 		ApiServer:         d.Get("api_server").(string),
@@ -42,5 +48,6 @@ func schemaToKubernetesIntegrationConfiguration(d *schema.ResourceData) Kubernet
 		TolerationsBytes:  tolerationsBytes,
 		AnnotationsBytes:  annotationsBytes,
 		NodeSelectorBytes: nodeSelectorBytes,
+		NodeAffinityBytes: nodeSelectorBytes,
 	}
 }
