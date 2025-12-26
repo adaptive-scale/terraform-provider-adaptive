@@ -445,7 +445,6 @@ func (c *Client) DeleteSession(sessionID string) (bool, error) {
 		func() (map[string]interface{}, error) {
 			return _readSession(c, sessionID)
 		}, RetryLimit(retryForStatus), Sleep(timeout), RetryResultChecker(func(intermedResult any) bool {
-			log.Printf("status: %v", intermedResult)
 			if res, ok := intermedResult.(map[string]interface{}); !ok {
 				// bad data format
 				return true
@@ -463,6 +462,7 @@ func (c *Client) DeleteSession(sessionID string) (bool, error) {
 	if err != nil {
 		return false, fmt.Errorf("could to read session %s %w", sessionID, err)
 	}
+
 	if status, ok := resp["Status"].(string); ok {
 		if strings.ToLower(status) != "terminated" {
 			return false, fmt.Errorf("error read session %s", sessionID)
@@ -472,6 +472,22 @@ func (c *Client) DeleteSession(sessionID string) (bool, error) {
 		// TODO: Add tracing ID
 		return false, errors.New("could not delete session")
 	}
+
+	request, err = http.NewRequest("POST", fmt.Sprintf("%s/forcedelete/%s", c.sessionAPI(), sessionID), nil)
+	if err != nil {
+		return false, err
+	}
+
+	_response, err := c.do(request)
+	if err != nil {
+		return false, fmt.Errorf("failed to request adaptive api. err %w", err)
+	}
+
+	if _response.StatusCode != 200 {
+		return false, fmt.Errorf("error force deleting session %s", sessionID)
+	}
+
+	return true, nil
 }
 
 // Resources / Integrations
