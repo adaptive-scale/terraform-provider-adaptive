@@ -48,6 +48,6 @@ func schemaToKubernetesIntegrationConfiguration(d *schema.ResourceData) Kubernet
 		TolerationsBytes:  tolerationsBytes,
 		AnnotationsBytes:  annotationsBytes,
 		NodeSelectorBytes: nodeSelectorBytes,
-		NodeAffinityBytes: nodeSelectorBytes,
+		NodeAffinityBytes: nodeAffinityBytes,
 	}
 }
