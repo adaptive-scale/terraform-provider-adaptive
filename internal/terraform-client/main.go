@@ -451,9 +451,22 @@ func (c *Client) DeleteSession(sessionID string) (bool, error) {
 			} else {
 				if res != nil {
 					if status, okk := res["Status"].(string); !okk {
-						return true
+						return false
 					} else {
-						return strings.ToLower(status) != "terminated" || strings.ToLower(status) != "marked-for-deletion" || strings.ToLower(status) != "does-not-exist"
+						statusLower := strings.ToLower(status)
+
+						log.Printf("Session %s status: %s\n", sessionID, statusLower)
+						// Return true to keep retrying if NOT in a terminal state
+						terminated := (statusLower == "terminated" || statusLower == "marked-for-deletion")
+						if terminated {
+							log.Println("Session terminated, continuing to delete...")
+							_, err2 := c.deleteSession(sessionID)
+							if err2 != nil {
+								log.Printf("error deleting session %s: %s", sessionID, err)
+								return false
+							}
+							return false
+						}
 					}
 				}
 				return true
@@ -464,16 +477,22 @@ func (c *Client) DeleteSession(sessionID string) (bool, error) {
 	}
 
 	if status, ok := resp["Status"].(string); ok {
-		if strings.ToLower(status) != "terminated" {
-			return false, fmt.Errorf("error read session %s", sessionID)
+		statusLower := strings.ToLower(status)
+		if statusLower == "terminated" || statusLower == "marked-for-deletion" || statusLower == "does-not-exist" {
+			return true, nil
 		}
-		return true, nil
+		return false, fmt.Errorf("error read session %s", sessionID)
 	} else {
 		// TODO: Add tracing ID
 		return false, errors.New("could not delete session")
 	}
 
-	request, err = http.NewRequest("POST", fmt.Sprintf("%s/forcedelete/%s", c.sessionAPI(), sessionID), nil)
+	return true, nil
+}
+
+func (c *Client) deleteSession(sessionID string) (bool, error) {
+
+	request, err := http.NewRequest("POST", fmt.Sprintf("%s/forcedelete/%s", c.sessionAPI(), sessionID), nil)
 	if err != nil {
 		return false, err
 	}
