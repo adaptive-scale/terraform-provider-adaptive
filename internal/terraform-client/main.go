@@ -248,6 +248,7 @@ func (c *Client) CreateSession(
 	users []string,
 	memory, cpu string,
 	tags []string,
+	groups []string,
 ) (*CreateSessionResponse, error) {
 	req := CreateSessionRequest{
 		SessionName:       sessionName,
@@ -263,6 +264,7 @@ func (c *Client) CreateSession(
 		Memory:            memory,
 		CPU:               cpu,
 		UsersTags:         tags,
+		Groups:            groups,
 	}
 
 	payloadBuf := bytes.NewBuffer([]byte{})
@@ -378,6 +380,7 @@ func (c *Client) UpdateSession(
 	users []string,
 	memory, cpu string,
 	tags []string,
+	groups []string,
 ) (*UpdateSessionResponse, error) {
 	req := UpdateSessionRequest{
 		SessionName:       sessionName,
@@ -393,6 +396,7 @@ func (c *Client) UpdateSession(
 		Memory:            memory,
 		CPU:               cpu,
 		UsersTags:         tags,
+		Groups:            groups,
 	}
 	payloadBuf := bytes.NewBuffer([]byte{})
 	if err := json.NewEncoder(payloadBuf).Encode(req); err != nil {

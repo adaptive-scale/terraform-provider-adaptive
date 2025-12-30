@@ -13,6 +13,8 @@ import (
 	"os"
 	"path"
 
+	"github.com/adaptive-scale/terraform-provider-adaptive/internal/provider/components"
+	"github.com/adaptive-scale/terraform-provider-adaptive/internal/provider/integrations"
 	client "github.com/adaptive-scale/terraform-provider-adaptive/internal/terraform-client"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/diag"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
@@ -53,14 +55,12 @@ func New(version string) func() *schema.Provider {
 			},
 
 			ResourcesMap: map[string]*schema.Resource{
-				"adaptive_endpoint":      resourceAdaptiveSession(),
-				"adaptive_resource":      resourceAdaptiveResource(),
-				"adaptive_authorization": resourceAdaptiveAuthorization(),
-				"adaptive_group":         resourceAdaptiveTeam(),
-				"adaptive_script":        resourceAdaptiveScript(),
-			},
-
-			ConfigureContextFunc: providerConfigure,
+				"adaptive_endpoint":      components.ResourceAdaptiveSession(),
+				"adaptive_resource":      components.ResourceAdaptiveResource(),
+				"adaptive_authorization": integrations.ResourceAdaptiveAuthorization(),
+				"adaptive_group":         components.ResourceAdaptiveTeam(),
+				"adaptive_script":        components.ResourceAdaptiveScript(),
+			}, ConfigureContextFunc: providerConfigure,
 		}
 		return p
 	}
