@@ -177,6 +177,15 @@ func ResourceAdaptiveSession() *schema.Resource {
 				},
 				Description: "The list of users associated with the adaptive endpoint",
 			},
+			"groups": {
+				Type:     schema.TypeList,
+				Computed: true,
+				Optional: true,
+				Elem: &schema.Schema{
+					Type: schema.TypeString,
+				},
+				Description: "The list of groups associated with the adaptive endpoint",
+			},
 			"is_jit_enabled": {
 				Type:        schema.TypeBool,
 				Optional:    true,
@@ -347,24 +356,6 @@ func ResourceAdaptiveSessionCreate(ctx context.Context, d *schema.ResourceData, 
 		return diag.FromErr(fmt.Errorf("pause_timeout must be a string"))
 	}
 
-	// var tags []string
-	// _tags := d.Get("tags")
-	// if tags == nil {
-	// 	_tags = []string{}
-	// }
-
-	// if _, ok := _tags.([]interface{}); !ok {
-	// 	return diag.FromErr(fmt.Errorf("tags must be a list of strings"))
-	// }
-	// for _, t := range _tags.([]interface{}) {
-	// 	if val, ok := t.(string); !ok {
-	// 		return diag.FromErr(fmt.Errorf("tag must be a string"))
-	// 	} else {
-	// 		tags = append(tags, val)
-	// 	}
-
-	// }
-
 	userTags, err := integrations.TagsFromSchema(d)
 	if err != nil {
 		return diag.FromErr(err)
@@ -378,6 +369,24 @@ func ResourceAdaptiveSessionCreate(ctx context.Context, d *schema.ResourceData, 
 	cpu := d.Get("cpu")
 	if _, ok := cpu.(string); !ok {
 		return diag.FromErr(fmt.Errorf("cpu must be a string"))
+	}
+
+	groups := d.Get("groups")
+	groupsVal := make([]string, 0)
+
+	if groups != nil {
+		if groupsList, ok := groups.([]interface{}); ok {
+			for _, u := range groupsList {
+				if val, ok := u.(string); !ok {
+					return diag.FromErr(fmt.Errorf("group name must be a string"))
+				} else {
+					if len(val) == 0 {
+						return diag.FromErr(fmt.Errorf("group name cannot be empty"))
+					}
+					groupsVal = append(groupsVal, val)
+				}
+			}
+		}
 	}
 
 	resp, err := client.CreateSession(
@@ -394,6 +403,7 @@ func ResourceAdaptiveSessionCreate(ctx context.Context, d *schema.ResourceData, 
 		userEmails,
 		mem.(string), cpu.(string),
 		userTags,
+		groupsVal,
 	)
 	if err != nil {
 		return diag.FromErr(err)
@@ -522,6 +532,24 @@ func ResourceAdaptiveSessionUpdate(ctx context.Context, d *schema.ResourceData, 
 		return diag.FromErr(err)
 	}
 
+	groups := d.Get("groups")
+	groupsVal := make([]string, 0)
+
+	if groups != nil {
+		if groupsList, ok := groups.([]interface{}); ok {
+			for _, u := range groupsList {
+				if val, ok := u.(string); !ok {
+					return diag.FromErr(fmt.Errorf("group name must be a string"))
+				} else {
+					if len(val) == 0 {
+						return diag.FromErr(fmt.Errorf("group name cannot be empty"))
+					}
+					groupsVal = append(groupsVal, val)
+				}
+			}
+		}
+	}
+
 	resp, err := client.UpdateSession(
 		sessionID,
 		d.Get("name").(string),
@@ -536,6 +564,7 @@ func ResourceAdaptiveSessionUpdate(ctx context.Context, d *schema.ResourceData, 
 		userEmails,
 		mem.(string), cpu.(string),
 		userTags,
+		groupsVal,
 	)
 	if err != nil {
 		return diag.FromErr(err)
