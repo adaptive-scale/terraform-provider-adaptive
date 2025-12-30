@@ -74,6 +74,21 @@ func resourceAdaptivePostgres() *schema.Resource {
 				Optional: true,
 				Computed: true,
 			},
+			"root_cert": {
+				Type:        schema.TypeString,
+				Optional:    true,
+				Description: "The root SSL certificate for the Postgres instance in PEM format.",
+			},
+			"tls_cert_file": {
+				Type:        schema.TypeString,
+				Optional:    true,
+				Description: "The client TLS certificate for the Postgres instance in PEM format.",
+			},
+			"tls_key_file": {
+				Type:        schema.TypeString,
+				Optional:    true,
+				Description: "The client TLS key for the Postgres instance in PEM format.",
+			},
 		},
 	}
 }

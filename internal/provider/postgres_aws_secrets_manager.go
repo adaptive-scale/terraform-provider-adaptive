@@ -38,41 +38,20 @@ func resourceAdaptivePostgresAWS() *schema.Resource {
 				Required:    true,
 				Description: "The name of the Postgres database to create.",
 			},
-			"host": {
+			"arn": {
 				Type:        schema.TypeString,
 				Required:    true,
-				Description: "The hostname of the Postgres instance to connect to.",
+				Description: "The AWS RDS instance ARN.",
 			},
-			"port": {
+			"region": {
 				Type:        schema.TypeString,
 				Required:    true,
-				Description: "The port number of the Postgres instance to connect to.",
+				Description: "The AWS region where the RDS instance is hosted.",
 			},
-			"username": {
+			"secret_id": {
 				Type:        schema.TypeString,
 				Required:    true,
-				Description: "The username to authenticate with the Postgres instance.",
-			},
-			"password": {
-				Type:        schema.TypeString,
-				Required:    true,
-				Description: "The password to authenticate with the Postgres instance.",
-			},
-			"ssl_mode": {
-				Type:        schema.TypeString,
-				Required:    true,
-				Description: "The SSL mode to use when connecting to the Postgres instance.",
-			},
-			"database_name": {
-				Type:        schema.TypeString,
-				Optional:    true,
-				Default:     "",
-				Description: "The name of the Postgres database to create. If not specified, the default database will be used.",
-			},
-			"last_updated": {
-				Type:     schema.TypeString,
-				Optional: true,
-				Computed: true,
+				Description: "The AWS Secrets Manager secret ID that contains the database credentials.",
 			},
 		},
 	}

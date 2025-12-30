@@ -24,15 +24,25 @@ func resourceAdaptiveMongoAWS() *schema.Resource {
 				Required:    true,
 				Description: "The name of the MongoDB instance to create.",
 			},
-			"uri": {
+			"arn": {
 				Type:        schema.TypeString,
 				Required:    true,
-				Description: "The connection string for the MongoDB instance to connect to.",
+				Description: "The Amazon Resource Name (ARN) of the AWS IAM Role to be used for authentication.",
 			},
-			"last_updated": {
-				Type:     schema.TypeString,
-				Optional: true,
-				Computed: true,
+			"region": {
+				Type:        schema.TypeString,
+				Required:    true,
+				Description: "The AWS region where the MongoDB instance is hosted.",
+			},
+			"secret_id": {
+				Type:        schema.TypeString,
+				Required:    true,
+				Description: "The identifier of the AWS Secrets Manager secret that contains the credentials for accessing the MongoDB instance.",
+			},
+			"key": {
+				Type:        schema.TypeString,
+				Required:    true,
+				Description: "The key within the AWS Secrets Manager secret that holds the MongoDB credentials.",
 			},
 		},
 	}
