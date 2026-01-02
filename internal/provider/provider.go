@@ -82,7 +82,7 @@ type AdaptiveDeploymentsConfig struct {
 	Deployments map[string]AdaptiveDeploymentConfig `json:"deployments"`
 }
 
-func tryReadingServiceToken(potentialToken, workspaceURL string) (string, string, error) {
+func TryReadingServiceToken(potentialToken, workspaceURL string) (string, string, error) {
 	if potentialToken == "" {
 		return "", "", errors.New("'serviceToken' field cannot be empty")
 	}
@@ -134,7 +134,7 @@ func providerConfigure(ctx context.Context, d *schema.ResourceData) (interface{}
 		serviceToken = string(serviceTokenJSON)
 	}
 
-	svcToken, wsURL, err := tryReadingServiceToken(serviceToken, workspaceURL)
+	svcToken, wsURL, err := TryReadingServiceToken(serviceToken, workspaceURL)
 	if err != nil {
 		return nil, diag.Errorf(fmt.Sprintf("bad service token: %s", err))
 	}
