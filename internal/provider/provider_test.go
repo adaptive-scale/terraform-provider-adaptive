@@ -91,7 +91,7 @@ func TestTryReadingServiceToken(t *testing.T) {
 						"url": "https://prod.adaptive.live",
 						"token": "prod-token-789",
 						"name": "production",
-						"default": false
+						"default": true
 					},
 					"dev": {
 						"url": "https://dev.adaptive.live",
