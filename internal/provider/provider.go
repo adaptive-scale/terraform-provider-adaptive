@@ -14,7 +14,6 @@ import (
 	"path"
 
 	"github.com/adaptive-scale/terraform-provider-adaptive/internal/provider/components"
-	"github.com/adaptive-scale/terraform-provider-adaptive/internal/provider/integrations"
 	client "github.com/adaptive-scale/terraform-provider-adaptive/internal/terraform-client"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/diag"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
@@ -57,7 +56,7 @@ func New(version string) func() *schema.Provider {
 			ResourcesMap: map[string]*schema.Resource{
 				"adaptive_endpoint":      components.ResourceAdaptiveSession(),
 				"adaptive_resource":      components.ResourceAdaptiveResource(),
-				"adaptive_authorization": integrations.ResourceAdaptiveAuthorization(),
+				"adaptive_authorization": components.ResourceAdaptiveAuthorization(),
 				"adaptive_group":         components.ResourceAdaptiveTeam(),
 				"adaptive_script":        components.ResourceAdaptiveScript(),
 			}, ConfigureContextFunc: providerConfigure,
@@ -86,9 +85,6 @@ func tryReadingServiceToken(potentialToken, workspaceURL string) (string, string
 	if potentialToken == "" {
 		return "", "", errors.New("'serviceToken' field cannot be empty")
 	}
-
-	fmt.Println("Trying to parse service token...")
-	fmt.Printf("Token content: %s\n", workspaceURL)
 
 	// First, try to parse as deployments config
 	var deploymentsConfig AdaptiveDeploymentsConfig

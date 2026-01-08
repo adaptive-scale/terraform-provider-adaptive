@@ -459,10 +459,9 @@ func (c *Client) DeleteSession(sessionID string) (bool, error) {
 					} else {
 						statusLower := strings.ToLower(status)
 
-						log.Printf("Session %s status: %s\n", sessionID, statusLower)
 						// Return true to keep retrying if NOT in a terminal state
-						terminated := (statusLower == "terminated" || statusLower == "marked-for-deletion")
-						if terminated {
+						terminatedOrFailed := (statusLower == "terminated" || statusLower == "marked-for-deletion" || statusLower == "failed" || statusLower == "failed-to-restart")
+						if terminatedOrFailed {
 							log.Println("Session terminated, continuing to delete...")
 							_, err2 := c.deleteSession(sessionID)
 							if err2 != nil {
