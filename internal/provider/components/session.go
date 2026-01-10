@@ -125,7 +125,7 @@ func ResourceAdaptiveSession() *schema.Resource {
 			"name": {
 				Type:        schema.TypeString,
 				Required:    true,
-				Description: "The name of the Postgres database to create.",
+				Description: "The name of the session to create.",
 			},
 			"resource": {
 				Type:        schema.TypeString,
@@ -155,7 +155,7 @@ func ResourceAdaptiveSession() *schema.Resource {
 
 					return nil, nil
 				},
-				Description: "The port number of the Postgres instance to connect to.",
+				Description: "The time-to-live duration for the session. If not set, defaults to 90 days.",
 			},
 			"authorization": {
 				Type:        schema.TypeString,
@@ -166,7 +166,7 @@ func ResourceAdaptiveSession() *schema.Resource {
 				Type:        schema.TypeString,
 				Default:     "",
 				Optional:    true,
-				Description: "The cluster in which this session should be created. If not provided will be set to default cluster set in workspace settings	of user's workspace",
+				Description: "The cluster in which this session should be created. If not provided will be set to default cluster set in workspace settings of the user's workspace",
 			},
 			"users": {
 				Type:     schema.TypeList,
@@ -199,7 +199,7 @@ func ResourceAdaptiveSession() *schema.Resource {
 				Elem: &schema.Schema{
 					Type: schema.TypeString,
 				},
-				Description: "The list of users emails who can approve Just-In-Time access requests",
+				Description: "The list of user emails who can approve Just-In-Time access requests",
 			},
 			"pause_timeout": {
 				Type:        schema.TypeString,
@@ -268,9 +268,10 @@ func ResourceAdaptiveSession() *schema.Resource {
 				Description: "Optional tags",
 			},
 			"last_updated": {
-				Type:     schema.TypeString,
-				Optional: true,
-				Computed: true,
+				Type:        schema.TypeString,
+				Optional:    true,
+				Computed:    true,
+				Description: "The last time the session was updated.",
 			},
 		},
 	}
