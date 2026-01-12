@@ -141,7 +141,7 @@ func ResourceAdaptiveSession() *schema.Resource {
 			"ttl": {
 				Type:     schema.TypeString,
 				Optional: true,
-				Default:  SessionTTLOption90days,
+				Default:  "",
 				ValidateFunc: func(i interface{}, s string) ([]string, []error) {
 					if _, ok := i.(string); !ok {
 						return nil, []error{fmt.Errorf("ttl must be a string")}
@@ -155,7 +155,7 @@ func ResourceAdaptiveSession() *schema.Resource {
 
 					return nil, nil
 				},
-				Description: "The port number of the Postgres instance to connect to.",
+				Description: "The time-to-live (TTL) for the session. The session will be automatically terminated after this time period.",
 			},
 			"authorization": {
 				Type:        schema.TypeString,
@@ -550,11 +550,17 @@ func ResourceAdaptiveSessionUpdate(ctx context.Context, d *schema.ResourceData, 
 		}
 	}
 
+	// Get authorization - use GetOk to preserve empty values from state
+	authorizationName := ""
+	if auth, ok := d.GetOk("authorization"); ok {
+		authorizationName = auth.(string)
+	}
+
 	resp, err := client.UpdateSession(
 		sessionID,
 		d.Get("name").(string),
 		d.Get("resource").(string),
-		d.Get("authorization").(string),
+		authorizationName,
 		d.Get("cluster").(string),
 		d.Get("ttl").(string),
 		validSessionType,
