@@ -141,7 +141,7 @@ func ResourceAdaptiveSession() *schema.Resource {
 			"ttl": {
 				Type:     schema.TypeString,
 				Optional: true,
-				Default:  SessionTTLOption90days,
+				Default:  "",
 				ValidateFunc: func(i interface{}, s string) ([]string, []error) {
 					if _, ok := i.(string); !ok {
 						return nil, []error{fmt.Errorf("ttl must be a string")}
@@ -155,7 +155,7 @@ func ResourceAdaptiveSession() *schema.Resource {
 
 					return nil, nil
 				},
-				Description: "The time-to-live duration for the session. If not set, defaults to 90 days.",
+				Description: "The time-to-live (TTL) for the session. The session will be automatically terminated after this time period. If not set, defaults to 90 days.",
 			},
 			"authorization": {
 				Type:        schema.TypeString,
@@ -551,11 +551,17 @@ func ResourceAdaptiveSessionUpdate(ctx context.Context, d *schema.ResourceData, 
 		}
 	}
 
+	// Get authorization - use GetOk to preserve empty values from state
+	authorizationName := ""
+	if auth, ok := d.GetOk("authorization"); ok {
+		authorizationName = auth.(string)
+	}
+
 	resp, err := client.UpdateSession(
 		sessionID,
 		d.Get("name").(string),
 		d.Get("resource").(string),
-		d.Get("authorization").(string),
+		authorizationName,
 		d.Get("cluster").(string),
 		d.Get("ttl").(string),
 		validSessionType,
