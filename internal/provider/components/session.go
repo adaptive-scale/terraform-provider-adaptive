@@ -25,7 +25,7 @@ const (
 	SessionTTLOption60days  = "60d"
 	SessionTTLOption90days  = "90d"
 	SessionTTLOption180days = "180d"
-	SessionTTLOption360days = "360d"
+	SessionTTLOption365days = "365d"
 )
 
 var validTTLOptions = []string{
@@ -39,7 +39,7 @@ var validTTLOptions = []string{
 	SessionTTLOption60days,
 	SessionTTLOption90days,
 	SessionTTLOption180days,
-	SessionTTLOption360days,
+	SessionTTLOption365days,
 }
 
 const (
