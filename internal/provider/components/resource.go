@@ -549,7 +549,7 @@ func schemaToResourceIntegrationConfiguration(d *schema.ResourceData, intType st
 	case "sql_server":
 		return integrations.SchemaToSQLServerIntegrationConfiguration(d), nil
 	case "azuresqlserver":
-		return integrations.SchemaToAzureSQLServerIntegrationConfiguration(d), nil
+		return integrations.SchemaToAzureSQLServerIntegrationConfiguration(d)
 	case "splunk":
 		return integrations.SchemaToSplunkIntegrationConfiguration(d), nil
 	case "datadog":

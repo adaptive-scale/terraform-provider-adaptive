@@ -1,6 +1,9 @@
 package integrations
 
-import "github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
+import (
+	"errors"
+	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
+)
 
 type AzureSQLServerIntegrationConfiguration struct {
 	Name         string `yaml:"name"`
@@ -11,36 +14,36 @@ type AzureSQLServerIntegrationConfiguration struct {
 	DatabaseName string `yaml:"databaseName"`
 }
 
-func SchemaToAzureSQLServerIntegrationConfiguration(d *schema.ResourceData) AzureSQLServerIntegrationConfiguration {
+func SchemaToAzureSQLServerIntegrationConfiguration(d *schema.ResourceData) (AzureSQLServerIntegrationConfiguration, error) {
 	// Validate required fields
 	name, ok := d.Get("name").(string)
 	if !ok || name == "" {
-		panic("name attribute is required and must be a non-empty string")
+		return AzureSQLServerIntegrationConfiguration{}, errors.New("name attribute is required and must be a non-empty string")
 	}
 
 	hostname, ok := d.Get("hostname").(string)
 	if !ok || hostname == "" {
-		panic("hostname attribute is required and must be a non-empty string")
+		return AzureSQLServerIntegrationConfiguration{}, errors.New("hostname attribute is required and must be a non-empty string")
 	}
 
 	port, ok := d.Get("port").(string)
 	if !ok || port == "" {
-		panic("port attribute is required and must be a non-empty string")
+		return AzureSQLServerIntegrationConfiguration{}, errors.New("port attribute is required and must be a non-empty string")
 	}
 
 	username, ok := d.Get("username").(string)
 	if !ok || username == "" {
-		panic("username attribute is required and must be a non-empty string")
+		return AzureSQLServerIntegrationConfiguration{}, errors.New("username attribute is required and must be a non-empty string")
 	}
 
 	password, ok := d.Get("password").(string)
 	if !ok || password == "" {
-		panic("password attribute is required and must be a non-empty string")
+		return AzureSQLServerIntegrationConfiguration{}, errors.New("password attribute is required and must be a non-empty string")
 	}
 
 	databaseName, ok := d.Get("database_name").(string)
 	if !ok || databaseName == "" {
-		panic("database_name attribute is required and must be a non-empty string")
+		return AzureSQLServerIntegrationConfiguration{}, errors.New("database_name attribute is required and must be a non-empty string")
 	}
 
 	return AzureSQLServerIntegrationConfiguration{
@@ -50,5 +53,5 @@ func SchemaToAzureSQLServerIntegrationConfiguration(d *schema.ResourceData) Azur
 		Username:     username,
 		Password:     password,
 		DatabaseName: databaseName,
-	}
+	}, nil
 }
