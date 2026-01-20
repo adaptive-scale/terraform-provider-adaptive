@@ -15,7 +15,7 @@ type KubernetesIntegrationConfiguration struct {
 	TolerationsBytes  string `yaml:"tolerationsBytes,omitempty"`
 	AnnotationsBytes  string `yaml:"annotationsBytes,omitempty"`
 	NodeSelectorBytes string `yaml:"nodeSelectorBytes,omitempty"`
-	NodeAffinityBytes string `yaml:"nodeAffinityBytes,omitempty"`
+	NodeAffinityBytes string `yaml:"affinityBytes,omitempty"`
 }
 
 func SchemaToKubernetesIntegrationConfiguration(d *schema.ResourceData) KubernetesIntegrationConfiguration {
