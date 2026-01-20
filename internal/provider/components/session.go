@@ -558,6 +558,7 @@ func ResourceAdaptiveSessionUpdate(ctx context.Context, d *schema.ResourceData, 
 	}
 
 	resp, err := client.UpdateSession(
+		ctx,
 		sessionID,
 		d.Get("name").(string),
 		d.Get("resource").(string),
@@ -586,7 +587,7 @@ func ResourceAdaptiveSessionDelete(ctx context.Context, d *schema.ResourceData, 
 	sessionID := d.Id()
 	client := m.(*adaptive.Client)
 
-	_, err := client.DeleteSession(sessionID)
+	_, err := client.DeleteSession(ctx, sessionID)
 	if err != nil {
 		return diag.FromErr(err)
 	}

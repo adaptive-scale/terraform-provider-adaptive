@@ -167,7 +167,7 @@ func resourceAdaptiveCockroachDBUpdate(ctx context.Context, d *schema.ResourceDa
 		return diag.FromErr(err)
 	}
 
-	_, err = client.UpdateResource(resourceID, "cockroachdb", config, []string{})
+	_, err = client.UpdateResource(ctx, resourceID, "cockroachdb", config, []string{})
 	if err != nil {
 		return diag.FromErr(err)
 	}
@@ -179,7 +179,7 @@ func resourceAdaptiveCockroachDBUpdate(ctx context.Context, d *schema.ResourceDa
 func resourceAdaptiveCockroachDBDelete(ctx context.Context, d *schema.ResourceData, m interface{}) diag.Diagnostics {
 	resourceID := d.Id()
 	client := m.(*adaptive.Client)
-	_, err := client.DeleteResource(resourceID, d.Get("name").(string))
+	_, err := client.DeleteResource(ctx, resourceID, d.Get("name").(string))
 	if err != nil {
 		return diag.FromErr(err)
 	}

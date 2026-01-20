@@ -9,12 +9,12 @@ import (
 	"errors"
 	"fmt"
 	"io/ioutil"
-	"log"
 	"os"
 	"path"
 
 	"github.com/adaptive-scale/terraform-provider-adaptive/internal/provider/components"
 	client "github.com/adaptive-scale/terraform-provider-adaptive/internal/terraform-client"
+	"github.com/hashicorp/terraform-plugin-log/tflog"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/diag"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
 )
@@ -115,7 +115,7 @@ func providerConfigure(ctx context.Context, d *schema.ResourceData) (interface{}
 	serviceToken := d.Get("service_token").(string)
 	workspaceURL := d.Get("workspace_url").(string)
 	if serviceToken == "" {
-		log.Println("empty token initilization. defaulting to adaptive-cli config folder")
+		tflog.Debug(ctx, "empty token initialization, defaulting to adaptive-cli config folder")
 
 		defaultLocation := "~/.adaptive/token"
 		homeDir, err := os.UserHomeDir()

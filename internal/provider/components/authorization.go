@@ -90,7 +90,7 @@ func ResourceAdaptiveAuthorizationRead(ctx context.Context, d *schema.ResourceDa
 	client := m.(*adaptive.Client)
 	authID := d.Id()
 
-	resp, err := client.ReadAuthorization(authID, false)
+	resp, err := client.ReadAuthorization(ctx, authID, false)
 	if err != nil {
 		return diag.FromErr(err)
 	}

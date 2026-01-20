@@ -90,7 +90,7 @@ func resourceAdaptiveAWSDocumentDBUpdate(ctx context.Context, d *schema.Resource
 		return diag.FromErr(err)
 	}
 
-	_, err = client.UpdateResource(resourceID, "awsdocumentdb", config, []string{})
+	_, err = client.UpdateResource(ctx, resourceID, "awsdocumentdb", config, []string{})
 	if err != nil {
 		return diag.FromErr(err)
 	}
@@ -102,7 +102,7 @@ func resourceAdaptiveAWSDocumentDBUpdate(ctx context.Context, d *schema.Resource
 func resourceAdaptiveAWSDocumentDBDelete(ctx context.Context, d *schema.ResourceData, m interface{}) diag.Diagnostics {
 	resourceID := d.Id()
 	client := m.(*adaptive.Client)
-	_, err := client.DeleteResource(resourceID, d.Get("name").(string))
+	_, err := client.DeleteResource(ctx, resourceID, d.Get("name").(string))
 	if err != nil {
 		return diag.FromErr(err)
 	}

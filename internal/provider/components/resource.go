@@ -675,7 +675,7 @@ func ResourceAdaptiveResourceUpdate(ctx context.Context, d *schema.ResourceData,
 		return diag.FromErr(err)
 	}
 
-	_, err = client.UpdateResource(resourceID, iType, config, userTags)
+	_, err = client.UpdateResource(ctx, resourceID, iType, config, userTags)
 	if err != nil {
 		return diag.FromErr(err)
 	}
@@ -687,7 +687,7 @@ func ResourceAdaptiveResourceUpdate(ctx context.Context, d *schema.ResourceData,
 func ResourceAdaptiveResourceDelete(ctx context.Context, d *schema.ResourceData, m interface{}) diag.Diagnostics {
 	resourceID := d.Id()
 	client := m.(*adaptive.Client)
-	_, err := client.DeleteResource(resourceID, d.Get("name").(string))
+	_, err := client.DeleteResource(ctx, resourceID, d.Get("name").(string))
 	if err != nil {
 		return diag.FromErr(err)
 	}

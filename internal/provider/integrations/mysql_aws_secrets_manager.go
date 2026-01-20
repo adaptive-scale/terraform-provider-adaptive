@@ -115,7 +115,7 @@ func resourceAdaptiveMySQLAWSUpdate(ctx context.Context, d *schema.ResourceData,
 		return diag.FromErr(err)
 	}
 
-	_, err = client.UpdateResource(resourceID, "mysql", config, []string{})
+	_, err = client.UpdateResource(ctx, resourceID, "mysql", config, []string{})
 	if err != nil {
 		return diag.FromErr(err)
 	}
@@ -127,7 +127,7 @@ func resourceAdaptiveMySQLAWSUpdate(ctx context.Context, d *schema.ResourceData,
 func resourceAdaptiveMySQLAWSDelete(ctx context.Context, d *schema.ResourceData, m interface{}) diag.Diagnostics {
 	resourceID := d.Id()
 	client := m.(*adaptive.Client)
-	_, err := client.DeleteResource(resourceID, d.Get("name").(string))
+	_, err := client.DeleteResource(ctx, resourceID, d.Get("name").(string))
 	if err != nil {
 		return diag.FromErr(err)
 	}
