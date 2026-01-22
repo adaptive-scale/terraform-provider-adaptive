@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io/ioutil"
 	"net/http"
 
 	"github.com/hashicorp/terraform-plugin-log/tflog"
@@ -106,12 +107,17 @@ func _readAuthorization(ctx context.Context, c *Client, authID string) (map[stri
 		})
 		return nil, fmt.Errorf("failed to request adaptive api. err %w", err)
 	}
-	if response.StatusCode != http.StatusAccepted {
+	if response.StatusCode != http.StatusAccepted && response.StatusCode != http.StatusOK {
+
+		d, _ := ioutil.ReadAll(response.Body) // drain body to allow connection reuse
+
 		tflog.Error(ctx, "Unexpected status code reading authorization", map[string]interface{}{
 			"auth_id":     authID,
 			"status_code": response.StatusCode,
 			"expected":    http.StatusAccepted,
+			"error_body":  string(d),
 		})
+
 		return nil, fmt.Errorf("error read authorization %s", authID)
 	}
 	var resp map[string]interface{}
@@ -151,10 +157,14 @@ func _readResource(ctx context.Context, c *Client, resourceID string) (map[strin
 		return nil, fmt.Errorf("failed to request adaptive api. err %w", err)
 	}
 	if response.StatusCode != http.StatusAccepted {
+
+		d, _ := ioutil.ReadAll(response.Body) // drain body to allow connection reuse
+
 		tflog.Error(ctx, "Unexpected status code reading resource", map[string]interface{}{
 			"resource_id": resourceID,
 			"status_code": response.StatusCode,
 			"expected":    http.StatusAccepted,
+			"error_body":  string(d),
 		})
 		return nil, fmt.Errorf("error read resource %s", resourceID)
 	}

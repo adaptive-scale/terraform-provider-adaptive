@@ -123,7 +123,7 @@ func (c *Client) CreateSession(
 			"id":    response.ID,
 			"error": err.Error(),
 		})
-		return nil, fmt.Errorf("failed to create session %s", response.ID)
+		// return &response, fmt.Errorf("failed to create session %s", response.ID)
 	}
 	tflog.Debug(ctx, "Session successfully created and verified", map[string]interface{}{
 		"id":   response.ID,

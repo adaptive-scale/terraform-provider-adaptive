@@ -43,10 +43,12 @@ var validTTLOptions = []string{
 }
 
 const (
-	SessionTypeDefault = "direct"
-	SessionTypeDirect  = "direct"
-	SessionTypeScript  = "script"
-	SessionTypeClient  = "client"
+	SessionTypeDefault  = "direct"
+	SessionTypeDirect   = "direct"
+	SessionTypeScript   = "script"
+	SessionTypeClient   = "client"
+	SessionTypeCLI      = "cli"
+	SessionTypeServices = "services"
 )
 
 const (
@@ -278,7 +280,7 @@ func ResourceAdaptiveSession() *schema.Resource {
 }
 
 func isValidSessionType(t string) bool {
-	return t == SessionTypeDirect || t == SessionTypeClient || t == SessionTypeScript
+	return t == SessionTypeDirect || t == SessionTypeClient || t == SessionTypeScript || t == SessionTypeCLI || t == SessionTypeServices
 }
 
 func getSessionType(t string) (string, bool) {
@@ -292,6 +294,10 @@ func getSessionType(t string) (string, bool) {
 			return "cli", true
 		case SessionTypeClient:
 			return "client", true
+		case SessionTypeCLI:
+			return "cli", true
+		case SessionTypeServices:
+			return "services", true
 		default:
 			return "", false
 		}
