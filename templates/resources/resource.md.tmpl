@@ -1,0 +1,211 @@
+---
+page_title: "adaptive_resource Resource - terraform-provider-adaptive"
+subcategory: ""
+description: |-
+  Manages an Adaptive resource, which represents a connection to external services like databases, cloud platforms, and APIs.
+---
+
+# adaptive_resource (Resource)
+
+The `adaptive_resource` resource allows you to create and manage connections to external services in Adaptive. Resources are the foundation of Adaptive's access management - they define how to connect to databases, cloud platforms, Kubernetes clusters, and other services.
+
+## Supported Resource Types
+
+| Type | Description |
+|------|-------------|
+| `postgres` | PostgreSQL database |
+| `mysql` | MySQL database |
+| `mongodb` | MongoDB database |
+| `cockroachdb` | CockroachDB database |
+| `clickhouse` | ClickHouse analytics database |
+| `snowflake` | Snowflake data warehouse |
+| `sqlserver` | Microsoft SQL Server |
+| `yugabytedb` | YugabyteDB distributed SQL |
+| `aws` | Amazon Web Services |
+| `azure` | Microsoft Azure |
+| `gcp` | Google Cloud Platform |
+| `kubernetes` | Kubernetes cluster |
+| `ssh` | SSH server |
+| `okta` | Okta identity provider |
+| `onelogin` | OneLogin identity provider |
+| `jumpcloud` | JumpCloud directory |
+| `google` | Google Workspace |
+| `datadog` | Datadog monitoring |
+| `splunk` | Splunk logging |
+| `elasticsearch` | Elasticsearch |
+| `rabbitmq` | RabbitMQ message broker |
+| `zerotier` | ZeroTier network |
+| `services` | Generic services |
+| `customintegration` | Custom integration |
+
+## Example Usage
+
+### PostgreSQL Database
+
+```terraform
+resource "adaptive_resource" "postgres" {
+  name          = "production-postgres"
+  type          = "postgres"
+  host          = "postgres.example.com"
+  port          = "5432"
+  username      = "admin"
+  password      = var.db_password
+  database_name = "myapp"
+  ssl_mode      = "require"
+  tags          = ["production", "database"]
+}
+```
+
+### MySQL Database
+
+```terraform
+resource "adaptive_resource" "mysql" {
+  name          = "app-mysql"
+  type          = "mysql"
+  host          = "mysql.example.com"
+  port          = "3306"
+  username      = "root"
+  password      = var.mysql_password
+  database_name = "application"
+  ssl_mode      = "REQUIRED"
+  tags          = ["staging"]
+}
+```
+
+### MongoDB
+
+```terraform
+resource "adaptive_resource" "mongodb" {
+  name = "analytics-mongodb"
+  type = "mongodb"
+  uri  = "mongodb+srv://user:password@cluster.mongodb.net/analytics"
+  tags = ["analytics"]
+}
+```
+
+### Kubernetes Cluster
+
+```terraform
+resource "adaptive_resource" "k8s" {
+  name          = "production-cluster"
+  type          = "kubernetes"
+  api_server    = "https://kubernetes.example.com:6443"
+  cluster_cert  = file("ca.crt")
+  cluster_token = var.k8s_token
+  namespace     = "default"
+  tags          = ["production", "k8s"]
+}
+```
+
+### AWS
+
+```terraform
+resource "adaptive_resource" "aws" {
+  name              = "aws-production"
+  type              = "aws"
+  access_key_id     = var.aws_access_key
+  secret_access_key = var.aws_secret_key
+  region_name       = "us-west-2"
+  tags              = ["production", "cloud"]
+}
+```
+
+### Azure
+
+```terraform
+resource "adaptive_resource" "azure" {
+  name              = "azure-production"
+  type              = "azure"
+  tenant_id         = var.azure_tenant_id
+  application_id    = var.azure_app_id
+  api_client_id     = var.azure_client_id
+  api_client_secret = var.azure_client_secret
+  tags              = ["production", "cloud"]
+}
+```
+
+### GCP
+
+```terraform
+resource "adaptive_resource" "gcp" {
+  name       = "gcp-production"
+  type       = "gcp"
+  project_id = "my-project-123"
+  key_file   = file("service-account.json")
+  tags       = ["production", "cloud"]
+}
+```
+
+### SSH Server
+
+```terraform
+resource "adaptive_resource" "ssh" {
+  name     = "bastion-host"
+  type     = "ssh"
+  host     = "bastion.example.com"
+  port     = "22"
+  username = "admin"
+  key      = file("~/.ssh/id_rsa")
+  tags     = ["infrastructure"]
+}
+```
+
+### Snowflake
+
+```terraform
+resource "adaptive_resource" "snowflake" {
+  name      = "analytics-snowflake"
+  type      = "snowflake"
+  host      = "account.snowflakecomputing.com"
+  username  = "TERRAFORM_USER"
+  password  = var.snowflake_password
+  warehouse = "COMPUTE_WH"
+  database_name = "ANALYTICS"
+  schema    = "PUBLIC"
+  role      = "ACCOUNTADMIN"
+  tags      = ["analytics"]
+}
+```
+
+### Reading Secrets from Files
+
+```terraform
+locals {
+  secrets = yamldecode(file("secrets.yaml"))
+}
+
+resource "adaptive_resource" "postgres_from_file" {
+  name          = "postgres-secure"
+  type          = "postgres"
+  host          = local.secrets.postgres.host
+  port          = local.secrets.postgres.port
+  username      = local.secrets.postgres.username
+  password      = local.secrets.postgres.password
+  database_name = local.secrets.postgres.database
+  ssl_mode      = "require"
+}
+```
+
+### Using AWS Secrets Manager
+
+```terraform
+resource "adaptive_resource" "postgres_with_secrets" {
+  name       = "postgres-secrets-manager"
+  type       = "postgres"
+  host       = "postgres.example.com"
+  port       = "5432"
+  secret_id  = "arn:aws:secretsmanager:us-west-2:123456789:secret:db-creds"
+  aws_arn    = "arn:aws:iam::123456789:role/secrets-access"
+  aws_region_name = "us-west-2"
+}
+```
+
+{{ .SchemaMarkdown | trimspace }}
+
+## Import
+
+Resources can be imported using the resource ID:
+
+```shell
+terraform import adaptive_resource.example resource-id
+```
