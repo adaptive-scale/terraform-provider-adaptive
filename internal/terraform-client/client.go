@@ -426,11 +426,9 @@ func (c *Client) ReadSession(sessionID string, waitForStatus bool) (map[string]i
 		return nil, fmt.Errorf("could to create session %s", sessionID)
 	}
 	finalStatus := strings.ToLower(resp["Status"].(string))
-	if finalStatus != "created" {
-		log.Printf("[ERROR] Session not in created status: session_id=%s, status=%s", sessionID, resp["Status"])
-		return nil, fmt.Errorf("error create session %s", sessionID)
-	}
-	log.Printf("[DEBUG] Session successfully created: session_id=%s", sessionID)
+
+	log.Printf("[DEBUG] current status: %s", finalStatus)
+
 	return resp, nil
 }
 
