@@ -519,6 +519,11 @@ func ResourceAdaptiveResource() *schema.Resource {
 				Optional:    true,
 				Description: "The default cluster",
 			},
+			"use_tenant": {
+				Type:        schema.TypeBool,
+				Optional:    true,
+				Description: "Whether to use tenant for Azure Active Directory authentication",
+			},
 		},
 	}
 }
@@ -532,6 +537,8 @@ func schemaToResourceIntegrationConfiguration(d *schema.ResourceData, intType st
 		return integrations.SchemaToAWSRedshiftIntegrationConfiguration(d), nil
 	case "azure":
 		return integrations.SchemaToAzureIntegrationConfiguration(d), nil
+	case "azureactivedirectory":
+		return integrations.SchemaToAzureActiveDirectoryIntegrationConfiguration(d), nil
 	case "cockroachdb":
 		return integrations.SchemaToCockroachDBIntegrationConfiguration(d), nil
 	case "gcp":
