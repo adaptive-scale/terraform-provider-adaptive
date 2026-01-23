@@ -13,11 +13,12 @@ The `adaptive_authorization` resource defines permission policies that control w
 
 | Type | Description | Permission Format |
 |------|-------------|-------------------|
-| `postgres` | PostgreSQL database | SQL privileges (SELECT, INSERT, UPDATE, DELETE, etc.) |
-| `mysql` | MySQL database | SQL privileges |
-| `mongodb` | MongoDB database | MongoDB roles (read, readWrite, dbAdmin, etc.) |
-| `kubernetes` | Kubernetes cluster | RBAC verbs and resources |
-| `ssh` | SSH server | Shell access controls |
+| `postgres` | PostgreSQL database | YAML with database, privileges, objects |
+| `mysql` | MySQL database | YAML with objects (database.table), privileges |
+| `sqlserver` | Microsoft SQL Server | YAML with server_roles, server_permissions, databases |
+| `mongodb` | MongoDB database | JSON with role, privileges, actions |
+| `kubernetes` | Kubernetes cluster | Kubernetes RBAC Role manifest |
+| `ssh` | SSH server | YAML with allow/deny for data_transfer, operations, directories |
 
 ## Example Usage
 
@@ -27,7 +28,14 @@ The `adaptive_authorization` resource defines permission policies that control w
 resource "adaptive_authorization" "postgres_readonly" {
   name          = "postgres-readonly"
   resource_type = "postgres"
-  permissions   = "SELECT"
+  permissions   = <<-EOT
+    allow:
+      - database: production
+        privileges:
+          - SELECT
+        objects:
+          - ALL
+  EOT
   description   = "Read-only access to PostgreSQL databases"
 }
 ```
@@ -38,7 +46,17 @@ resource "adaptive_authorization" "postgres_readonly" {
 resource "adaptive_authorization" "postgres_readwrite" {
   name          = "postgres-readwrite"
   resource_type = "postgres"
-  permissions   = "SELECT, INSERT, UPDATE, DELETE"
+  permissions   = <<-EOT
+    allow:
+      - database: application
+        privileges:
+          - SELECT
+          - INSERT
+          - UPDATE
+          - DELETE
+        objects:
+          - ALL
+  EOT
   description   = "Read-write access to PostgreSQL databases"
 }
 ```
@@ -49,8 +67,47 @@ resource "adaptive_authorization" "postgres_readwrite" {
 resource "adaptive_authorization" "postgres_admin" {
   name          = "postgres-admin"
   resource_type = "postgres"
-  permissions   = "ALL PRIVILEGES"
+  permissions   = <<-EOT
+    allow:
+      - database: sakila
+        privileges:
+          - ALL
+        objects:
+          - ALL
+  EOT
   description   = "Full administrative access to PostgreSQL"
+}
+```
+
+### PostgreSQL Multi-Database Access
+
+```terraform
+resource "adaptive_authorization" "postgres_multi_db" {
+  name          = "postgres-multi-db"
+  resource_type = "postgres"
+  permissions   = <<-EOT
+    allow:
+      - database: sakila
+        privileges:
+          - ALL
+        objects:
+          - ALL
+      - database: employees
+        privileges:
+          - SELECT
+          - INSERT
+          - UPDATE
+        objects:
+          - departments
+          - employees
+      - database: analytics
+        privileges:
+          - SELECT
+        objects:
+          - reports
+          - dashboards
+  EOT
+  description   = "Access to multiple databases with different permissions"
 }
 ```
 
@@ -60,8 +117,166 @@ resource "adaptive_authorization" "postgres_admin" {
 resource "adaptive_authorization" "mysql_readonly" {
   name          = "mysql-readonly"
   resource_type = "mysql"
-  permissions   = "SELECT"
+  permissions   = <<-EOT
+    allow:
+      - objects:
+          - production.*
+        privileges:
+          - SELECT
+  EOT
   description   = "Read-only access to MySQL databases"
+}
+```
+
+### MySQL Read-Write Access
+
+```terraform
+resource "adaptive_authorization" "mysql_readwrite" {
+  name          = "mysql-readwrite"
+  resource_type = "mysql"
+  permissions   = <<-EOT
+    allow:
+      - objects:
+          - application.*
+        privileges:
+          - SELECT
+          - INSERT
+          - UPDATE
+          - DELETE
+  EOT
+  description   = "Read-write access to MySQL databases"
+}
+```
+
+### MySQL Table-Specific Access
+
+```terraform
+resource "adaptive_authorization" "mysql_tables" {
+  name          = "mysql-table-access"
+  resource_type = "mysql"
+  permissions   = <<-EOT
+    allow:
+      - objects:
+          - ecommerce.orders
+          - ecommerce.products
+        privileges:
+          - SELECT
+          - INSERT
+          - UPDATE
+      - objects:
+          - ecommerce.users
+        privileges:
+          - SELECT
+  EOT
+  description   = "Access to specific MySQL tables with different permissions"
+}
+```
+
+### SQL Server Read-Only Access
+
+```terraform
+resource "adaptive_authorization" "sqlserver_readonly" {
+  name          = "sqlserver-readonly"
+  resource_type = "sqlserver"
+  permissions   = <<-EOT
+    name: readonly-sqlserver
+    databases:
+      include_databases:
+        - production
+      database_roles:
+        - db_datareader
+  EOT
+  description   = "Read-only access to SQL Server databases"
+}
+```
+
+### SQL Server Read-Write Access
+
+```terraform
+resource "adaptive_authorization" "sqlserver_readwrite" {
+  name          = "sqlserver-readwrite"
+  resource_type = "sqlserver"
+  permissions   = <<-EOT
+    name: readwrite-sqlserver
+    databases:
+      include_databases:
+        - application
+      database_roles:
+        - db_datareader
+        - db_datawriter
+  EOT
+  description   = "Read-write access to SQL Server databases"
+}
+```
+
+### SQL Server Admin with Server Roles
+
+```terraform
+resource "adaptive_authorization" "sqlserver_admin" {
+  name          = "sqlserver-admin"
+  resource_type = "sqlserver"
+  permissions   = <<-EOT
+    name: admin-sqlserver
+    server_roles:
+      - securityadmin
+    server_permissions:
+      - effect: ALLOW
+        action: ALTER ANY LOGIN
+    databases:
+      include_databases:
+        - nwnd
+      database_roles:
+        - db_datareader
+      permissions:
+        - effect: ALLOW
+          action: INSERT
+          object:
+            schema: dbo
+            name: Order Details
+  EOT
+  description   = "SQL Server admin with server roles and granular permissions"
+}
+```
+
+### SQL Server Object-Level Permissions
+
+```terraform
+resource "adaptive_authorization" "sqlserver_granular" {
+  name          = "sqlserver-granular"
+  resource_type = "sqlserver"
+  permissions   = <<-EOT
+    name: granular-sqlserver
+    databases:
+      include_databases:
+        - ecommerce
+      permissions:
+        - effect: ALLOW
+          action: SELECT
+          object:
+            schema: dbo
+            name: Products
+        - effect: ALLOW
+          action: SELECT
+          object:
+            schema: dbo
+            name: Categories
+        - effect: ALLOW
+          action: INSERT
+          object:
+            schema: dbo
+            name: Orders
+        - effect: ALLOW
+          action: UPDATE
+          object:
+            schema: dbo
+            name: Orders
+        - effect: DENY
+          action: DELETE
+          object:
+            schema: dbo
+            name: Orders
+  EOT
+  description   = "SQL Server with granular object-level permissions"
 }
 ```
 
@@ -71,7 +286,18 @@ resource "adaptive_authorization" "mysql_readonly" {
 resource "adaptive_authorization" "mongodb_readonly" {
   name          = "mongodb-readonly"
   resource_type = "mongodb"
-  permissions   = "read"
+  permissions   = <<-EOT
+    {
+      "role": "readOnly",
+      "privileges": [
+        {
+          "resource": { "db": "production", "collection": "" },
+          "actions": ["find", "listCollections", "listIndexes"]
+        }
+      ],
+      "roles": []
+    }
+  EOT
   description   = "Read-only access to MongoDB collections"
 }
 ```
@@ -82,25 +308,71 @@ resource "adaptive_authorization" "mongodb_readonly" {
 resource "adaptive_authorization" "mongodb_readwrite" {
   name          = "mongodb-readwrite"
   resource_type = "mongodb"
-  permissions   = "readWrite"
+  permissions   = <<-EOT
+    {
+      "role": "readWrite",
+      "privileges": [
+        {
+          "resource": { "db": "application", "collection": "" },
+          "actions": ["find", "insert", "update", "remove"]
+        }
+      ],
+      "roles": []
+    }
+  EOT
   description   = "Read-write access to MongoDB collections"
 }
 ```
 
-### MongoDB with Custom Roles (Multi-line)
+### MongoDB Collection-Specific Access
+
+```terraform
+resource "adaptive_authorization" "mongodb_collection" {
+  name          = "mongodb-collection-access"
+  resource_type = "mongodb"
+  permissions   = <<-EOT
+    {
+      "role": "collectionRole",
+      "privileges": [
+        {
+          "resource": { "db": "test", "collection": "prod" },
+          "actions": ["find", "update", "insert"]
+        },
+        {
+          "resource": { "db": "test", "collection": "staging" },
+          "actions": ["find"]
+        }
+      ],
+      "roles": []
+    }
+  EOT
+  description   = "Collection-specific access with different permissions per collection"
+}
+```
+
+### MongoDB with Inherited Roles
 
 ```terraform
 resource "adaptive_authorization" "mongodb_custom" {
   name          = "mongodb-custom-roles"
   resource_type = "mongodb"
   permissions   = <<-EOT
-    [
-      { "role": "read", "db": "analytics" },
-      { "role": "readWrite", "db": "application" },
-      { "role": "dbAdmin", "db": "application" }
-    ]
+    {
+      "role": "appAdmin",
+      "privileges": [
+        {
+          "resource": { "db": "admin", "collection": "system.users" },
+          "actions": ["find", "update"]
+        }
+      ],
+      "roles": [
+        { "role": "read", "db": "analytics" },
+        { "role": "readWrite", "db": "application" },
+        { "role": "dbAdmin", "db": "application" }
+      ]
+    }
   EOT
-  description   = "Custom MongoDB roles across multiple databases"
+  description   = "Custom MongoDB role with inherited roles across databases"
 }
 ```
 
@@ -111,9 +383,14 @@ resource "adaptive_authorization" "k8s_namespace_admin" {
   name          = "k8s-namespace-admin"
   resource_type = "kubernetes"
   permissions   = <<-EOT
-    apiGroups: ["*"]
-    resources: ["*"]
-    verbs: ["*"]
+    apiVersion: rbac.authorization.k8s.io/v1
+    kind: Role
+    metadata:
+      name: adaptive-admin
+    rules:
+    - apiGroups: ["*"]
+      resources: ["*"]
+      verbs: ["*"]
   EOT
   description   = "Full access within a Kubernetes namespace"
 }
@@ -126,11 +403,134 @@ resource "adaptive_authorization" "k8s_readonly" {
   name          = "k8s-readonly"
   resource_type = "kubernetes"
   permissions   = <<-EOT
-    apiGroups: [""]
-    resources: ["pods", "services", "configmaps"]
-    verbs: ["get", "list", "watch"]
+    apiVersion: rbac.authorization.k8s.io/v1
+    kind: Role
+    metadata:
+      name: adaptive-readonly
+    rules:
+    - apiGroups: [""]
+      resources: ["pods", "services", "configmaps"]
+      verbs: ["get", "list", "watch"]
+    - apiGroups: ["apps"]
+      resources: ["deployments", "replicasets"]
+      verbs: ["get", "list", "watch"]
   EOT
   description   = "Read-only access to core Kubernetes resources"
+}
+```
+
+### Kubernetes Developer Access
+
+```terraform
+resource "adaptive_authorization" "k8s_developer" {
+  name          = "k8s-developer"
+  resource_type = "kubernetes"
+  permissions   = <<-EOT
+    apiVersion: rbac.authorization.k8s.io/v1
+    kind: Role
+    metadata:
+      name: adaptive-developer
+    rules:
+    - apiGroups: [""]
+      resources: ["pods", "services", "configmaps", "secrets"]
+      verbs: ["get", "list", "watch", "create", "update", "delete"]
+    - apiGroups: ["apps"]
+      resources: ["deployments", "replicasets", "statefulsets"]
+      verbs: ["get", "list", "watch", "create", "update", "delete"]
+    - apiGroups: [""]
+      resources: ["pods/log", "pods/exec"]
+      verbs: ["get", "create"]
+  EOT
+  description   = "Developer access to manage workloads in Kubernetes"
+}
+```
+
+### SSH Restricted Access
+
+```terraform
+resource "adaptive_authorization" "ssh_restricted" {
+  name          = "ssh-restricted"
+  resource_type = "ssh"
+  permissions   = <<-EOT
+    allow:
+      data_transfer:
+        - upload
+        - download
+        - list
+    deny:
+      operations:
+        - cp
+        - rm
+        - cat
+        - env
+        - mv
+        - vi
+      directories:
+        - /opt
+        - /var
+  EOT
+  description   = "SSH access with restricted operations and directory access"
+}
+```
+
+### SSH Read-Only Access
+
+```terraform
+resource "adaptive_authorization" "ssh_readonly" {
+  name          = "ssh-readonly"
+  resource_type = "ssh"
+  permissions   = <<-EOT
+    allow:
+      data_transfer:
+        - download
+        - list
+    deny:
+      operations:
+        - rm
+        - mv
+        - cp
+        - vi
+        - nano
+        - dd
+        - chmod
+        - chown
+      directories:
+        - /etc
+        - /root
+        - /var/log
+  EOT
+  description   = "SSH read-only access for monitoring and log viewing"
+}
+```
+
+### SSH Developer Access
+
+```terraform
+resource "adaptive_authorization" "ssh_developer" {
+  name          = "ssh-developer"
+  resource_type = "ssh"
+  permissions   = <<-EOT
+    allow:
+      data_transfer:
+        - upload
+        - download
+        - list
+      directories:
+        - /home
+        - /app
+        - /var/www
+    deny:
+      operations:
+        - rm -rf
+        - dd
+        - mkfs
+        - fdisk
+      directories:
+        - /etc
+        - /root
+        - /boot
+  EOT
+  description   = "SSH developer access with safe boundaries"
 }
 ```
 

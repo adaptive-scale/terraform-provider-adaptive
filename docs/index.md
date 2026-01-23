@@ -125,10 +125,13 @@ The Adaptive provider supports 50+ integration types including:
 | **Databases** | PostgreSQL, MySQL, MongoDB, CockroachDB, ClickHouse, Snowflake, SQL Server, YugabyteDB |
 | **Cloud Platforms** | AWS, Azure, GCP |
 | **Container Orchestration** | Kubernetes |
-| **Identity Providers** | Okta, OneLogin, JumpCloud, Google |
-| **Monitoring** | Datadog, Splunk, Elasticsearch, Coralogix |
+| **Identity Providers** | Okta, Azure Active Directory, OneLogin, JumpCloud, Google Workspace |
+| **Monitoring & Logging** | Datadog, Splunk, Elasticsearch, Coralogix, Syslog |
+| **Collaboration** | Microsoft Teams |
 | **Message Queues** | RabbitMQ |
-| **Network & Security** | SSH, ZeroTier, Cisco NGFW, Fortinet, Palo Alto |
+| **Infrastructure** | SSH, Windows (RDP), ZeroTier |
+| **Network Security** | Cisco NGFW, Fortinet, Palo Alto |
+| **Custom** | Custom Integrations, Services |
 
 See the [examples directory](https://github.com/adaptive-scale/terraform-provider-adaptive/tree/master/examples) for integration-specific configurations.
 

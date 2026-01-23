@@ -26,16 +26,21 @@ The `adaptive_resource` resource allows you to create and manage connections to 
 | `gcp` | Google Cloud Platform |
 | `kubernetes` | Kubernetes cluster |
 | `ssh` | SSH server |
+| `windows` | Windows server (RDP) |
 | `okta` | Okta identity provider |
+| `azureactivedirectory` | Azure Active Directory |
 | `onelogin` | OneLogin identity provider |
 | `jumpcloud` | JumpCloud directory |
 | `google` | Google Workspace |
+| `msteams` | Microsoft Teams |
 | `datadog` | Datadog monitoring |
 | `splunk` | Splunk logging |
 | `elasticsearch` | Elasticsearch |
+| `coralogix` | Coralogix logging |
+| `syslog` | Syslog server |
 | `rabbitmq` | RabbitMQ message broker |
 | `zerotier` | ZeroTier network |
-| `services` | Generic services |
+| `services` | Generic services (URL list) |
 | `customintegration` | Custom integration |
 
 ## Example Usage
@@ -164,6 +169,248 @@ resource "adaptive_resource" "snowflake" {
   schema    = "PUBLIC"
   role      = "ACCOUNTADMIN"
   tags      = ["analytics"]
+}
+```
+
+### CockroachDB
+
+```terraform
+resource "adaptive_resource" "cockroachdb" {
+  name          = "production-cockroachdb"
+  type          = "cockroachdb"
+  host          = "cockroach.example.com"
+  port          = "26257"
+  username      = "admin"
+  password      = var.cockroach_password
+  database_name = "defaultdb"
+  ssl_mode      = "verify-full"
+  root_cert     = file("ca.crt")
+  tags          = ["production", "database"]
+}
+```
+
+### ClickHouse
+
+```terraform
+resource "adaptive_resource" "clickhouse" {
+  name          = "analytics-clickhouse"
+  type          = "clickhouse"
+  host          = "clickhouse.example.com"
+  port          = "9440"
+  username      = "default"
+  password      = var.clickhouse_password
+  database_name = "analytics"
+  ssl_mode      = "require"
+  tags          = ["analytics"]
+}
+```
+
+### Services
+
+```terraform
+resource "adaptive_resource" "services" {
+  name = "internal-services"
+  type = "services"
+  urls = "https://api.internal.com,https://admin.internal.com,https://dashboard.internal.com"
+  tags = ["internal", "web"]
+}
+```
+
+### Okta
+
+```terraform
+resource "adaptive_resource" "okta" {
+  name          = "okta-sso"
+  type          = "okta"
+  domain        = "mycompany.okta.com"
+  client_id     = var.okta_client_id
+  client_secret = var.okta_client_secret
+  tags          = ["identity", "sso"]
+}
+```
+
+### Azure Active Directory
+
+```terraform
+resource "adaptive_resource" "azure_ad" {
+  name          = "azure-ad-integration"
+  type          = "azureactivedirectory"
+  domain        = "mycompany.onmicrosoft.com"
+  tenant_id     = var.azure_tenant_id
+  client_id     = var.azure_client_id
+  client_secret = var.azure_client_secret
+  tags          = ["identity", "azure"]
+}
+```
+
+### OneLogin
+
+```terraform
+resource "adaptive_resource" "onelogin" {
+  name              = "onelogin-sso"
+  type              = "onelogin"
+  domain            = "mycompany.onelogin.com"
+  client_id         = var.onelogin_client_id
+  client_secret     = var.onelogin_client_secret
+  api_client_id     = var.onelogin_api_client_id
+  api_client_secret = var.onelogin_api_client_secret
+  tags              = ["identity", "sso"]
+}
+```
+
+### JumpCloud
+
+```terraform
+resource "adaptive_resource" "jumpcloud" {
+  name          = "jumpcloud-directory"
+  type          = "jumpcloud"
+  domain        = "console.jumpcloud.com"
+  client_id     = var.jumpcloud_client_id
+  client_secret = var.jumpcloud_client_secret
+  api_token     = var.jumpcloud_api_key
+  tags          = ["identity", "directory"]
+}
+```
+
+### Google Workspace
+
+```terraform
+resource "adaptive_resource" "google_workspace" {
+  name          = "google-workspace"
+  type          = "google"
+  domain        = "mycompany.com"
+  client_id     = var.google_client_id
+  client_secret = var.google_client_secret
+  tags          = ["identity", "google"]
+}
+```
+
+### Datadog
+
+```terraform
+resource "adaptive_resource" "datadog" {
+  name       = "datadog-monitoring"
+  type       = "datadog"
+  dd_site    = "datadoghq.com"
+  dd_api_key = var.datadog_api_key
+  tags       = ["monitoring"]
+}
+```
+
+### Splunk
+
+```terraform
+resource "adaptive_resource" "splunk" {
+  name     = "splunk-logging"
+  type     = "splunk"
+  url      = "https://splunk.example.com:8088"
+  token_id = var.splunk_hec_token
+  tags     = ["logging"]
+}
+```
+
+### Elasticsearch
+
+```terraform
+resource "adaptive_resource" "elasticsearch" {
+  name     = "elasticsearch-cluster"
+  type     = "elasticsearch"
+  uri      = "https://elasticsearch.example.com:9200"
+  username = "elastic"
+  password = var.elasticsearch_password
+  index    = "logs"
+  tags     = ["logging", "search"]
+}
+```
+
+### Coralogix
+
+```terraform
+resource "adaptive_resource" "coralogix" {
+  name             = "coralogix-logging"
+  type             = "coralogix"
+  uri              = "https://api.coralogix.com"
+  private_key      = var.coralogix_private_key
+  application_name = "my-application"
+  sub_system_name  = "production"
+  tags             = ["logging"]
+}
+```
+
+### Syslog
+
+```terraform
+resource "adaptive_resource" "syslog" {
+  name     = "syslog-server"
+  type     = "syslog"
+  hostname = "syslog.example.com"
+  port     = "514"
+  protocol = "tcp"
+  tags     = ["logging"]
+}
+```
+
+### RabbitMQ
+
+```terraform
+resource "adaptive_resource" "rabbitmq" {
+  name     = "rabbitmq-broker"
+  type     = "rabbitmq"
+  uri      = "amqp://rabbitmq.example.com:5672"
+  username = "admin"
+  password = var.rabbitmq_password
+  tags     = ["messaging"]
+}
+```
+
+### Microsoft Teams
+
+```terraform
+resource "adaptive_resource" "msteams" {
+  name          = "teams-integration"
+  type          = "msteams"
+  tenant_id     = var.teams_tenant_id
+  client_id     = var.teams_app_id
+  client_secret = var.teams_app_key
+  tags          = ["collaboration"]
+}
+```
+
+### ZeroTier
+
+```terraform
+resource "adaptive_resource" "zerotier" {
+  name       = "zerotier-network"
+  type       = "zerotier"
+  network_id = "1234567890abcdef"
+  api_token  = var.zerotier_api_token
+  tags       = ["networking"]
+}
+```
+
+### Windows (RDP)
+
+```terraform
+resource "adaptive_resource" "windows" {
+  name     = "windows-server"
+  type     = "windows"
+  hostname = "windows.example.com"
+  port     = "3389"
+  username = "Administrator"
+  password = var.windows_password
+  tags     = ["infrastructure", "windows"]
+}
+```
+
+### Custom Integration
+
+```terraform
+resource "adaptive_resource" "custom" {
+  name                 = "custom-app"
+  type                 = "customintegration"
+  image                = "myregistry/myapp:latest"
+  service_account_name = "custom-sa"
+  tags                 = ["custom"]
 }
 ```
 
