@@ -1,9 +1,11 @@
 package integrations
 
 import (
+	"context"
 	"errors"
 	"fmt"
 
+	"github.com/hashicorp/terraform-plugin-log/tflog"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
 )
 
@@ -62,4 +64,21 @@ func TagsFromSchema(d *schema.ResourceData) ([]string, error) {
 	}
 
 	return userTags, nil
+}
+
+func DefaultClusterFromSchema(d *schema.ResourceData) (string, error) {
+	defaultClusterAttr, ok := d.GetOk("default_cluster")
+	if !ok {
+		return "", nil
+	}
+	defaultCluster, okk := defaultClusterAttr.(string)
+	if !okk {
+		return "", fmt.Errorf("default_cluster must be a string, got %T", defaultClusterAttr)
+	}
+
+	tflog.Debug(context.Background(), "Default cluster from schema", map[string]interface{}{
+		"default_cluster": defaultCluster,
+	})
+
+	return defaultCluster, nil
 }

@@ -15,7 +15,7 @@ resource "adaptive_mysql" "example" {
 
 import (
 	"context"
-	"errors"
+	"fmt"
 	"time"
 
 	adaptive "github.com/adaptive-scale/terraform-provider-adaptive/internal/terraform-client"
@@ -103,15 +103,14 @@ func resourceAdaptiveMySQLCreate(ctx context.Context, d *schema.ResourceData, m 
 	obj := SchemaToMySQLIntegrationConfiguration(d)
 	config, err := yaml.Marshal(obj)
 	if err != nil {
-		err := errors.New("provider error, could not marshal")
-		return diag.FromErr(err)
+		return diag.FromErr(fmt.Errorf("provider error, could not marshal: %w", err))
 	}
 
 	rName, err := NameFromSchema(d)
 	if err != nil {
 		return diag.FromErr(err)
 	}
-	resp, err := client.CreateResource(ctx, rName, "mysql", config, []string{})
+	resp, err := client.CreateResource(ctx, rName, "mysql", config, []string{}, "")
 	if err != nil {
 		return diag.FromErr(err)
 	}
@@ -132,11 +131,10 @@ func resourceAdaptiveMySQLUpdate(ctx context.Context, d *schema.ResourceData, m 
 	obj := SchemaToMySQLIntegrationConfiguration(d)
 	config, err := yaml.Marshal(obj)
 	if err != nil {
-		err := errors.New("provider error, could not marshal")
-		return diag.FromErr(err)
+		return diag.FromErr(fmt.Errorf("provider error, could not marshal: %w", err))
 	}
 
-	_, err = client.UpdateResource(ctx, resourceID, "mysql", config, []string{})
+	_, err = client.UpdateResource(ctx, resourceID, "mysql", config, []string{}, "")
 	if err != nil {
 		return diag.FromErr(err)
 	}

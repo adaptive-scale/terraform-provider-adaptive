@@ -11,7 +11,7 @@ resource "adaptive_google" "example" {
 
 import (
 	"context"
-	"errors"
+	"fmt"
 	"time"
 
 	adaptive "github.com/adaptive-scale/terraform-provider-adaptive/internal/terraform-client"
@@ -82,8 +82,7 @@ func resourceAdaptiveGoogleCreate(ctx context.Context, d *schema.ResourceData, m
 	obj := SchemaToGoogleOAuthIntegrationConfiguration(d)
 	config, err := yaml.Marshal(obj)
 	if err != nil {
-		err := errors.New("provider error, could not marshal")
-		return diag.FromErr(err)
+		return diag.FromErr(fmt.Errorf("provider error, could not marshal: %w", err))
 	}
 
 	rName, err := NameFromSchema(d)
@@ -91,7 +90,7 @@ func resourceAdaptiveGoogleCreate(ctx context.Context, d *schema.ResourceData, m
 		return diag.FromErr(err)
 	}
 
-	resp, err := client.CreateResource(ctx, rName, "google", config, []string{})
+	resp, err := client.CreateResource(ctx, rName, "google", config, []string{}, "")
 	if err != nil {
 		return diag.FromErr(err)
 	}
@@ -112,11 +111,10 @@ func resourceAdaptiveGoogleUpdate(ctx context.Context, d *schema.ResourceData, m
 	obj := SchemaToGoogleOAuthIntegrationConfiguration(d)
 	config, err := yaml.Marshal(obj)
 	if err != nil {
-		err := errors.New("provider error, could not marshal")
-		return diag.FromErr(err)
+		return diag.FromErr(fmt.Errorf("provider error, could not marshal: %w", err))
 	}
 
-	_, err = client.UpdateResource(ctx, resourceID, "google", config, []string{})
+	_, err = client.UpdateResource(ctx, resourceID, "google", config, []string{}, "")
 	if err != nil {
 		return diag.FromErr(err)
 	}

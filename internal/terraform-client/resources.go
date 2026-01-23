@@ -85,6 +85,7 @@ func (c *Client) CreateResource(
 	name, rType string,
 	yamlRConfig []byte,
 	tags []string,
+	defaultCluster string,
 ) (*CreateResourceResponse, error) {
 	tflog.Debug(ctx, "CreateResource called", map[string]interface{}{
 		"name": name,
@@ -95,6 +96,7 @@ func (c *Client) CreateResource(
 		Name:            name,
 		Configuration:   string(yamlRConfig),
 		UserTags:        tags,
+		DefaultCluster:  defaultCluster,
 	}
 
 	payloadBuf := bytes.NewBuffer([]byte{})
@@ -158,6 +160,7 @@ func (c *Client) UpdateResource(
 	rType string,
 	yamlRConfig []byte,
 	tags []string,
+	defaultCluster string,
 ) (*UpdateResourceResponse, error) {
 	tflog.Debug(ctx, "UpdateResource called", map[string]interface{}{
 		"resource_id": resourceID,
@@ -167,6 +170,7 @@ func (c *Client) UpdateResource(
 		IntegrationType: rType,
 		Configuration:   string(yamlRConfig),
 		UserTags:        tags,
+		DefaultCluster:  defaultCluster,
 	}
 
 	payloadBuf := bytes.NewBuffer([]byte{})

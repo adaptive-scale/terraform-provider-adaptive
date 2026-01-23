@@ -14,7 +14,7 @@ Example resource usage:
 
 import (
 	"context"
-	"errors"
+	"fmt"
 	"time"
 
 	adaptive "github.com/adaptive-scale/terraform-provider-adaptive/internal/terraform-client"
@@ -101,15 +101,25 @@ func resourceAdaptiveSSHCreate(ctx context.Context, d *schema.ResourceData, m in
 	obj := SchemaToSSHIntegrationConfiguration(d)
 	config, err := yaml.Marshal(obj)
 	if err != nil {
-		err := errors.New("provider error, could not marshal")
-		return diag.FromErr(err)
+		return diag.FromErr(fmt.Errorf("provider error, could not marshal: %w", err))
 	}
 
 	rName, err := NameFromSchema(d)
 	if err != nil {
 		return diag.FromErr(err)
 	}
-	resp, err := client.CreateResource(ctx, rName, "ssh", config, []string{})
+
+	userTags, err := TagsFromSchema(d)
+	if err != nil {
+		return diag.FromErr(err)
+	}
+
+	defaultCluster, err := DefaultClusterFromSchema(d)
+	if err != nil {
+		return diag.FromErr(err)
+	}
+
+	resp, err := client.CreateResource(ctx, rName, "ssh", config, userTags, defaultCluster)
 	if err != nil {
 		return diag.FromErr(err)
 	}
@@ -130,11 +140,19 @@ func resourceAdaptiveSSHUpdate(ctx context.Context, d *schema.ResourceData, m in
 	obj := SchemaToSSHIntegrationConfiguration(d)
 	config, err := yaml.Marshal(obj)
 	if err != nil {
-		err := errors.New("provider error, could not marshal")
+		return diag.FromErr(fmt.Errorf("provider error, could not marshal: %w", err))
+	}
+	userTags, err := TagsFromSchema(d)
+	if err != nil {
 		return diag.FromErr(err)
 	}
 
-	_, err = client.UpdateResource(ctx, resourceID, "ssh", config, []string{})
+	defaultCluster, err := DefaultClusterFromSchema(d)
+	if err != nil {
+		return diag.FromErr(err)
+	}
+
+	_, err = client.UpdateResource(ctx, resourceID, "ssh", config, userTags, defaultCluster)
 	if err != nil {
 		return diag.FromErr(err)
 	}

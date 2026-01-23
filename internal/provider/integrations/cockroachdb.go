@@ -17,7 +17,7 @@ Example resource usage:
 
 import (
 	"context"
-	"errors"
+	"fmt"
 	"strings"
 	"time"
 
@@ -134,15 +134,14 @@ func resourceAdaptiveCockroachDBCreate(ctx context.Context, d *schema.ResourceDa
 	obj := SchemaToCockroachDBIntegrationConfiguration(d)
 	config, err := yaml.Marshal(obj)
 	if err != nil {
-		err := errors.New("provider error, could not marshal")
-		return diag.FromErr(err)
+		return diag.FromErr(fmt.Errorf("provider error, could not marshal: %w", err))
 	}
 
 	rName, err := NameFromSchema(d)
 	if err != nil {
 		return diag.FromErr(err)
 	}
-	resp, err := client.CreateResource(ctx, rName, "cockroachdb", config, []string{})
+	resp, err := client.CreateResource(ctx, rName, "cockroachdb", config, []string{}, "")
 	if err != nil {
 		return diag.FromErr(err)
 	}
@@ -163,11 +162,10 @@ func resourceAdaptiveCockroachDBUpdate(ctx context.Context, d *schema.ResourceDa
 	obj := SchemaToCockroachDBIntegrationConfiguration(d)
 	config, err := yaml.Marshal(obj)
 	if err != nil {
-		err := errors.New("provider error, could not marshal")
-		return diag.FromErr(err)
+		return diag.FromErr(fmt.Errorf("provider error, could not marshal: %w", err))
 	}
 
-	_, err = client.UpdateResource(ctx, resourceID, "cockroachdb", config, []string{})
+	_, err = client.UpdateResource(ctx, resourceID, "cockroachdb", config, []string{}, "")
 	if err != nil {
 		return diag.FromErr(err)
 	}

@@ -5,12 +5,14 @@ type CreateResourceRequest struct {
 	Name            string   `json:"name"`
 	Configuration   string   `json:"config"`
 	UserTags        []string `json:"userTags"`
+	DefaultCluster  string   `json:"defaultCluster,omitempty"`
 }
 
 type UpdateResourceRequest struct {
 	IntegrationType string   `json:"integrationType"`
 	Configuration   string   `json:"config"`
 	UserTags        []string `json:"userTags"`
+	DefaultCluster  string   `json:"defaultCluster,omitempty"`
 }
 
 type CreateResourceResponse struct {

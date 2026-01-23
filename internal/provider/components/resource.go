@@ -495,6 +495,11 @@ func ResourceAdaptiveResource() *schema.Resource {
 				Optional:    true,
 				Description: "The database password",
 			},
+			"default_cluster": {
+				Type:        schema.TypeString,
+				Optional:    true,
+				Description: "The default cluster",
+			},
 		},
 	}
 }
@@ -633,7 +638,12 @@ func ResourceAdaptiveResourceCreate(ctx context.Context, d *schema.ResourceData,
 		return diag.FromErr(err)
 	}
 
-	resp, err := client.CreateResource(ctx, rName, iType, config, userTags)
+	defaultCluster, err := integrations.DefaultClusterFromSchema(d)
+	if err != nil {
+		return diag.FromErr(err)
+	}
+
+	resp, err := client.CreateResource(ctx, rName, iType, config, userTags, defaultCluster)
 	if err != nil {
 		return diag.FromErr(err)
 	}
@@ -675,7 +685,12 @@ func ResourceAdaptiveResourceUpdate(ctx context.Context, d *schema.ResourceData,
 		return diag.FromErr(err)
 	}
 
-	_, err = client.UpdateResource(ctx, resourceID, iType, config, userTags)
+	defaultCluster, err := integrations.DefaultClusterFromSchema(d)
+	if err != nil {
+		return diag.FromErr(err)
+	}
+
+	_, err = client.UpdateResource(ctx, resourceID, iType, config, userTags, defaultCluster)
 	if err != nil {
 		return diag.FromErr(err)
 	}

@@ -64,14 +64,12 @@ func (c *Client) ReadAuthorization(ctx context.Context, authID string, waitForSt
 		})
 		return nil, fmt.Errorf("could to read session %s %w", authID, err)
 	}
-	finalStatus := strings.ToLower(resp["Status"].(string))
-	if finalStatus != "created" {
-		tflog.Error(ctx, "Authorization not in created status", map[string]interface{}{
-			"auth_id": authID,
-			"status":  resp["Status"],
-		})
-		return nil, fmt.Errorf("error read session %s", authID)
-	}
+
+	tflog.Error(ctx, "Authorization not in created status", map[string]interface{}{
+		"auth_id": authID,
+		"status":  resp["Status"],
+	})
+
 	tflog.Debug(ctx, "Authorization successfully created", map[string]interface{}{
 		"auth_id": authID,
 	})
