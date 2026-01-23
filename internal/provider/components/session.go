@@ -72,6 +72,25 @@ var validMemoryValues = []string{
 	EndpointMemory8192,
 }
 
+var validIdleTimeoutValues = []string{
+	"15m",
+	"30m",
+	"1h",
+	"2h",
+	"3h",
+	"6h",
+	"1d",
+	"3d",
+	"7d",
+	"15d",
+	"30d",
+	"60d",
+	"90d",
+	"180d",
+	"365d",
+	"99999d",
+}
+
 const (
 	EndpointCPUDefault = "0.5"
 	EndpointCPU0125    = "0.125"
@@ -169,6 +188,25 @@ func ResourceAdaptiveSession() *schema.Resource {
 				Default:     "",
 				Optional:    true,
 				Description: "The cluster in which this session should be created. If not provided will be set to default cluster set in workspace settings of the user's workspace",
+			},
+			"idle_timeout": {
+				Type:        schema.TypeString,
+				Optional:    true,
+				Default:     "",
+				Elem:        &schema.Schema{Type: schema.TypeString},
+				Description: "The time after which the session will be automatically terminated if no user is connected. Defaults to never timeout.",
+				ValidateFunc: func(i interface{}, k string) (ws []string, es []error) {
+					if _, ok := i.(string); !ok {
+						es = append(es, fmt.Errorf("idle_timeout must be a string"))
+					}
+
+					// make sure it's valid value
+					if !slices.Contains(
+						validIdleTimeoutValues, i.(string)) {
+						es = append(es, fmt.Errorf("idle_timeout must be one of %v", validIdleTimeoutValues))
+					}
+					return
+				},
 			},
 			"users": {
 				Type:     schema.TypeList,
@@ -378,6 +416,11 @@ func ResourceAdaptiveSessionCreate(ctx context.Context, d *schema.ResourceData, 
 		return diag.FromErr(fmt.Errorf("cpu must be a string"))
 	}
 
+	idleTimeout := d.Get("idle_timeout")
+	if _, ok := idleTimeout.(string); !ok {
+		return diag.FromErr(fmt.Errorf("idle_timeout must be a string"))
+	}
+
 	groups := d.Get("groups")
 	groupsVal := make([]string, 0)
 
@@ -411,6 +454,7 @@ func ResourceAdaptiveSessionCreate(ctx context.Context, d *schema.ResourceData, 
 		mem.(string), cpu.(string),
 		userTags,
 		groupsVal,
+		idleTimeout.(string),
 	)
 	if err != nil {
 		return diag.FromErr(err)
@@ -445,27 +489,27 @@ func ResourceAdaptiveSessionUpdate(ctx context.Context, d *schema.ResourceData, 
 	client := m.(*adaptive.Client)
 	sessionID := d.Id()
 
-	if d.HasChange("type") {
-		return diag.Errorf("Cannot change type after creation")
-	}
-	if d.HasChange("resource") {
-		return diag.Errorf("Cannot change resource after creation")
-	}
-	if d.HasChange("authorization") {
-		return diag.Errorf("Cannot change authorizaton after creation")
-	}
-	if d.HasChange("cluster") {
-		return diag.Errorf("Cannot change cluster after creation")
-	}
-	if d.HasChange("ttl") {
-		return diag.Errorf("Cannot change ttl after creation")
-	}
-	if d.HasChange("memory") {
-		return diag.Errorf("Cannot change memory after creation")
-	}
-	if d.HasChange("cpu") {
-		return diag.Errorf("Cannot change cpu after creation")
-	}
+	// if d.HasChange("type") {
+	// 	return diag.Errorf("Cannot change type after creation")
+	// }
+	// if d.HasChange("resource") {
+	// 	return diag.Errorf("Cannot change resource after creation")
+	// }
+	// if d.HasChange("authorization") {
+	// 	return diag.Errorf("Cannot change authorizaton after creation")
+	// }
+	// if d.HasChange("cluster") {
+	// 	return diag.Errorf("Cannot change cluster after creation")
+	// }
+	// if d.HasChange("ttl") {
+	// 	return diag.Errorf("Cannot change ttl after creation")
+	// }
+	// if d.HasChange("memory") {
+	// 	return diag.Errorf("Cannot change memory after creation")
+	// }
+	// if d.HasChange("cpu") {
+	// 	return diag.Errorf("Cannot change cpu after creation")
+	// }
 
 	users := d.Get("users").([]interface{})
 	userEmails := make([]string, len(users))
@@ -524,6 +568,11 @@ func ResourceAdaptiveSessionUpdate(ctx context.Context, d *schema.ResourceData, 
 		return diag.FromErr(fmt.Errorf("pause_timeout must be a string"))
 	}
 
+	idleTimeout := d.Get("idle_timeout")
+	if _, ok := idleTimeout.(string); !ok {
+		return diag.FromErr(fmt.Errorf("idle_timeout must be a string"))
+	}
+
 	mem := d.Get("memory")
 	if _, ok := mem.(string); !ok {
 		return diag.FromErr(fmt.Errorf("memory must be a string"))
@@ -579,6 +628,7 @@ func ResourceAdaptiveSessionUpdate(ctx context.Context, d *schema.ResourceData, 
 		mem.(string), cpu.(string),
 		userTags,
 		groupsVal,
+		idleTimeout.(string),
 	)
 	if err != nil {
 		return diag.FromErr(err)

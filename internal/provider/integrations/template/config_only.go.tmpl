@@ -1,0 +1,29 @@
+package integrations
+
+import "github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
+
+// {{.IntegrationName}}IntegrationConfiguration represents the configuration
+// for a {{.IntegrationName}} integration that will be serialized as YAML.
+type {{.IntegrationName}}IntegrationConfiguration struct {
+	Name string `yaml:"name"`
+	// Add your integration-specific fields here with yaml tags
+	// Example:
+	// Hostname string `yaml:"hostname"`
+	// Port     string `yaml:"port"`
+	// Username string `yaml:"username"`
+	// Password string `yaml:"password"`
+}
+
+// SchemaTo{{.IntegrationName}}IntegrationConfiguration converts the Terraform
+// schema to a {{.IntegrationName}}IntegrationConfiguration struct.
+func SchemaTo{{.IntegrationName}}IntegrationConfiguration(d *schema.ResourceData) {{.IntegrationName}}IntegrationConfiguration {
+	return {{.IntegrationName}}IntegrationConfiguration{
+		Name: d.Get("name").(string),
+		// Map your schema fields to configuration fields here
+		// Example:
+		// Hostname: d.Get("hostname").(string),
+		// Port:     d.Get("port").(string),
+		// Username: d.Get("username").(string),
+		// Password: d.Get("password").(string),
+	}
+}

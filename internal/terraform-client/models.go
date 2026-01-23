@@ -46,8 +46,9 @@ type CreateSessionRequest struct {
 	UsersTags []string `json:"usertags"`
 
 	// pause endpoint timeout
-	Timeout string   `json:"timeout"`
-	Groups  []string `json:"groups,omitempty"`
+	PauseTimeout string   `json:"pause_timeout,omitempty"`
+	Groups       []string `json:"groups,omitempty"`
+	IdleTimeout  string   `json:"idle_timeout,omitempty"`
 }
 
 type CreateSessionResponse struct {

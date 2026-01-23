@@ -30,6 +30,7 @@ func (c *Client) CreateSession(
 	memory, cpu string,
 	tags []string,
 	groups []string,
+	idleTimeout string,
 ) (*CreateSessionResponse, error) {
 	tflog.Debug(ctx, "CreateSession called", map[string]interface{}{
 		"name":          sessionName,
@@ -48,7 +49,8 @@ func (c *Client) CreateSession(
 		SessionUsers:      users,
 		IsJITEnabled:      isJITEnabled,
 		AccessApprovers:   accessApprovers,
-		Timeout:           pauseTimeout,
+		PauseTimeout:      pauseTimeout,
+		IdleTimeout:       idleTimeout,
 		Memory:            memory,
 		CPU:               cpu,
 		UsersTags:         tags,
@@ -263,6 +265,7 @@ func (c *Client) UpdateSession(
 	memory, cpu string,
 	tags []string,
 	groups []string,
+	idleTimeout string,
 ) (*UpdateSessionResponse, error) {
 	tflog.Debug(ctx, "UpdateSession called", map[string]interface{}{
 		"session_id": sessionID,
@@ -279,12 +282,14 @@ func (c *Client) UpdateSession(
 		SessionUsers:      users,
 		IsJITEnabled:      isJITEnabled,
 		AccessApprovers:   accessApprovers,
-		Timeout:           pauseTimeout,
+		PauseTimeout:      pauseTimeout,
 		Memory:            memory,
 		CPU:               cpu,
 		UsersTags:         tags,
 		Groups:            groups,
+		IdleTimeout:       idleTimeout,
 	}
+
 	payloadBuf := bytes.NewBuffer([]byte{})
 	if err := json.NewEncoder(payloadBuf).Encode(req); err != nil {
 		tflog.Error(ctx, "Failed to encode request body for updating session", map[string]interface{}{

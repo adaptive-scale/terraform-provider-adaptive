@@ -1,0 +1,176 @@
+package integrations
+
+/*
+Example resource usage:
+
+resource "adaptive_{{.ResourceName}}" "example" {
+	name = "instance-name"
+	// Add your resource-specific fields here
+}
+*/
+
+import (
+	"context"
+	"fmt"
+	"time"
+
+	adaptive "github.com/adaptive-scale/terraform-provider-adaptive/internal/terraform-client"
+	"github.com/hashicorp/terraform-plugin-sdk/v2/diag"
+	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
+	"gopkg.in/yaml.v2"
+)
+
+// {{.IntegrationName}}IntegrationConfiguration represents the configuration
+// for a {{.IntegrationName}} integration that will be serialized as YAML.
+type {{.IntegrationName}}IntegrationConfiguration struct {
+	Name    string `yaml:"name"`
+	Version string `yaml:"version"`
+	// Add your integration-specific fields here with yaml tags
+	// Example:
+	// Hostname string `yaml:"hostname"`
+	// Port     string `yaml:"port"`
+	// Username string `yaml:"username"`
+	// Password string `yaml:"password"`
+}
+
+// resourceAdaptive{{.IntegrationName}} defines the Terraform resource schema
+// for the {{.IntegrationName}} integration.
+func resourceAdaptive{{.IntegrationName}}() *schema.Resource {
+	return &schema.Resource{
+		CreateContext: resourceAdaptive{{.IntegrationName}}Create,
+		ReadContext:   resourceAdaptive{{.IntegrationName}}Read,
+		UpdateContext: resourceAdaptive{{.IntegrationName}}Update,
+		DeleteContext: resourceAdaptive{{.IntegrationName}}Delete,
+
+		Schema: map[string]*schema.Schema{
+			"name": {
+				Type:        schema.TypeString,
+				Required:    true,
+				Description: "The name of the {{.IntegrationName}} integration to create.",
+			},
+			// Add your integration-specific schema fields here
+			// Example:
+			// "hostname": {
+			// 	Type:        schema.TypeString,
+			// 	Required:    true,
+			// 	Description: "The hostname to connect to.",
+			// },
+			// "port": {
+			// 	Type:        schema.TypeString,
+			// 	Required:    true,
+			// 	Description: "The port number to connect to.",
+			// },
+			// "username": {
+			// 	Type:        schema.TypeString,
+			// 	Required:    true,
+			// 	Description: "The username for authentication.",
+			// },
+			// "password": {
+			// 	Type:        schema.TypeString,
+			// 	Required:    true,
+			// 	Sensitive:   true,
+			// 	Description: "The password for authentication.",
+			// },
+			"last_updated": {
+				Type:     schema.TypeString,
+				Optional: true,
+				Computed: true,
+			},
+		},
+	}
+}
+
+// SchemaTo{{.IntegrationName}}IntegrationConfiguration converts the Terraform
+// schema to a {{.IntegrationName}}IntegrationConfiguration struct that can be
+// serialized as YAML for making API calls.
+func SchemaTo{{.IntegrationName}}IntegrationConfiguration(d *schema.ResourceData) {{.IntegrationName}}IntegrationConfiguration {
+	return {{.IntegrationName}}IntegrationConfiguration{
+		Name:    d.Get("name").(string),
+		Version: "1.0",
+		// Map your schema fields to configuration fields here
+		// Example:
+		// Hostname: d.Get("hostname").(string),
+		// Port:     d.Get("port").(string),
+		// Username: d.Get("username").(string),
+		// Password: d.Get("password").(string),
+	}
+}
+
+func resourceAdaptive{{.IntegrationName}}Create(ctx context.Context, d *schema.ResourceData, m interface{}) diag.Diagnostics {
+	client := m.(*adaptive.Client)
+
+	obj := SchemaTo{{.IntegrationName}}IntegrationConfiguration(d)
+	config, err := yaml.Marshal(obj)
+	if err != nil {
+		return diag.FromErr(fmt.Errorf("provider error, could not marshal: %w", err))
+	}
+
+	rName, err := NameFromSchema(d)
+	if err != nil {
+		return diag.FromErr(err)
+	}
+
+	userTags, err := TagsFromSchema(d)
+	if err != nil {
+		return diag.FromErr(err)
+	}
+
+	defaultCluster, err := DefaultClusterFromSchema(d)
+	if err != nil {
+		return diag.FromErr(err)
+	}
+
+	resp, err := client.CreateResource(ctx, rName, "{{.ResourceType}}", config, userTags, defaultCluster)
+	if err != nil {
+		return diag.FromErr(err)
+	}
+
+	d.SetId(resp.ID)
+	resourceAdaptive{{.IntegrationName}}Read(ctx, d, m)
+	return nil
+}
+
+func resourceAdaptive{{.IntegrationName}}Read(ctx context.Context, d *schema.ResourceData, m interface{}) diag.Diagnostics {
+	return nil
+}
+
+func resourceAdaptive{{.IntegrationName}}Update(ctx context.Context, d *schema.ResourceData, m interface{}) diag.Diagnostics {
+	client := m.(*adaptive.Client)
+	resourceID := d.Id()
+
+	obj := SchemaTo{{.IntegrationName}}IntegrationConfiguration(d)
+	config, err := yaml.Marshal(obj)
+	if err != nil {
+		return diag.FromErr(fmt.Errorf("provider error, could not marshal: %w", err))
+	}
+
+	userTags, err := TagsFromSchema(d)
+	if err != nil {
+		return diag.FromErr(err)
+	}
+
+	defaultCluster, err := DefaultClusterFromSchema(d)
+	if err != nil {
+		return diag.FromErr(err)
+	}
+
+	_, err = client.UpdateResource(ctx, resourceID, "{{.ResourceType}}", config, userTags, defaultCluster)
+	if err != nil {
+		return diag.FromErr(err)
+	}
+
+	d.Set("last_updated", time.Now())
+	return resourceAdaptive{{.IntegrationName}}Read(ctx, d, m)
+}
+
+func resourceAdaptive{{.IntegrationName}}Delete(ctx context.Context, d *schema.ResourceData, m interface{}) diag.Diagnostics {
+	resourceID := d.Id()
+	client := m.(*adaptive.Client)
+	_, err := client.DeleteResource(ctx, resourceID, d.Get("name").(string))
+	if err != nil {
+		return diag.FromErr(err)
+	}
+
+	d.SetId("")
+	return nil
+}
