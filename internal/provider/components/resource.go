@@ -4,10 +4,12 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/adaptive-scale/terraform-provider-adaptive/internal/provider/integrations"
 	adaptive "github.com/adaptive-scale/terraform-provider-adaptive/internal/terraform-client"
+	"github.com/hashicorp/go-cty/cty"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/diag"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
 	"golang.org/x/exp/slices"
@@ -18,6 +20,7 @@ var (
 	validIntegrationTypes = []string{
 		"aws",
 		"azure",
+		"azureactivedirectory",
 		"cockroachdb",
 		"gcp",
 		"google",
@@ -78,6 +81,21 @@ func isValidIntegrationType(t string) bool {
 	return false
 }
 
+// validateIntegrationType returns a schema validation function that checks
+// if the provided value is a valid integration type.
+func validateIntegrationType(i any, p cty.Path) diag.Diagnostics {
+	v, ok := i.(string)
+	if !ok {
+		return diag.Errorf("expected type to be string")
+	}
+
+	if !isValidIntegrationType(v) {
+		return diag.Errorf("invalid integration type %q; valid types are: %s", v, strings.Join(validIntegrationTypes, ", "))
+	}
+
+	return nil
+}
+
 // TODO: Add generic attributes like:
 // - Authorization
 
@@ -94,9 +112,10 @@ func ResourceAdaptiveResource() *schema.Resource {
 		},
 		Schema: map[string]*schema.Schema{
 			"type": {
-				Type:        schema.TypeString,
-				Required:    true,
-				Description: "Type of the Adaptive resource",
+				Type:             schema.TypeString,
+				Required:         true,
+				Description:      "Type of the Adaptive resource",
+				ValidateDiagFunc: validateIntegrationType,
 			},
 			"name": {
 				Type:        schema.TypeString,

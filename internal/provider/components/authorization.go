@@ -10,11 +10,49 @@ resource "adaptive_authorization" "example" {
 
 import (
 	"context"
+	"strings"
 
 	adaptive "github.com/adaptive-scale/terraform-provider-adaptive/internal/terraform-client"
+	"github.com/hashicorp/go-cty/cty"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/diag"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
 )
+
+var validAuthorizedResourceTypes = map[string]bool{
+	"kubernetes":                  true,
+	"mongo":                       true,
+	"mongodb_atlas":               true,
+	"mongodb_aws_secrets_manager": true,
+	"mongo36":                     true,
+	"elasticsearch":               true,
+	"ssh":                         true,
+	"postgres":                    true,
+	"mysql":                       true,
+	"sql_server":                  true,
+	"sqlserver_aws_secrets_manager": true,
+	"postgres_aws_secrets_manager":  true,
+	"mysql_aws_secrets_manager":     true,
+	"yugabytedb":                    true,
+	"cockroachdb":                   true,
+	"proxysql":                      true,
+}
+
+func validateAuthorizedResourceType(i any, p cty.Path) diag.Diagnostics {
+	v, ok := i.(string)
+	if !ok {
+		return diag.Errorf("expected resource_type to be string")
+	}
+
+	if !validAuthorizedResourceTypes[v] {
+		validTypes := make([]string, 0, len(validAuthorizedResourceTypes))
+		for k := range validAuthorizedResourceTypes {
+			validTypes = append(validTypes, k)
+		}
+		return diag.Errorf("invalid resource_type %q; valid types are: %s", v, strings.Join(validTypes, ", "))
+	}
+
+	return nil
+}
 
 type AuthorizationConfiguration struct {
 	Name        string `json:"name"`
@@ -45,9 +83,10 @@ func ResourceAdaptiveAuthorization() *schema.Resource {
 				Description: "An optional description of the authorization object.",
 			},
 			"resource_type": {
-				Type:        schema.TypeString,
-				Required:    true,
-				Description: "Resource type to grant permission on. Eg. kubernetes, postgres, mysql, mongodb",
+				Type:             schema.TypeString,
+				Required:         true,
+				Description:      "Resource type to grant permission on. Eg. kubernetes, postgres, mysql, mongodb",
+				ValidateDiagFunc: validateAuthorizedResourceType,
 			},
 			"permissions": {
 				Type:        schema.TypeString,
