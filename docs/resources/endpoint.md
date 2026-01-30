@@ -178,6 +178,7 @@ resource "adaptive_group" "developers" {
 - `last_updated` (String) The last time the session was updated.
 - `memory` (String) Memory of endpoint pod
 - `pause_timeout` (String) The time after which the session will be paused if no user has connected to it. Defaults to never pause.
+- `script_only_access` (Boolean) Whether the endpoint should only be accessible via script. Defaults to `false`.
 - `tags` (List of String) Optional tags
 - `timeouts` (Block, Optional) (see [below for nested schema](#nestedblock--timeouts))
 - `ttl` (String) The time-to-live (TTL) for the session. The session will be automatically terminated after this time period. If not set, defaults to 90 days.
