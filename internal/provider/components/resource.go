@@ -69,6 +69,7 @@ var (
 		"keyspaces",
 		"rabbitmq",
 		"azurecosmosnosql",
+		"msteams_workflow",
 	}
 )
 
@@ -629,6 +630,8 @@ func schemaToResourceIntegrationConfiguration(d *schema.ResourceData, intType st
 		return integrations.SchemaToRabbitMQIntegrationConfiguration(d), nil
 	case "azurecosmosnosql":
 		return integrations.SchemaToAzureCosmosNoSQLIntegrationConfiguration(d), nil
+	case "msteams_workflow":
+		return integrations.SchemaToMSTeamsWorkflowIntegrationConfiguration(d), nil
 	default:
 		return nil, fmt.Errorf("invalid adaptive resource type %s", intType)
 	}
