@@ -55,12 +55,13 @@ func New(version string) func() *schema.Provider {
 			},
 
 			ResourcesMap: map[string]*schema.Resource{
-				"adaptive_endpoint":      components.ResourceAdaptiveSession(),
-				"adaptive_resource":      components.ResourceAdaptiveResource(),
-				"adaptive_authorization": components.ResourceAdaptiveAuthorization(),
-				"adaptive_group":         components.ResourceAdaptiveTeam(),
-				"adaptive_script":             components.ResourceAdaptiveScript(),
-				"adaptive_msteams_workflow":   integrations.ResourceAdaptiveMSTeamsWorkflow(),
+				"adaptive_endpoint":         components.ResourceAdaptiveSession(),
+				"adaptive_resource":         components.ResourceAdaptiveResource(),
+				"adaptive_authorization":    components.ResourceAdaptiveAuthorization(),
+				"adaptive_group":            components.ResourceAdaptiveTeam(),
+				"adaptive_script":           components.ResourceAdaptiveScript(),
+				"adaptive_schedule":         components.ResourceAdaptiveSchedule(),
+				"adaptive_msteams_workflow": integrations.ResourceAdaptiveMSTeamsWorkflow(),
 			}, ConfigureContextFunc: providerConfigure,
 		}
 		return p
