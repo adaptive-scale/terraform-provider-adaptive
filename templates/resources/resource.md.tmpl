@@ -26,6 +26,7 @@ The `adaptive_resource` resource allows you to create and manage connections to 
 | `gcp` | Google Cloud Platform |
 | `kubernetes` | Kubernetes cluster |
 | `ssh` | SSH server |
+| `adaptive_rdp` | Windows RDP fleet — multiple targets, per-target credentials, in-browser access |
 | `okta` | Okta identity provider |
 | `onelogin` | OneLogin identity provider |
 | `jumpcloud` | JumpCloud directory |
@@ -147,6 +148,38 @@ resource "adaptive_resource" "ssh" {
   username = "admin"
   key      = file("~/.ssh/id_rsa")
   tags     = ["infrastructure"]
+}
+```
+
+### Adaptive RDP (Multi-Target Fleet)
+
+The `adaptive_rdp` type manages a fleet of Windows RDP hosts in a single resource. Each `targets` block is one host with its own credentials; users pick a target from the in-browser desktop picker. `password` is sensitive, `port` defaults to `3389`, and the optional `record` overrides the global session-recording setting per target (omit it to inherit the global setting).
+
+```terraform
+resource "adaptive_resource" "rdp_fleet" {
+  name = "rdp-fleet-01"
+  type = "adaptive_rdp"
+
+  targets {
+    id       = "server-1"
+    name     = "Windows Server 1"
+    host     = "10.0.0.5"
+    port     = 3389
+    username = "administrator"
+    password = var.win1_password
+  }
+
+  targets {
+    id       = "server-2"
+    name     = "Windows Server 2"
+    host     = "10.0.0.6"
+    username = "administrator"
+    password = var.win2_password
+    domain   = "CORP"
+    record   = true
+  }
+
+  tags = ["windows", "production"]
 }
 ```
 

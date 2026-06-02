@@ -39,6 +39,7 @@ var (
 		"awsredshift",
 		"zerotier",
 		"rdp_windows",
+		"adaptive_rdp",
 		"mongodb_atlas",
 		"awssecretsmanager",
 
@@ -525,6 +526,57 @@ func ResourceAdaptiveResource() *schema.Resource {
 				Optional:    true,
 				Description: "Whether to use tenant for Azure Active Directory authentication",
 			},
+			"targets": {
+				Type:        schema.TypeList,
+				Optional:    true,
+				Description: "List of RDP targets. Used by the adaptive_rdp resource. Each block is one Windows host with its own credentials.",
+				Elem: &schema.Resource{
+					Schema: map[string]*schema.Schema{
+						"id": {
+							Type:        schema.TypeString,
+							Required:    true,
+							Description: "Unique identifier for the target within the fleet.",
+						},
+						"name": {
+							Type:        schema.TypeString,
+							Optional:    true,
+							Description: "Human-friendly name shown in the in-browser target picker.",
+						},
+						"host": {
+							Type:        schema.TypeString,
+							Required:    true,
+							Description: "Hostname or IP of the Windows server.",
+						},
+						"port": {
+							Type:        schema.TypeInt,
+							Optional:    true,
+							Default:     3389,
+							Description: "RDP port. Defaults to 3389.",
+						},
+						"username": {
+							Type:        schema.TypeString,
+							Required:    true,
+							Description: "Username to authenticate with the target.",
+						},
+						"password": {
+							Type:        schema.TypeString,
+							Optional:    true,
+							Sensitive:   true,
+							Description: "Password to authenticate with the target.",
+						},
+						"domain": {
+							Type:        schema.TypeString,
+							Optional:    true,
+							Description: "Optional Windows domain for the target.",
+						},
+						"record": {
+							Type:        schema.TypeBool,
+							Optional:    true,
+							Description: "Per-target session-recording override. If unset, inherits the global recording setting (COLLECT_RDP_RECORDINGS).",
+						},
+					},
+				},
+			},
 		},
 	}
 }
@@ -576,6 +628,8 @@ func schemaToResourceIntegrationConfiguration(d *schema.ResourceData, intType st
 		return integrations.SchemaToMongoAtlasIntegrationConfiguration(d), nil
 	case "rdp_windows":
 		return integrations.SchemaToRDPWindowsIntegrationConfiguration(d), nil
+	case "adaptive_rdp":
+		return integrations.SchemaToAdaptiveRDPIntegrationConfiguration(d)
 	case "awssecretsmanager":
 		return integrations.SchemaToAWSSecretsManagerConfiguration(d), nil
 	case "sql_server":

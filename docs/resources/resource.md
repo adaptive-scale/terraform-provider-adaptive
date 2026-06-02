@@ -26,21 +26,17 @@ The `adaptive_resource` resource allows you to create and manage connections to 
 | `gcp` | Google Cloud Platform |
 | `kubernetes` | Kubernetes cluster |
 | `ssh` | SSH server |
-| `windows` | Windows server (RDP) |
+| `adaptive_rdp` | Windows RDP fleet — multiple targets, per-target credentials, in-browser access |
 | `okta` | Okta identity provider |
-| `azureactivedirectory` | Azure Active Directory |
 | `onelogin` | OneLogin identity provider |
 | `jumpcloud` | JumpCloud directory |
 | `google` | Google Workspace |
-| `msteams` | Microsoft Teams |
 | `datadog` | Datadog monitoring |
 | `splunk` | Splunk logging |
 | `elasticsearch` | Elasticsearch |
-| `coralogix` | Coralogix logging |
-| `syslog` | Syslog server |
 | `rabbitmq` | RabbitMQ message broker |
 | `zerotier` | ZeroTier network |
-| `services` | Generic services (URL list) |
+| `services` | Generic services |
 | `customintegration` | Custom integration |
 
 ## Example Usage
@@ -155,6 +151,38 @@ resource "adaptive_resource" "ssh" {
 }
 ```
 
+### Adaptive RDP (Multi-Target Fleet)
+
+The `adaptive_rdp` type manages a fleet of Windows RDP hosts in a single resource. Each `targets` block is one host with its own credentials; users pick a target from the in-browser desktop picker. `password` is sensitive, `port` defaults to `3389`, and the optional `record` overrides the global session-recording setting per target (omit it to inherit the global setting).
+
+```terraform
+resource "adaptive_resource" "rdp_fleet" {
+  name = "rdp-fleet-01"
+  type = "adaptive_rdp"
+
+  targets {
+    id       = "server-1"
+    name     = "Windows Server 1"
+    host     = "10.0.0.5"
+    port     = 3389
+    username = "administrator"
+    password = var.win1_password
+  }
+
+  targets {
+    id       = "server-2"
+    name     = "Windows Server 2"
+    host     = "10.0.0.6"
+    username = "administrator"
+    password = var.win2_password
+    domain   = "CORP"
+    record   = true
+  }
+
+  tags = ["windows", "production"]
+}
+```
+
 ### Snowflake
 
 ```terraform
@@ -169,248 +197,6 @@ resource "adaptive_resource" "snowflake" {
   schema    = "PUBLIC"
   role      = "ACCOUNTADMIN"
   tags      = ["analytics"]
-}
-```
-
-### CockroachDB
-
-```terraform
-resource "adaptive_resource" "cockroachdb" {
-  name          = "production-cockroachdb"
-  type          = "cockroachdb"
-  host          = "cockroach.example.com"
-  port          = "26257"
-  username      = "admin"
-  password      = var.cockroach_password
-  database_name = "defaultdb"
-  ssl_mode      = "verify-full"
-  root_cert     = file("ca.crt")
-  tags          = ["production", "database"]
-}
-```
-
-### ClickHouse
-
-```terraform
-resource "adaptive_resource" "clickhouse" {
-  name          = "analytics-clickhouse"
-  type          = "clickhouse"
-  host          = "clickhouse.example.com"
-  port          = "9440"
-  username      = "default"
-  password      = var.clickhouse_password
-  database_name = "analytics"
-  ssl_mode      = "require"
-  tags          = ["analytics"]
-}
-```
-
-### Services
-
-```terraform
-resource "adaptive_resource" "services" {
-  name = "internal-services"
-  type = "services"
-  urls = "https://api.internal.com,https://admin.internal.com,https://dashboard.internal.com"
-  tags = ["internal", "web"]
-}
-```
-
-### Okta
-
-```terraform
-resource "adaptive_resource" "okta" {
-  name          = "okta-sso"
-  type          = "okta"
-  domain        = "mycompany.okta.com"
-  client_id     = var.okta_client_id
-  client_secret = var.okta_client_secret
-  tags          = ["identity", "sso"]
-}
-```
-
-### Azure Active Directory
-
-```terraform
-resource "adaptive_resource" "azure_ad" {
-  name          = "azure-ad-integration"
-  type          = "azureactivedirectory"
-  domain        = "mycompany.onmicrosoft.com"
-  tenant_id     = var.azure_tenant_id
-  client_id     = var.azure_client_id
-  client_secret = var.azure_client_secret
-  tags          = ["identity", "azure"]
-}
-```
-
-### OneLogin
-
-```terraform
-resource "adaptive_resource" "onelogin" {
-  name              = "onelogin-sso"
-  type              = "onelogin"
-  domain            = "mycompany.onelogin.com"
-  client_id         = var.onelogin_client_id
-  client_secret     = var.onelogin_client_secret
-  api_client_id     = var.onelogin_api_client_id
-  api_client_secret = var.onelogin_api_client_secret
-  tags              = ["identity", "sso"]
-}
-```
-
-### JumpCloud
-
-```terraform
-resource "adaptive_resource" "jumpcloud" {
-  name          = "jumpcloud-directory"
-  type          = "jumpcloud"
-  domain        = "console.jumpcloud.com"
-  client_id     = var.jumpcloud_client_id
-  client_secret = var.jumpcloud_client_secret
-  api_token     = var.jumpcloud_api_key
-  tags          = ["identity", "directory"]
-}
-```
-
-### Google Workspace
-
-```terraform
-resource "adaptive_resource" "google_workspace" {
-  name          = "google-workspace"
-  type          = "google"
-  domain        = "mycompany.com"
-  client_id     = var.google_client_id
-  client_secret = var.google_client_secret
-  tags          = ["identity", "google"]
-}
-```
-
-### Datadog
-
-```terraform
-resource "adaptive_resource" "datadog" {
-  name       = "datadog-monitoring"
-  type       = "datadog"
-  dd_site    = "datadoghq.com"
-  dd_api_key = var.datadog_api_key
-  tags       = ["monitoring"]
-}
-```
-
-### Splunk
-
-```terraform
-resource "adaptive_resource" "splunk" {
-  name     = "splunk-logging"
-  type     = "splunk"
-  url      = "https://splunk.example.com:8088"
-  token_id = var.splunk_hec_token
-  tags     = ["logging"]
-}
-```
-
-### Elasticsearch
-
-```terraform
-resource "adaptive_resource" "elasticsearch" {
-  name     = "elasticsearch-cluster"
-  type     = "elasticsearch"
-  uri      = "https://elasticsearch.example.com:9200"
-  username = "elastic"
-  password = var.elasticsearch_password
-  index    = "logs"
-  tags     = ["logging", "search"]
-}
-```
-
-### Coralogix
-
-```terraform
-resource "adaptive_resource" "coralogix" {
-  name             = "coralogix-logging"
-  type             = "coralogix"
-  uri              = "https://api.coralogix.com"
-  private_key      = var.coralogix_private_key
-  application_name = "my-application"
-  sub_system_name  = "production"
-  tags             = ["logging"]
-}
-```
-
-### Syslog
-
-```terraform
-resource "adaptive_resource" "syslog" {
-  name     = "syslog-server"
-  type     = "syslog"
-  hostname = "syslog.example.com"
-  port     = "514"
-  protocol = "tcp"
-  tags     = ["logging"]
-}
-```
-
-### RabbitMQ
-
-```terraform
-resource "adaptive_resource" "rabbitmq" {
-  name     = "rabbitmq-broker"
-  type     = "rabbitmq"
-  uri      = "amqp://rabbitmq.example.com:5672"
-  username = "admin"
-  password = var.rabbitmq_password
-  tags     = ["messaging"]
-}
-```
-
-### Microsoft Teams
-
-```terraform
-resource "adaptive_resource" "msteams" {
-  name          = "teams-integration"
-  type          = "msteams"
-  tenant_id     = var.teams_tenant_id
-  client_id     = var.teams_app_id
-  client_secret = var.teams_app_key
-  tags          = ["collaboration"]
-}
-```
-
-### ZeroTier
-
-```terraform
-resource "adaptive_resource" "zerotier" {
-  name       = "zerotier-network"
-  type       = "zerotier"
-  network_id = "1234567890abcdef"
-  api_token  = var.zerotier_api_token
-  tags       = ["networking"]
-}
-```
-
-### Windows (RDP)
-
-```terraform
-resource "adaptive_resource" "windows" {
-  name     = "windows-server"
-  type     = "windows"
-  hostname = "windows.example.com"
-  port     = "3389"
-  username = "Administrator"
-  password = var.windows_password
-  tags     = ["infrastructure", "windows"]
-}
-```
-
-### Custom Integration
-
-```terraform
-resource "adaptive_resource" "custom" {
-  name                 = "custom-app"
-  type                 = "customintegration"
-  image                = "myregistry/myapp:latest"
-  service_account_name = "custom-sa"
-  tags                 = ["custom"]
 }
 ```
 
@@ -483,6 +269,7 @@ resource "adaptive_resource" "postgres_with_secrets" {
 - `database_username` (String) The database username
 - `dd_api_key` (String) The Datadog API key
 - `dd_site` (String) The Datadog site to send data to
+- `default_cluster` (String) The default cluster
 - `default_user` (String) Default user for the Services resource
 - `domain` (String) The domain name for a resource. Used by Google, Okta resource
 - `host` (String) Hostname of the adaptive resource. Used by CockroachDB, Postgres, Mysql, SSH resources
@@ -516,6 +303,7 @@ resource "adaptive_resource" "postgres_with_secrets" {
 - `ssl_mode` (String) The SSL mode to use when connecting to the database. Used by CockroachDB, Postgres, Mysql resources
 - `sub_system_name` (String) The sub system name for the service
 - `tags` (List of String) Optional tags
+- `targets` (Block List) List of RDP targets. Used by the adaptive_rdp resource. Each block is one Windows host with its own credentials. (see [below for nested schema](#nestedblock--targets))
 - `tenant_id` (String) The Azure tenant ID. Used by Azure resource.
 - `timeouts` (Block, Optional) (see [below for nested schema](#nestedblock--timeouts))
 - `tls_cert_file` (String) The certificate file to use for the Postgres-like resources.
@@ -528,6 +316,7 @@ resource "adaptive_resource" "postgres_with_secrets" {
 - `urls` (String) Comma-separated list of URLs. Used by Services resource
 - `use_proxy` (Boolean) Whether to use proxy
 - `use_service_account` (Boolean) Whether to use service account for authentication. Used by GCP resource
+- `use_tenant` (Boolean) Whether to use tenant for Azure Active Directory authentication
 - `username` (String) Username for the adaptive resource authentication. Used by CockroachDB, Postgres, Mysql, SSH resources
 - `version` (String) The version
 - `warehouse` (String) The Snowflake warehouse name. Used by Snowflake resource
@@ -536,6 +325,24 @@ resource "adaptive_resource" "postgres_with_secrets" {
 ### Read-Only
 
 - `id` (String) The ID of this resource.
+
+<a id="nestedblock--targets"></a>
+### Nested Schema for `targets`
+
+Required:
+
+- `host` (String) Hostname or IP of the Windows server.
+- `id` (String) Unique identifier for the target within the fleet.
+- `username` (String) Username to authenticate with the target.
+
+Optional:
+
+- `domain` (String) Optional Windows domain for the target.
+- `name` (String) Human-friendly name shown in the in-browser target picker.
+- `password` (String, Sensitive) Password to authenticate with the target.
+- `port` (Number) RDP port. Defaults to 3389.
+- `record` (Boolean) Per-target session-recording override. If unset, inherits the global recording setting (COLLECT_RDP_RECORDINGS).
+
 
 <a id="nestedblock--timeouts"></a>
 ### Nested Schema for `timeouts`
