@@ -38,6 +38,7 @@ type ScheduleRequest struct {
 	ExpiresAt     *string `json:"expiresAt,omitempty"`
 	MaxAccessTime *int    `json:"maxAccessTime,omitempty"`
 	Timezone      string  `json:"timezone,omitempty"`
+	OperationType string  `json:"operationType,omitempty"`
 }
 
 // ScheduleResponse mirrors handler.TerraformScheduleResponse. On a 400 the
@@ -50,6 +51,8 @@ type ScheduleResponse struct {
 	AllDay          bool     `json:"allDay"`
 	MappedEndpoints []string `json:"mappedEndpoints,omitempty"`
 	Timezone        string   `json:"timezone,omitempty"`
+	OperationType   string   `json:"operationType,omitempty"`
+	ExpiresAt       string   `json:"expiresAt,omitempty"`
 
 	UnresolvedUsers     []string `json:"unresolvedUsers,omitempty"`
 	UnresolvedTeams     []string `json:"unresolvedTeams,omitempty"`

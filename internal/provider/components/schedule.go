@@ -123,6 +123,22 @@ func ResourceAdaptiveSchedule() *schema.Resource {
 				Optional:    true,
 				Description: "IANA timezone the window is evaluated in. Empty inherits the workspace default.",
 			},
+			"operation_type": {
+				Type:        schema.TypeString,
+				Optional:    true,
+				Default:     "autoapprove",
+				Description: "Whether a request covered by this schedule is auto-approved or auto-rejected. One of: autoapprove (default), autoreject.",
+				ValidateFunc: func(i interface{}, k string) ([]string, []error) {
+					v, ok := i.(string)
+					if !ok {
+						return nil, []error{fmt.Errorf("%s must be a string", k)}
+					}
+					if v != "autoapprove" && v != "autoreject" {
+						return nil, []error{fmt.Errorf("%s must be one of autoapprove, autoreject; got %q", k, v)}
+					}
+					return nil, nil
+				},
+			},
 		},
 	}
 }
@@ -157,6 +173,7 @@ func scheduleRequestFromSchema(d *schema.ResourceData) (*adaptive.ScheduleReques
 		Teams:         stringList(d, "teams"),
 		Endpoints:     stringList(d, "endpoints"),
 		Timezone:      d.Get("timezone").(string),
+		OperationType: d.Get("operation_type").(string),
 	}
 
 	if v := d.Get("expires_at").(string); v != "" {
@@ -225,6 +242,19 @@ func ResourceAdaptiveScheduleRead(ctx context.Context, d *schema.ResourceData, m
 	}
 	if resp.Timezone != "" {
 		if err := d.Set("timezone", resp.Timezone); err != nil {
+			return diag.FromErr(err)
+		}
+	}
+	if resp.OperationType != "" {
+		if err := d.Set("operation_type", resp.OperationType); err != nil {
+			return diag.FromErr(err)
+		}
+	}
+	// expires_at is returned by the backend normalized to RFC3339 UTC. Refresh
+	// only when present so the lossy read view doesn't clobber a value the
+	// backend chose not to report (matches the timezone/operation_type pattern).
+	if resp.ExpiresAt != "" {
+		if err := d.Set("expires_at", resp.ExpiresAt); err != nil {
 			return diag.FromErr(err)
 		}
 	}
