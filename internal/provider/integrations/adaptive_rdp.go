@@ -38,24 +38,27 @@ func SchemaToAdaptiveRDPIntegrationConfiguration(d *schema.ResourceData) (Adapti
 	if !ok {
 		return AdaptiveRDPIntegrationConfiguration{}, errors.New("adaptive_rdp requires at least one `targets` block")
 	}
-	list, ok := raw.([]interface{})
-	if !ok || len(list) == 0 {
-		return AdaptiveRDPIntegrationConfiguration{}, errors.New("adaptive_rdp requires at least one `targets` block")
-	}
+	list := raw.([]interface{})
 
 	// `record` is tri-state on the backend (nil = inherit the global
 	// COLLECT_RDP_RECORDINGS setting). The SDK collapses an unset bool to
 	// false via d.Get, so read the raw config to tell "unset" from "false".
 	recordOverrides := adaptiveRDPRecordOverrides(d, len(list))
 
+	seenIDs := make(map[string]bool, len(list))
 	targets := make([]AdaptiveRDPTargetConfig, 0, len(list))
 	for i, item := range list {
 		m, ok := item.(map[string]interface{})
 		if !ok {
 			return AdaptiveRDPIntegrationConfiguration{}, errors.New("could not parse `targets` entry")
 		}
+		id := m["id"].(string)
+		if seenIDs[id] {
+			return AdaptiveRDPIntegrationConfiguration{}, fmt.Errorf("duplicate `targets` id %q: each target must have a unique id", id)
+		}
+		seenIDs[id] = true
 		targets = append(targets, AdaptiveRDPTargetConfig{
-			ID:       m["id"].(string),
+			ID:       id,
 			Name:     m["name"].(string),
 			Host:     m["host"].(string),
 			Port:     m["port"].(int),
