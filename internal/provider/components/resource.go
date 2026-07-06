@@ -529,7 +529,7 @@ func ResourceAdaptiveResource() *schema.Resource {
 			"targets": {
 				Type:        schema.TypeList,
 				Optional:    true,
-				Description: "List of RDP targets. Used by the adaptive_rdp resource. Each block is one Windows host with its own credentials.",
+				Description: "List of RDP targets. Used by the adaptive_rdp resource. Each block is one Windows host with its own credentials. Rejected on any other resource type.",
 				Elem: &schema.Resource{
 					Schema: map[string]*schema.Schema{
 						"id": {
@@ -560,7 +560,7 @@ func ResourceAdaptiveResource() *schema.Resource {
 						},
 						"password": {
 							Type:        schema.TypeString,
-							Optional:    true,
+							Required:    true,
 							Sensitive:   true,
 							Description: "Password to authenticate with the target.",
 						},
@@ -583,6 +583,12 @@ func ResourceAdaptiveResource() *schema.Resource {
 
 // Returns a YAML marshallable struct for the integration configuration
 func schemaToResourceIntegrationConfiguration(d *schema.ResourceData, intType string) (any, error) {
+	// The provider shares one flat schema across all integration types, so a
+	// `targets` block on any other type would be accepted and then silently
+	// ignored. Reject it so the config can't drift from what actually runs.
+	if _, ok := d.GetOk("targets"); ok && intType != "adaptive_rdp" {
+		return nil, fmt.Errorf("`targets` is only supported by resources of type \"adaptive_rdp\", not %q", intType)
+	}
 	switch intType {
 	case "aws":
 		return integrations.SchemaToAWSIntegrationConfiguration(d), nil
@@ -627,7 +633,11 @@ func schemaToResourceIntegrationConfiguration(d *schema.ResourceData, intType st
 	case "mongodb_atlas":
 		return integrations.SchemaToMongoAtlasIntegrationConfiguration(d), nil
 	case "rdp_windows":
-		return integrations.SchemaToRDPWindowsIntegrationConfiguration(d), nil
+		cfg := integrations.SchemaToRDPWindowsIntegrationConfiguration(d)
+		if cfg.Password == "" {
+			return nil, errors.New("rdp_windows requires a non-empty `password`; RDP connections with blank passwords fail to authenticate")
+		}
+		return cfg, nil
 	case "adaptive_rdp":
 		return integrations.SchemaToAdaptiveRDPIntegrationConfiguration(d)
 	case "awssecretsmanager":

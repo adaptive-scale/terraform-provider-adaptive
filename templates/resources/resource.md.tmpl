@@ -172,7 +172,7 @@ resource "adaptive_resource" "windows" {
 
 ### Adaptive RDP (Multi-Target Fleet)
 
-The `adaptive_rdp` type manages a fleet of Windows RDP hosts in a single resource. Each `targets` block is one host with its own credentials; users pick a target from the in-browser desktop picker. `password` is sensitive, `port` defaults to `3389`, and the optional `record` overrides the global session-recording setting per target (omit it to inherit the global setting).
+The `adaptive_rdp` type manages a fleet of Windows RDP hosts in a single resource. Each `targets` block is one host with its own credentials; users pick a target from the in-browser desktop picker. `password` is required (RDP logins with blank passwords fail to authenticate) and marked sensitive, `port` defaults to `3389`, and the optional `record` overrides the global session-recording setting per target (omit it to inherit the global setting). The `targets` block is only accepted on `adaptive_rdp` resources; any other type rejects it.
 
 ```terraform
 resource "adaptive_resource" "rdp_fleet" {

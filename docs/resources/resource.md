@@ -172,7 +172,7 @@ resource "adaptive_resource" "windows" {
 
 ### Adaptive RDP (Multi-Target Fleet)
 
-The `adaptive_rdp` type manages a fleet of Windows RDP hosts in a single resource. Each `targets` block is one host with its own credentials; users pick a target from the in-browser desktop picker. `password` is sensitive, `port` defaults to `3389`, and the optional `record` overrides the global session-recording setting per target (omit it to inherit the global setting).
+The `adaptive_rdp` type manages a fleet of Windows RDP hosts in a single resource. Each `targets` block is one host with its own credentials; users pick a target from the in-browser desktop picker. `password` is required (RDP logins with blank passwords fail to authenticate) and marked sensitive, `port` defaults to `3389`, and the optional `record` overrides the global session-recording setting per target (omit it to inherit the global setting). The `targets` block is only accepted on `adaptive_rdp` resources; any other type rejects it.
 
 ```terraform
 resource "adaptive_resource" "rdp_fleet" {
@@ -550,7 +550,7 @@ resource "adaptive_resource" "postgres_with_secrets" {
 - `ssl_mode` (String) The SSL mode to use when connecting to the database. Used by CockroachDB, Postgres, Mysql resources
 - `sub_system_name` (String) The sub system name for the service
 - `tags` (List of String) Optional tags
-- `targets` (Block List) List of RDP targets. Used by the adaptive_rdp resource. Each block is one Windows host with its own credentials. (see [below for nested schema](#nestedblock--targets))
+- `targets` (Block List) List of RDP targets. Used by the adaptive_rdp resource. Each block is one Windows host with its own credentials. Rejected on any other resource type. (see [below for nested schema](#nestedblock--targets))
 - `tenant_id` (String) The Azure tenant ID. Used by Azure resource.
 - `timeouts` (Block, Optional) (see [below for nested schema](#nestedblock--timeouts))
 - `tls_cert_file` (String) The certificate file to use for the Postgres-like resources.
@@ -580,13 +580,13 @@ Required:
 
 - `host` (String) Hostname or IP of the Windows server.
 - `id` (String) Unique identifier for the target within the fleet.
+- `password` (String, Sensitive) Password to authenticate with the target.
 - `username` (String) Username to authenticate with the target.
 
 Optional:
 
 - `domain` (String) Optional Windows domain for the target.
 - `name` (String) Human-friendly name shown in the in-browser target picker.
-- `password` (String, Sensitive) Password to authenticate with the target.
 - `port` (Number) RDP port. Defaults to 3389.
 - `record` (Boolean) Per-target session-recording override. If unset, inherits the global recording setting (COLLECT_RDP_RECORDINGS).
 

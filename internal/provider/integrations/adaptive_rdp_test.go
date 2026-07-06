@@ -22,7 +22,7 @@ func adaptiveRDPTestSchema() map[string]*schema.Schema {
 					"host":     {Type: schema.TypeString, Required: true},
 					"port":     {Type: schema.TypeInt, Optional: true, Default: 3389},
 					"username": {Type: schema.TypeString, Required: true},
-					"password": {Type: schema.TypeString, Optional: true, Sensitive: true},
+					"password": {Type: schema.TypeString, Required: true, Sensitive: true},
 					"domain":   {Type: schema.TypeString, Optional: true},
 					"record":   {Type: schema.TypeBool, Optional: true},
 				},
@@ -45,8 +45,8 @@ func TestSchemaToAdaptiveRDPIntegrationConfiguration_DuplicateID(t *testing.T) {
 	d := schema.TestResourceDataRaw(t, adaptiveRDPTestSchema(), map[string]interface{}{
 		"name": "rdp-fleet",
 		"targets": []interface{}{
-			map[string]interface{}{"id": "server-1", "host": "10.0.0.5", "username": "admin"},
-			map[string]interface{}{"id": "server-1", "host": "10.0.0.6", "username": "admin"},
+			map[string]interface{}{"id": "server-1", "host": "10.0.0.5", "username": "admin", "password": "pw"},
+			map[string]interface{}{"id": "server-1", "host": "10.0.0.6", "username": "admin", "password": "pw"},
 		},
 	})
 
@@ -59,12 +59,29 @@ func TestSchemaToAdaptiveRDPIntegrationConfiguration_DuplicateID(t *testing.T) {
 	}
 }
 
+func TestSchemaToAdaptiveRDPIntegrationConfiguration_EmptyPassword(t *testing.T) {
+	d := schema.TestResourceDataRaw(t, adaptiveRDPTestSchema(), map[string]interface{}{
+		"name": "rdp-fleet",
+		"targets": []interface{}{
+			map[string]interface{}{"id": "server-1", "host": "10.0.0.5", "username": "admin", "password": ""},
+		},
+	})
+
+	_, err := SchemaToAdaptiveRDPIntegrationConfiguration(d)
+	if err == nil {
+		t.Fatal("expected an error for an empty target password")
+	}
+	if !strings.Contains(err.Error(), "password") || !strings.Contains(err.Error(), "server-1") {
+		t.Fatalf("expected a password error naming the target, got: %v", err)
+	}
+}
+
 func TestSchemaToAdaptiveRDPIntegrationConfiguration_Success(t *testing.T) {
 	d := schema.TestResourceDataRaw(t, adaptiveRDPTestSchema(), map[string]interface{}{
 		"name": "rdp-fleet",
 		"targets": []interface{}{
-			map[string]interface{}{"id": "server-1", "host": "10.0.0.5", "username": "admin"},
-			map[string]interface{}{"id": "server-2", "host": "10.0.0.6", "username": "admin"},
+			map[string]interface{}{"id": "server-1", "host": "10.0.0.5", "username": "admin", "password": "pw"},
+			map[string]interface{}{"id": "server-2", "host": "10.0.0.6", "username": "admin", "password": "pw"},
 		},
 	})
 

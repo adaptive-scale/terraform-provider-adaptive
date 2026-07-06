@@ -57,13 +57,20 @@ func SchemaToAdaptiveRDPIntegrationConfiguration(d *schema.ResourceData) (Adapti
 			return AdaptiveRDPIntegrationConfiguration{}, fmt.Errorf("duplicate `targets` id %q: each target must have a unique id", id)
 		}
 		seenIDs[id] = true
+		// The schema marks password Required, but that still admits an
+		// explicit empty string — which the backend accepts and the RDP
+		// login then fails with. Reject it here instead.
+		password := m["password"].(string)
+		if password == "" {
+			return AdaptiveRDPIntegrationConfiguration{}, fmt.Errorf("target %q: `password` must not be empty; RDP connections with blank passwords fail to authenticate", id)
+		}
 		targets = append(targets, AdaptiveRDPTargetConfig{
 			ID:       id,
 			Name:     m["name"].(string),
 			Host:     m["host"].(string),
 			Port:     m["port"].(int),
 			Username: m["username"].(string),
-			Password: m["password"].(string),
+			Password: password,
 			Domain:   m["domain"].(string),
 			Record:   recordOverrides[i],
 		})
