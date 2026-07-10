@@ -3,7 +3,7 @@ HOSTNAME=adaptive-scale
 NAMESPACE=local
 NAME=adaptive
 BINARY=terraform-provider-${NAME}
-VERSION=0.1.6
+VERSION=0.1.47
 OS_ARCH=darwin_arm64
 
 default: install
@@ -38,3 +38,9 @@ testacc:
 
 docs:
 	go run github.com/hashicorp/terraform-plugin-docs/cmd/tfplugindocs generate
+
+test-examples:
+	./test-examples.sh
+
+test-examples-apply:
+	./test-examples.sh --apply

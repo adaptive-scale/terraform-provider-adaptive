@@ -5,12 +5,14 @@ type CreateResourceRequest struct {
 	Name            string   `json:"name"`
 	Configuration   string   `json:"config"`
 	UserTags        []string `json:"userTags"`
+	DefaultCluster  string   `json:"defaultCluster,omitempty"`
 }
 
 type UpdateResourceRequest struct {
 	IntegrationType string   `json:"integrationType"`
 	Configuration   string   `json:"config"`
 	UserTags        []string `json:"userTags"`
+	DefaultCluster  string   `json:"defaultCluster,omitempty"`
 }
 
 type CreateResourceResponse struct {
@@ -44,7 +46,12 @@ type CreateSessionRequest struct {
 	UsersTags []string `json:"usertags"`
 
 	// pause endpoint timeout
-	Timeout string `json:"timeout"`
+	PauseTimeout string   `json:"pause_timeout,omitempty"`
+	Groups       []string `json:"groups,omitempty"`
+	IdleTimeout  string   `json:"idle_timeout,omitempty"`
+
+	// script only access
+	ScriptOnlyAccess bool `json:"script_only_access"`
 }
 
 type CreateSessionResponse struct {
@@ -65,18 +72,6 @@ type UpdateSessionRequest = CreateSessionRequest
 // }
 
 type UpdateSessionResponse struct {
-	ID string `json:"id"`
-}
-
-// Authorizations
-type CreateAuthorizationRequest struct {
-	AuthorizationName string `json:"name"`
-	Resource          string `json:"resource"`
-	Description       string `json:"description"`
-	Permissions       string `json:"permissions"`
-}
-
-type CreateAuthorizationResponse struct {
 	ID string `json:"id"`
 }
 
