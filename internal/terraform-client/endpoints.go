@@ -31,6 +31,7 @@ func (c *Client) CreateSession(
 	tags []string,
 	groups []string,
 	idleTimeout string,
+	scriptOnlyAccess bool,
 ) (*CreateSessionResponse, error) {
 	tflog.Debug(ctx, "CreateSession called", map[string]interface{}{
 		"name":          sessionName,
@@ -55,6 +56,7 @@ func (c *Client) CreateSession(
 		CPU:               cpu,
 		UsersTags:         tags,
 		Groups:            groups,
+		ScriptOnlyAccess:  scriptOnlyAccess,
 	}
 
 	payloadBuf := bytes.NewBuffer([]byte{})
@@ -266,6 +268,7 @@ func (c *Client) UpdateSession(
 	tags []string,
 	groups []string,
 	idleTimeout string,
+	scriptOnlyAccess bool,
 ) (*UpdateSessionResponse, error) {
 	tflog.Debug(ctx, "UpdateSession called", map[string]interface{}{
 		"session_id": sessionID,
@@ -288,6 +291,7 @@ func (c *Client) UpdateSession(
 		UsersTags:         tags,
 		Groups:            groups,
 		IdleTimeout:       idleTimeout,
+		ScriptOnlyAccess:  scriptOnlyAccess,
 	}
 
 	payloadBuf := bytes.NewBuffer([]byte{})

@@ -13,6 +13,7 @@ import (
 	"path"
 
 	"github.com/adaptive-scale/terraform-provider-adaptive/internal/provider/components"
+	"github.com/adaptive-scale/terraform-provider-adaptive/internal/provider/integrations"
 	client "github.com/adaptive-scale/terraform-provider-adaptive/internal/terraform-client"
 	"github.com/hashicorp/terraform-plugin-log/tflog"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/diag"
@@ -58,7 +59,8 @@ func New(version string) func() *schema.Provider {
 				"adaptive_resource":      components.ResourceAdaptiveResource(),
 				"adaptive_authorization": components.ResourceAdaptiveAuthorization(),
 				"adaptive_group":         components.ResourceAdaptiveTeam(),
-				"adaptive_script":        components.ResourceAdaptiveScript(),
+				"adaptive_script":             components.ResourceAdaptiveScript(),
+				"adaptive_msteams_workflow":   integrations.ResourceAdaptiveMSTeamsWorkflow(),
 			}, ConfigureContextFunc: providerConfigure,
 		}
 		return p

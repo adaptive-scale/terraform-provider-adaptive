@@ -49,6 +49,9 @@ type CreateSessionRequest struct {
 	PauseTimeout string   `json:"pause_timeout,omitempty"`
 	Groups       []string `json:"groups,omitempty"`
 	IdleTimeout  string   `json:"idle_timeout,omitempty"`
+
+	// script only access
+	ScriptOnlyAccess bool `json:"script_only_access"`
 }
 
 type CreateSessionResponse struct {

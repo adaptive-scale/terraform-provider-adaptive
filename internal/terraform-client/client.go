@@ -211,6 +211,10 @@ func (c *Client) UpdateScript(ctx context.Context, id, name, command, endpoint *
 		return nil, err
 	}
 
+	tflog.Debug(ctx, "Sending update script request", map[string]interface{}{
+		"script_id": *id,
+	})
+
 	response, err := c.do(ctx, request)
 	if err != nil {
 		tflog.Error(ctx, "Failed to make request to adaptive API for updating script", map[string]interface{}{

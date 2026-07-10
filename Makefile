@@ -3,7 +3,7 @@ HOSTNAME=adaptive-scale
 NAMESPACE=local
 NAME=adaptive
 BINARY=terraform-provider-${NAME}
-VERSION=0.1.46
+VERSION=0.1.47
 OS_ARCH=darwin_arm64
 
 default: install

@@ -299,6 +299,12 @@ func ResourceAdaptiveSession() *schema.Resource {
 				Optional:    true,
 				Description: "CPU of endpoint pod",
 			},
+			"script_only_access": {
+				Type:        schema.TypeBool,
+				Optional:    true,
+				Default:     false,
+				Description: "Whether the endpoint should only be accessible via script",
+			},
 			"tags": {
 				Type:     schema.TypeList,
 				Optional: true,
@@ -439,6 +445,8 @@ func ResourceAdaptiveSessionCreate(ctx context.Context, d *schema.ResourceData, 
 		}
 	}
 
+	scriptOnlyAccess := d.Get("script_only_access").(bool)
+
 	resp, err := client.CreateSession(
 		ctx,
 		sName,
@@ -455,6 +463,7 @@ func ResourceAdaptiveSessionCreate(ctx context.Context, d *schema.ResourceData, 
 		userTags,
 		groupsVal,
 		idleTimeout.(string),
+		scriptOnlyAccess,
 	)
 	if err != nil {
 		return diag.FromErr(err)
@@ -612,6 +621,8 @@ func ResourceAdaptiveSessionUpdate(ctx context.Context, d *schema.ResourceData, 
 		authorizationName = auth.(string)
 	}
 
+	scriptOnlyAccess := d.Get("script_only_access").(bool)
+
 	resp, err := client.UpdateSession(
 		ctx,
 		sessionID,
@@ -629,6 +640,7 @@ func ResourceAdaptiveSessionUpdate(ctx context.Context, d *schema.ResourceData, 
 		userTags,
 		groupsVal,
 		idleTimeout.(string),
+		scriptOnlyAccess,
 	)
 	if err != nil {
 		return diag.FromErr(err)
