@@ -26,7 +26,8 @@ The `adaptive_resource` resource allows you to create and manage connections to 
 | `gcp` | Google Cloud Platform |
 | `kubernetes` | Kubernetes cluster |
 | `ssh` | SSH server |
-| `windows` | Windows server (RDP) |
+| `rdp_windows` | Windows server (single-target RDP) |
+| `adaptive_rdp` | Windows RDP fleet — multiple targets, per-target credentials, in-browser access |
 | `okta` | Okta identity provider |
 | `azureactivedirectory` | Azure Active Directory |
 | `onelogin` | OneLogin identity provider |
@@ -152,6 +153,52 @@ resource "adaptive_resource" "ssh" {
   username = "admin"
   key      = file("~/.ssh/id_rsa")
   tags     = ["infrastructure"]
+}
+```
+
+### Windows Server (Single-Target RDP)
+
+```terraform
+resource "adaptive_resource" "windows" {
+  name     = "windows-server"
+  type     = "rdp_windows"
+  hostname = "windows.example.com"
+  port     = "3389"
+  username = "Administrator"
+  password = var.windows_password
+  tags     = ["infrastructure", "windows"]
+}
+```
+
+### Adaptive RDP (Multi-Target Fleet)
+
+The `adaptive_rdp` type manages a fleet of Windows RDP hosts in a single resource. Each `targets` block is one host with its own credentials; users pick a target from the in-browser desktop picker. `password` is required (RDP logins with blank passwords fail to authenticate) and marked sensitive, `port` defaults to `3389`, and the optional `record` overrides the global session-recording setting per target (omit it to inherit the global setting). The `targets` block is only accepted on `adaptive_rdp` resources; any other type rejects it.
+
+```terraform
+resource "adaptive_resource" "rdp_fleet" {
+  name = "rdp-fleet-01"
+  type = "adaptive_rdp"
+
+  targets {
+    id       = "server-1"
+    name     = "Windows Server 1"
+    host     = "10.0.0.5"
+    port     = 3389
+    username = "administrator"
+    password = var.win1_password
+  }
+
+  targets {
+    id       = "server-2"
+    name     = "Windows Server 2"
+    host     = "10.0.0.6"
+    username = "administrator"
+    password = var.win2_password
+    domain   = "CORP"
+    record   = true
+  }
+
+  tags = ["windows", "production"]
 }
 ```
 
@@ -388,20 +435,6 @@ resource "adaptive_resource" "zerotier" {
 }
 ```
 
-### Windows (RDP)
-
-```terraform
-resource "adaptive_resource" "windows" {
-  name     = "windows-server"
-  type     = "windows"
-  hostname = "windows.example.com"
-  port     = "3389"
-  username = "Administrator"
-  password = var.windows_password
-  tags     = ["infrastructure", "windows"]
-}
-```
-
 ### Custom Integration
 
 ```terraform
@@ -483,6 +516,7 @@ resource "adaptive_resource" "postgres_with_secrets" {
 - `database_username` (String) The database username
 - `dd_api_key` (String) The Datadog API key
 - `dd_site` (String) The Datadog site to send data to
+- `default_cluster` (String) The default cluster
 - `default_user` (String) Default user for the Services resource
 - `domain` (String) The domain name for a resource. Used by Google, Okta resource
 - `host` (String) Hostname of the adaptive resource. Used by CockroachDB, Postgres, Mysql, SSH resources
@@ -516,6 +550,7 @@ resource "adaptive_resource" "postgres_with_secrets" {
 - `ssl_mode` (String) The SSL mode to use when connecting to the database. Used by CockroachDB, Postgres, Mysql resources
 - `sub_system_name` (String) The sub system name for the service
 - `tags` (List of String) Optional tags
+- `targets` (Block List) List of RDP targets. Used by the adaptive_rdp resource. Each block is one Windows host with its own credentials. Rejected on any other resource type. (see [below for nested schema](#nestedblock--targets))
 - `tenant_id` (String) The Azure tenant ID. Used by Azure resource.
 - `timeouts` (Block, Optional) (see [below for nested schema](#nestedblock--timeouts))
 - `tls_cert_file` (String) The certificate file to use for the Postgres-like resources.
@@ -528,6 +563,7 @@ resource "adaptive_resource" "postgres_with_secrets" {
 - `urls` (String) Comma-separated list of URLs. Used by Services resource
 - `use_proxy` (Boolean) Whether to use proxy
 - `use_service_account` (Boolean) Whether to use service account for authentication. Used by GCP resource
+- `use_tenant` (Boolean) Whether to use tenant for Azure Active Directory authentication
 - `username` (String) Username for the adaptive resource authentication. Used by CockroachDB, Postgres, Mysql, SSH resources
 - `version` (String) The version
 - `warehouse` (String) The Snowflake warehouse name. Used by Snowflake resource
@@ -536,6 +572,24 @@ resource "adaptive_resource" "postgres_with_secrets" {
 ### Read-Only
 
 - `id` (String) The ID of this resource.
+
+<a id="nestedblock--targets"></a>
+### Nested Schema for `targets`
+
+Required:
+
+- `host` (String) Hostname or IP of the Windows server.
+- `id` (String) Unique identifier for the target within the fleet.
+- `password` (String, Sensitive) Password to authenticate with the target.
+- `username` (String) Username to authenticate with the target.
+
+Optional:
+
+- `domain` (String) Optional Windows domain for the target.
+- `name` (String) Human-friendly name shown in the in-browser target picker.
+- `port` (Number) RDP port. Defaults to 3389.
+- `record` (Boolean) Per-target session-recording override. If unset, inherits the global recording setting (COLLECT_RDP_RECORDINGS).
+
 
 <a id="nestedblock--timeouts"></a>
 ### Nested Schema for `timeouts`

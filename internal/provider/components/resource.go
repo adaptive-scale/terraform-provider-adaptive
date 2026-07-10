@@ -39,6 +39,7 @@ var (
 		"awsredshift",
 		"zerotier",
 		"rdp_windows",
+		"adaptive_rdp",
 		"mongodb_atlas",
 		"awssecretsmanager",
 
@@ -525,12 +526,69 @@ func ResourceAdaptiveResource() *schema.Resource {
 				Optional:    true,
 				Description: "Whether to use tenant for Azure Active Directory authentication",
 			},
+			"targets": {
+				Type:        schema.TypeList,
+				Optional:    true,
+				Description: "List of RDP targets. Used by the adaptive_rdp resource. Each block is one Windows host with its own credentials. Rejected on any other resource type.",
+				Elem: &schema.Resource{
+					Schema: map[string]*schema.Schema{
+						"id": {
+							Type:        schema.TypeString,
+							Required:    true,
+							Description: "Unique identifier for the target within the fleet.",
+						},
+						"name": {
+							Type:        schema.TypeString,
+							Optional:    true,
+							Description: "Human-friendly name shown in the in-browser target picker.",
+						},
+						"host": {
+							Type:        schema.TypeString,
+							Required:    true,
+							Description: "Hostname or IP of the Windows server.",
+						},
+						"port": {
+							Type:        schema.TypeInt,
+							Optional:    true,
+							Default:     3389,
+							Description: "RDP port. Defaults to 3389.",
+						},
+						"username": {
+							Type:        schema.TypeString,
+							Required:    true,
+							Description: "Username to authenticate with the target.",
+						},
+						"password": {
+							Type:        schema.TypeString,
+							Required:    true,
+							Sensitive:   true,
+							Description: "Password to authenticate with the target.",
+						},
+						"domain": {
+							Type:        schema.TypeString,
+							Optional:    true,
+							Description: "Optional Windows domain for the target.",
+						},
+						"record": {
+							Type:        schema.TypeBool,
+							Optional:    true,
+							Description: "Per-target session-recording override. If unset, inherits the global recording setting (COLLECT_RDP_RECORDINGS).",
+						},
+					},
+				},
+			},
 		},
 	}
 }
 
 // Returns a YAML marshallable struct for the integration configuration
 func schemaToResourceIntegrationConfiguration(d *schema.ResourceData, intType string) (any, error) {
+	// The provider shares one flat schema across all integration types, so a
+	// `targets` block on any other type would be accepted and then silently
+	// ignored. Reject it so the config can't drift from what actually runs.
+	if _, ok := d.GetOk("targets"); ok && intType != "adaptive_rdp" {
+		return nil, fmt.Errorf("`targets` is only supported by resources of type \"adaptive_rdp\", not %q", intType)
+	}
 	switch intType {
 	case "aws":
 		return integrations.SchemaToAWSIntegrationConfiguration(d), nil
@@ -575,7 +633,13 @@ func schemaToResourceIntegrationConfiguration(d *schema.ResourceData, intType st
 	case "mongodb_atlas":
 		return integrations.SchemaToMongoAtlasIntegrationConfiguration(d), nil
 	case "rdp_windows":
-		return integrations.SchemaToRDPWindowsIntegrationConfiguration(d), nil
+		cfg := integrations.SchemaToRDPWindowsIntegrationConfiguration(d)
+		if cfg.Password == "" {
+			return nil, errors.New("rdp_windows requires a non-empty `password`; RDP connections with blank passwords fail to authenticate")
+		}
+		return cfg, nil
+	case "adaptive_rdp":
+		return integrations.SchemaToAdaptiveRDPIntegrationConfiguration(d)
 	case "awssecretsmanager":
 		return integrations.SchemaToAWSSecretsManagerConfiguration(d), nil
 	case "sql_server":
