@@ -1,10 +1,11 @@
 module github.com/adaptive-scale/terraform-provider-adaptive
 
+
 go 1.25.0
 
 require (
 	github.com/hashicorp/go-cty v1.5.0
-	github.com/hashicorp/terraform-plugin-docs v0.21.0
+	github.com/hashicorp/terraform-plugin-docs v0.24.0
 	github.com/hashicorp/terraform-plugin-log v0.10.0
 	github.com/hashicorp/terraform-plugin-sdk/v2 v2.40.0
 	golang.org/x/exp v0.0.0-20240719175910-8a7402abbf56
