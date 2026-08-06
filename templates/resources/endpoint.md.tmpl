@@ -82,6 +82,24 @@ resource "adaptive_endpoint" "auto_pause" {
 }
 ```
 
+### Endpoint That Does Not Retain Terminal Output
+
+For sessions that may surface regulated data on screen. Commands are still
+recorded for audit; the terminal output is purged after extraction, and session
+replay shows a notice in place of the recording. The workspace-level setting is
+OR'd with this, so leaving it `false` does not re-enable capture for a workspace
+that has turned it off.
+
+```terraform
+resource "adaptive_endpoint" "no_output_retention" {
+  name                   = "pci-support-access"
+  resource               = adaptive_resource.prod_postgres.name
+  disable_output_capture = true
+  users                  = ["support@example.com"]
+  tags                   = ["pci"]
+}
+```
+
 ### Kubernetes Endpoint with Custom Resources
 
 ```terraform

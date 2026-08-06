@@ -52,6 +52,9 @@ type CreateSessionRequest struct {
 
 	// script only access
 	ScriptOnlyAccess bool `json:"script_only_access"`
+
+	// do not retain terminal output for this endpoint
+	DisableOutputCapture bool `json:"disable_output_capture"`
 }
 
 type CreateSessionResponse struct {

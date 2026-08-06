@@ -82,6 +82,24 @@ resource "adaptive_endpoint" "auto_pause" {
 }
 ```
 
+### Endpoint That Does Not Retain Terminal Output
+
+For sessions that may surface regulated data on screen. Commands are still
+recorded for audit; the terminal output is purged after extraction, and session
+replay shows a notice in place of the recording. The workspace-level setting is
+OR'd with this, so leaving it `false` does not re-enable capture for a workspace
+that has turned it off.
+
+```terraform
+resource "adaptive_endpoint" "no_output_retention" {
+  name                   = "pci-support-access"
+  resource               = adaptive_resource.prod_postgres.name
+  disable_output_capture = true
+  users                  = ["support@example.com"]
+  tags                   = ["pci"]
+}
+```
+
 ### Kubernetes Endpoint with Custom Resources
 
 ```terraform
@@ -172,6 +190,7 @@ resource "adaptive_group" "developers" {
 - `authorization` (String) The authorization to use when creating the session.
 - `cluster` (String) The cluster in which this session should be created. If not provided will be set to default cluster set in workspace settings of the user's workspace
 - `cpu` (String) CPU of endpoint pod
+- `disable_output_capture` (Boolean) Whether to stop retaining terminal output for sessions on this endpoint. Commands are still audited; the recorded output is purged. The workspace-level setting is OR'd with this, so leaving it false does not re-enable capture for a workspace that has turned it off. Defaults to `false`.
 - `groups` (List of String) The list of groups associated with the adaptive endpoint
 - `is_jit_enabled` (Boolean) Whether Just-In-Time access is enabled for the session
 - `jit_approvers` (List of String) The list of user emails who can approve Just-In-Time access requests
