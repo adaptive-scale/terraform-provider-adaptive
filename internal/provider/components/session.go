@@ -305,6 +305,15 @@ func ResourceAdaptiveSession() *schema.Resource {
 				Default:     false,
 				Description: "Whether the endpoint should only be accessible via script",
 			},
+			"disable_output_capture": {
+				Type:     schema.TypeBool,
+				Optional: true,
+				Default:  false,
+				Description: "Whether to stop retaining terminal output for sessions on this endpoint. " +
+					"Commands are still audited; the recorded output is purged. " +
+					"The workspace-level setting is OR'd with this, so leaving it false " +
+					"does not re-enable capture for a workspace that has turned it off.",
+			},
 			"tags": {
 				Type:     schema.TypeList,
 				Optional: true,
@@ -446,6 +455,7 @@ func ResourceAdaptiveSessionCreate(ctx context.Context, d *schema.ResourceData, 
 	}
 
 	scriptOnlyAccess := d.Get("script_only_access").(bool)
+	disableOutputCapture := d.Get("disable_output_capture").(bool)
 
 	resp, err := client.CreateSession(
 		ctx,
@@ -464,6 +474,7 @@ func ResourceAdaptiveSessionCreate(ctx context.Context, d *schema.ResourceData, 
 		groupsVal,
 		idleTimeout.(string),
 		scriptOnlyAccess,
+		disableOutputCapture,
 	)
 	if err != nil {
 		return diag.FromErr(err)
@@ -622,6 +633,7 @@ func ResourceAdaptiveSessionUpdate(ctx context.Context, d *schema.ResourceData, 
 	}
 
 	scriptOnlyAccess := d.Get("script_only_access").(bool)
+	disableOutputCapture := d.Get("disable_output_capture").(bool)
 
 	resp, err := client.UpdateSession(
 		ctx,
@@ -641,6 +653,7 @@ func ResourceAdaptiveSessionUpdate(ctx context.Context, d *schema.ResourceData, 
 		groupsVal,
 		idleTimeout.(string),
 		scriptOnlyAccess,
+		disableOutputCapture,
 	)
 	if err != nil {
 		return diag.FromErr(err)
