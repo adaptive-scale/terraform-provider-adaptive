@@ -196,6 +196,42 @@ func ResourceAdaptiveResource() *schema.Resource {
 				},
 				Description: "The SSL mode to use when connecting to the database. Used by CockroachDB, Postgres, Mysql resources",
 			},
+			"use_rds_iam": {
+				Type:        schema.TypeBool,
+				Optional:    true,
+				Description: "Authenticate with short-lived AWS RDS IAM auth tokens instead of a stored password. The database user must be granted rds_iam, the RDS instance must have IAM authentication enabled, and `ssl_mode` cannot be `disable`. Used by Postgres resources.",
+			},
+			"use_irsa": {
+				Type:        schema.TypeBool,
+				Optional:    true,
+				Description: "Mint RDS IAM tokens with `aws_service_account`, or with the platform's own IRSA / instance-profile identity when it is empty. Set to false to use `aws_access_key_id` / `aws_secret_access_key` instead. Only used when `use_rds_iam` is set.",
+			},
+			"aws_region": {
+				Type:        schema.TypeString,
+				Optional:    true,
+				Description: "The AWS region used to mint RDS IAM tokens. Leave empty to auto-detect from an *.rds.amazonaws.com hostname. Only used when `use_rds_iam` is set.",
+			},
+			"aws_role_arn": {
+				Type:        schema.TypeString,
+				Optional:    true,
+				Description: "An IAM role to assume when minting RDS IAM tokens. With IRSA it overrides the service account's eks.amazonaws.com/role-arn annotation. Only used when `use_rds_iam` is set.",
+			},
+			"aws_access_key_id": {
+				Type:        schema.TypeString,
+				Optional:    true,
+				Description: "Static AWS access key id used to mint RDS IAM tokens. Requires `use_irsa = false`.",
+			},
+			"aws_secret_access_key": {
+				Type:        schema.TypeString,
+				Optional:    true,
+				Sensitive:   true,
+				Description: "Static AWS secret access key used to mint RDS IAM tokens. Requires `use_irsa = false`.",
+			},
+			"aws_service_account": {
+				Type:        schema.TypeString,
+				Optional:    true,
+				Description: "Name of a Kubernetes ServiceAccount in the session cluster annotated with eks.amazonaws.com/role-arn; the platform mints RDS IAM tokens on its behalf. Requires `use_irsa = true`.",
+			},
 			"api_server": {
 				Type:        schema.TypeString,
 				Optional:    true,
@@ -588,6 +624,18 @@ func schemaToResourceIntegrationConfiguration(d *schema.ResourceData, intType st
 	// ignored. Reject it so the config can't drift from what actually runs.
 	if _, ok := d.GetOk("targets"); ok && intType != "adaptive_rdp" {
 		return nil, fmt.Errorf("`targets` is only supported by resources of type \"adaptive_rdp\", not %q", intType)
+	}
+	// Same reasoning for the AWS RDS IAM block: only postgres reads it, so
+	// setting it on any other type would be silently dropped.
+	if intType != "postgres" {
+		for _, key := range []string{
+			"use_rds_iam", "use_irsa", "aws_region", "aws_role_arn",
+			"aws_access_key_id", "aws_secret_access_key", "aws_service_account",
+		} {
+			if _, ok := d.GetOk(key); ok {
+				return nil, fmt.Errorf("`%s` is only supported by resources of type \"postgres\", not %q", key, intType)
+			}
+		}
 	}
 	switch intType {
 	case "aws":

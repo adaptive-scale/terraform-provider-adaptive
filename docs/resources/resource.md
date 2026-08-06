@@ -62,6 +62,52 @@ resource "adaptive_resource" "postgres" {
 }
 ```
 
+### PostgreSQL on RDS with IAM authentication
+
+Set `use_rds_iam` to authenticate with short-lived AWS RDS IAM auth tokens
+instead of a stored password, so no `password` is needed. The database user must
+have been granted `rds_iam`, the RDS instance must have IAM authentication
+enabled, and `ssl_mode` cannot be `disable`.
+
+`use_irsa` selects the identity that mints the tokens. With it on, tokens are
+minted through `aws_service_account` — a Kubernetes ServiceAccount in the
+session cluster annotated with `eks.amazonaws.com/role-arn` — or, when that is
+empty, through the platform's own IRSA role or instance profile. With it off,
+`aws_access_key_id` / `aws_secret_access_key` are used instead. Leaving
+`use_irsa` unset infers it from whether static keys were given.
+
+`aws_region` is only needed when the region cannot be derived from an
+`*.rds.amazonaws.com` hostname, and `aws_role_arn` is an optional role to assume.
+
+```terraform
+resource "adaptive_resource" "rds_postgres" {
+  name     = "production-rds"
+  type     = "postgres"
+  host     = "mydb.abc123.us-east-1.rds.amazonaws.com"
+  port     = "5432"
+  username = "iam_user"
+  ssl_mode = "require"
+
+  use_rds_iam         = true
+  use_irsa            = true
+  aws_service_account = "adaptive-rds-access"
+}
+
+resource "adaptive_resource" "rds_postgres_static_keys" {
+  name     = "production-rds-keys"
+  type     = "postgres"
+  host     = "mydb.abc123.eu-west-1.rds.amazonaws.com"
+  port     = "5432"
+  username = "iam_user"
+  ssl_mode = "require"
+
+  use_rds_iam           = true
+  use_irsa              = false
+  aws_access_key_id     = var.aws_access_key_id
+  aws_secret_access_key = var.aws_secret_access_key
+}
+```
+
 ### MySQL Database
 
 ```terraform
@@ -502,8 +548,13 @@ resource "adaptive_resource" "postgres_with_secrets" {
 - `application_id` (String) The Azure application ID. Used by Azure resource.
 - `application_name` (String) The application name for the service
 - `arn` (String) The ARN of the AWS IAM role to assume to access AWS Secrets Manager secret
+- `aws_access_key_id` (String) Static AWS access key id used to mint RDS IAM tokens. Requires `use_irsa = false`.
 - `aws_arn` (String) The ARN of the AWS IAM role to assume to access AWS Secrets Manager secret
+- `aws_region` (String) The AWS region used to mint RDS IAM tokens. Leave empty to auto-detect from an *.rds.amazonaws.com hostname. Only used when `use_rds_iam` is set.
 - `aws_region_name` (String) The AWS region of the AWS Secrets Manager secret
+- `aws_role_arn` (String) An IAM role to assume when minting RDS IAM tokens. With IRSA it overrides the service account's eks.amazonaws.com/role-arn annotation. Only used when `use_rds_iam` is set.
+- `aws_secret_access_key` (String, Sensitive) Static AWS secret access key used to mint RDS IAM tokens. Requires `use_irsa = false`.
+- `aws_service_account` (String) Name of a Kubernetes ServiceAccount in the session cluster annotated with eks.amazonaws.com/role-arn; the platform mints RDS IAM tokens on its behalf. Requires `use_irsa = true`.
 - `client_id` (String) The client ID of a OAuth application. Used by Google, Okta resource
 - `client_secret` (String) The client secret for a resource. Used by Azure, Google, Okta resources.
 - `clientcert` (String) The Snowflake client certificate. Used by Snowflake resource
@@ -561,7 +612,9 @@ resource "adaptive_resource" "postgres_with_secrets" {
 - `uri` (String) Connection string to a resource. Used by MongoDB
 - `url` (String) The URL for the service
 - `urls` (String) Comma-separated list of URLs. Used by Services resource
+- `use_irsa` (Boolean) Mint RDS IAM tokens with `aws_service_account`, or with the platform's own IRSA / instance-profile identity when it is empty. Set to false to use `aws_access_key_id` / `aws_secret_access_key` instead. Only used when `use_rds_iam` is set.
 - `use_proxy` (Boolean) Whether to use proxy
+- `use_rds_iam` (Boolean) Authenticate with short-lived AWS RDS IAM auth tokens instead of a stored password. The database user must be granted rds_iam, the RDS instance must have IAM authentication enabled, and `ssl_mode` cannot be `disable`. Used by Postgres resources.
 - `use_service_account` (Boolean) Whether to use service account for authentication. Used by GCP resource
 - `use_tenant` (Boolean) Whether to use tenant for Azure Active Directory authentication
 - `username` (String) Username for the adaptive resource authentication. Used by CockroachDB, Postgres, Mysql, SSH resources
