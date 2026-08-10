@@ -15,6 +15,10 @@ func ResourceAdaptiveSchedule() *schema.Resource {
 		ReadContext:   ResourceAdaptiveScheduleRead,
 		UpdateContext: ResourceAdaptiveScheduleUpdate,
 		DeleteContext: ResourceAdaptiveScheduleDelete,
+		// Import takes the object's id; Read then hydrates the rest of state.
+		Importer: &schema.ResourceImporter{
+			StateContext: schema.ImportStatePassthroughContext,
+		},
 
 		Schema: map[string]*schema.Schema{
 			"name": {

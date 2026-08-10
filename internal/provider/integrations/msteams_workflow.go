@@ -31,6 +31,10 @@ func ResourceAdaptiveMSTeamsWorkflow() *schema.Resource {
 		ReadContext:   resourceAdaptiveMSTeamsWorkflowRead,
 		UpdateContext: resourceAdaptiveMSTeamsWorkflowUpdate,
 		DeleteContext: resourceAdaptiveMSTeamsWorkflowDelete,
+		// Import takes the object's id; Read then hydrates the rest of state.
+		Importer: &schema.ResourceImporter{
+			StateContext: schema.ImportStatePassthroughContext,
+		},
 
 		Schema: map[string]*schema.Schema{
 			"name": {
@@ -83,6 +87,25 @@ func resourceAdaptiveMSTeamsWorkflowCreate(ctx context.Context, d *schema.Resour
 }
 
 func resourceAdaptiveMSTeamsWorkflowRead(ctx context.Context, d *schema.ResourceData, m interface{}) diag.Diagnostics {
+	client := m.(*adaptive.Client)
+
+	resource, err := client.GetResource(ctx, d.Id())
+	if err != nil {
+		return diag.FromErr(err)
+	}
+	// Deleted out of band — drop it so Terraform plans a recreate.
+	if resource == nil {
+		d.SetId("")
+		return nil
+	}
+
+	if err := d.Set("name", resource.Name); err != nil {
+		return diag.FromErr(err)
+	}
+	// webhook_url is not refreshed: a Teams webhook URL carries its own
+	// authentication token, so the backend redacts it like any other credential.
+	// It stays at whatever the config last wrote.
+
 	return nil
 }
 
