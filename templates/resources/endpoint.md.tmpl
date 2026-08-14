@@ -70,6 +70,27 @@ resource "adaptive_endpoint" "authorized" {
 }
 ```
 
+### Endpoint with DLP Policy
+
+```terraform
+resource "adaptive_dlp_policy" "pii_strict" {
+  name                 = "pii-strict"
+  block_screenshot     = true
+  block_clipboard_copy = true
+  block_bulk_export    = true
+  max_export_rows      = 500
+  applies_to_labels    = ["pii"]
+}
+
+resource "adaptive_endpoint" "protected" {
+  name       = "postgres-pii-access"
+  resource   = adaptive_resource.postgres.name
+  users      = ["analyst@example.com"]
+  dlp_policy = adaptive_dlp_policy.pii_strict.name
+  tags       = ["pii"]
+}
+```
+
 ### Endpoint with Auto-Pause
 
 ```terraform

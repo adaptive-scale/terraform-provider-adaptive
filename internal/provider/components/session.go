@@ -305,6 +305,12 @@ func ResourceAdaptiveSession() *schema.Resource {
 				Default:     false,
 				Description: "Whether the endpoint should only be accessible via script",
 			},
+			"dlp_policy": {
+				Type:        schema.TypeString,
+				Optional:    true,
+				Default:     "",
+				Description: "Name of the DLP policy (adaptive_dlp_policy) to apply to this endpoint. If not set, no endpoint-specific DLP policy is applied.",
+			},
 			"tags": {
 				Type:     schema.TypeList,
 				Optional: true,
@@ -464,6 +470,7 @@ func ResourceAdaptiveSessionCreate(ctx context.Context, d *schema.ResourceData, 
 		groupsVal,
 		idleTimeout.(string),
 		scriptOnlyAccess,
+		d.Get("dlp_policy").(string),
 	)
 	if err != nil {
 		return diag.FromErr(err)
@@ -641,6 +648,7 @@ func ResourceAdaptiveSessionUpdate(ctx context.Context, d *schema.ResourceData, 
 		groupsVal,
 		idleTimeout.(string),
 		scriptOnlyAccess,
+		d.Get("dlp_policy").(string),
 	)
 	if err != nil {
 		return diag.FromErr(err)
