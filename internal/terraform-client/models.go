@@ -52,6 +52,9 @@ type CreateSessionRequest struct {
 
 	// script only access
 	ScriptOnlyAccess bool `json:"script_only_access"`
+
+	// name of the DLP policy applied to the endpoint
+	DLPPolicy string `json:"dlp_policy,omitempty"`
 }
 
 type CreateSessionResponse struct {

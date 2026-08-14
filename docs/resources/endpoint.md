@@ -70,6 +70,27 @@ resource "adaptive_endpoint" "authorized" {
 }
 ```
 
+### Endpoint with DLP Policy
+
+```terraform
+resource "adaptive_dlp_policy" "pii_strict" {
+  name                 = "pii-strict"
+  block_screenshot     = true
+  block_clipboard_copy = true
+  block_bulk_export    = true
+  max_export_rows      = 500
+  applies_to_labels    = ["pii"]
+}
+
+resource "adaptive_endpoint" "protected" {
+  name       = "postgres-pii-access"
+  resource   = adaptive_resource.postgres.name
+  users      = ["analyst@example.com"]
+  dlp_policy = adaptive_dlp_policy.pii_strict.name
+  tags       = ["pii"]
+}
+```
+
 ### Endpoint with Auto-Pause
 
 ```terraform
@@ -172,6 +193,7 @@ resource "adaptive_group" "developers" {
 - `authorization` (String) The authorization to use when creating the session.
 - `cluster` (String) The cluster in which this session should be created. If not provided will be set to default cluster set in workspace settings of the user's workspace
 - `cpu` (String) CPU of endpoint pod
+- `dlp_policy` (String) Name of the DLP policy (adaptive_dlp_policy) to apply to this endpoint. If not set, no endpoint-specific DLP policy is applied.
 - `groups` (List of String) The list of groups associated with the adaptive endpoint
 - `is_jit_enabled` (Boolean) Whether Just-In-Time access is enabled for the session
 - `jit_approvers` (List of String) The list of user emails who can approve Just-In-Time access requests

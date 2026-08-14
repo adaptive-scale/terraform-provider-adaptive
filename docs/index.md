@@ -107,6 +107,7 @@ resource "adaptive_group" "db_admins" {
 - [adaptive_authorization](resources/authorization.md) - Define permission policies
 - [adaptive_group](resources/group.md) - Organize users and endpoints
 - [adaptive_script](resources/script.md) - Execute commands on endpoints
+- [adaptive_dlp_policy](resources/dlp_policy.md) - Enforce data loss prevention controls on endpoints
 
 ## Authentication Methods
 

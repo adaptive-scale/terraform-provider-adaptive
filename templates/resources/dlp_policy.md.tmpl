@@ -1,0 +1,105 @@
+---
+page_title: "adaptive_dlp_policy Resource - terraform-provider-adaptive"
+subcategory: ""
+description: |-
+  Manages an Adaptive Data Loss Prevention (DLP) policy that controls screenshots, clipboard, file transfer, and bulk export behavior on protected endpoints.
+---
+
+# adaptive_dlp_policy (Resource)
+
+The `adaptive_dlp_policy` resource defines a Data Loss Prevention policy that restricts how data can leave sessions on protected endpoints. Policies can:
+
+- **Block screenshots** of protected sessions
+- **Block clipboard copy/paste** in and out of sessions
+- **Block file transfer** (upload/download)
+- **Block or cap bulk exports** with a maximum row count
+- **Block session log export**
+- **Block entire access surfaces** (e.g. `webshell`)
+- **Carve out exceptions** with expr-lang expressions (e.g. `"sre" in teams && deviceTrusted`)
+
+Attach a policy to an endpoint via the `dlp_policy` attribute of `adaptive_endpoint`, target labeled data with `applies_to_labels`, or make it the workspace default with `workspace_default`.
+
+~> The Adaptive server upserts DLP policies **by name**, and the policy name is the Terraform resource ID. Renaming a policy therefore creates a new policy on the server; the previously named policy is deleted, which also clears any endpoint/workspace references to it. Treat `name` as a stable identifier.
+
+## Example Usage
+
+### Strict PII Policy
+
+```terraform
+resource "adaptive_dlp_policy" "pii_strict" {
+  name        = "pii-strict"
+  description = "Strict controls for endpoints handling PII"
+  enabled     = true
+
+  block_screenshot         = true
+  block_clipboard_copy     = true
+  block_clipboard_paste    = false
+  block_file_transfer      = true
+  block_bulk_export        = true
+  max_export_rows          = 500
+  block_session_log_export = true
+
+  blocked_surfaces  = ["webshell"]
+  exceptions        = ["\"sre\" in teams && deviceTrusted"]
+  applies_to_labels = ["pii"]
+  workspace_default = false
+}
+```
+
+### Workspace Default Policy
+
+```terraform
+resource "adaptive_dlp_policy" "baseline" {
+  name              = "workspace-baseline"
+  description       = "Baseline DLP controls for every endpoint"
+  block_screenshot  = true
+  block_bulk_export = true
+  max_export_rows   = 10000
+  workspace_default = true
+}
+```
+
+### Policy Attached to an Endpoint
+
+```terraform
+resource "adaptive_dlp_policy" "pii_strict" {
+  name                 = "pii-strict"
+  block_screenshot     = true
+  block_clipboard_copy = true
+  block_bulk_export    = true
+  max_export_rows      = 500
+  applies_to_labels    = ["pii"]
+}
+
+resource "adaptive_endpoint" "protected" {
+  name       = "postgres-pii-access"
+  resource   = adaptive_resource.postgres.name
+  users      = ["analyst@example.com"]
+  dlp_policy = adaptive_dlp_policy.pii_strict.name
+}
+```
+
+## Exception Expressions
+
+The `exceptions` list holds [expr-lang](https://expr-lang.org/) expressions. A session matching any expression is exempt from the policy. Expressions are validated by the Adaptive server during `terraform apply`; an invalid expression fails the apply with the server's validation message.
+
+```terraform
+resource "adaptive_dlp_policy" "with_exceptions" {
+  name             = "prod-dlp"
+  block_screenshot = true
+  exceptions = [
+    "\"sre\" in teams && deviceTrusted",
+    "user.email endsWith \"@example.com\" && requestApproved",
+  ]
+}
+```
+
+{{ .SchemaMarkdown | trimspace }}
+
+## Import
+
+DLP policies can be imported using the policy name:
+
+```shell
+terraform import adaptive_dlp_policy.example pii-strict
+```
