@@ -21,7 +21,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@cbb722410c2e876e24abbe8de2cc27693e501dcb # v4.0.0
+        uses: actions/checkout@e8d4307400f9427dba7cb98e488d6ab85f1cec5f # v4.0.0
       - name: Unshallow
         run: git fetch --prune --unshallow
       - name: Set up Go
