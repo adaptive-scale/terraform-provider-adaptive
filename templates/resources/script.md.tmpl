@@ -197,3 +197,5 @@ Scripts can be imported using the script ID:
 ```shell
 terraform import adaptive_script.example script-id
 ```
+
+The Adaptive API does not return script bodies, so `command` comes back empty on import and has to be written into your configuration before the first apply. For the same reason a command edited outside Terraform cannot be read back; the provider instead records the server's fingerprint of the body and plans a rewrite once it stops matching.

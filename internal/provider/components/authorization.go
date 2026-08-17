@@ -70,6 +70,10 @@ func ResourceAdaptiveAuthorization() *schema.Resource {
 		UpdateContext: ResourceAdaptiveAuthorizationUpdate,
 		DeleteContext: ResourceAdaptiveAuthorizationDelete,
 
+		Importer: &schema.ResourceImporter{
+			StateContext: schema.ImportStatePassthroughContext,
+		},
+
 		Schema: map[string]*schema.Schema{
 			"name": {
 				Type:        schema.TypeString,
@@ -129,27 +133,26 @@ func ResourceAdaptiveAuthorizationRead(ctx context.Context, d *schema.ResourceDa
 	client := m.(*adaptive.Client)
 	authID := d.Id()
 
-	resp, err := client.ReadAuthorization(ctx, authID, false)
+	resp, err := client.ReadAuthorization(ctx, authID)
 	if err != nil {
 		return diag.FromErr(err)
 	}
-
-	data, ok := resp.(map[string]interface{})
-	if !ok {
-		return diag.Errorf("invalid response format")
+	// Deleted out-of-band — drop it from state so Terraform recreates it.
+	if resp == nil {
+		return notFoundGone(d)
 	}
 
-	if name, ok := data["name"].(string); ok {
-		d.Set("name", name)
+	if err := d.Set("name", resp.Name); err != nil {
+		return diag.FromErr(err)
 	}
-	if description, ok := data["description"].(string); ok {
-		d.Set("description", description)
+	if err := d.Set("description", resp.Description); err != nil {
+		return diag.FromErr(err)
 	}
-	if resourceType, ok := data["resource_type"].(string); ok {
-		d.Set("resource_type", resourceType)
+	if err := d.Set("resource_type", resp.ResourceType); err != nil {
+		return diag.FromErr(err)
 	}
-	if permissions, ok := data["permissions"].(string); ok {
-		d.Set("permissions", permissions)
+	if err := d.Set("permissions", resp.Permissions); err != nil {
+		return diag.FromErr(err)
 	}
 
 	return nil

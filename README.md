@@ -7,9 +7,10 @@ The [Adaptive Terraform Provider](https://registry.terraform.io/providers/adapti
 
 ## Features
 
-- **50+ Integrations** - Connect to databases, cloud platforms, Kubernetes, identity providers, and more
+- **80+ Integrations** - Connect to databases, cloud platforms, Kubernetes, identity providers, and more
 - **Fine-grained Access Control** - Define authorizations with specific permissions per resource type
-- **Just-In-Time Access** - Configure JIT access with approval workflows
+- **Just-In-Time Access** - Configure JIT access with approval workflows, multi-approver rules, and scheduled auto-approval
+- **Data Masking** - Mask columns of a database resource so session users never see the raw values
 - **Group Management** - Organize users and endpoints for simplified access management
 
 ## Quick Start
@@ -82,19 +83,20 @@ terraform apply
 
 | Category | Integrations |
 |----------|-------------|
-| **Databases** | PostgreSQL, MySQL, MongoDB, CockroachDB, ClickHouse, Snowflake, SQL Server, YugabyteDB, Elasticsearch |
-| **Cloud** | AWS, Azure, GCP |
+| **Databases** | PostgreSQL, MySQL, MongoDB, CockroachDB, ClickHouse, Snowflake, SQL Server, YugabyteDB, Oracle, Redis, ProxySQL, BigQuery, Elasticsearch |
+| **Cloud** | AWS (including ElastiCache, DocumentDB, CloudWatch Logs, Secrets Manager), Azure, GCP, DigitalOcean, Heroku |
 | **Container** | Kubernetes |
-| **Identity** | Okta, OneLogin, JumpCloud, Google |
+| **Identity** | Okta, OneLogin, JumpCloud, Google, LDAP, 1Password |
 | **Monitoring** | Datadog, Splunk, Coralogix |
-| **Network** | SSH, ZeroTier, Cisco/Fortinet/Palo Alto NGFW |
-| **Messaging** | RabbitMQ, Microsoft Teams |
+| **Network** | SSH, ZeroTier, Cisco/Fortinet/Palo Alto NGFW, Juniper, Sophos, secure tunnels |
+| **Remote Desktop** | RDP (single host, fleet, or LDAP-authenticated), VNC, Windows server groups, Chrome |
+| **Messaging** | RabbitMQ, Kafka, Confluent, Microsoft Teams, Slack |
 
 See the [examples directory](examples/) for configuration examples of each integration.
 
 ## Resources
 
-The provider includes 5 resource types:
+The provider includes 7 resource types:
 
 | Resource | Description |
 |----------|-------------|
@@ -103,9 +105,39 @@ The provider includes 5 resource types:
 | `adaptive_authorization` | Permission policy for fine-grained access control |
 | `adaptive_group` | User and endpoint organization for access management |
 | `adaptive_script` | Command execution on endpoints |
+| `adaptive_schedule` | Auto-approval or auto-rejection of access requests in a recurring window |
+| `adaptive_dataprotection` | Column-level masking policy for a database resource |
+
+## Refresh, Drift and Import
+
+Every resource now reads its real state back from the platform, so `terraform plan` reports changes made outside Terraform and a resource deleted out-of-band is planned for recreation instead of failing the refresh. All seven support `terraform import` by ID.
+
+Refresh is deliberately conservative about optional arguments: one your configuration never set is not populated from a server-side default, since that would show up as a diff on every plan. Two values the API never returns are handled through server-side fingerprints instead — the credentials on `adaptive_resource` (see its `redacted_digests` output) and the body of an `adaptive_script` — so a secret or script changed outside Terraform still surfaces as a pending change. Importing an `adaptive_resource` warns which credentials the platform withheld; write them into your configuration before the next apply, or the update will clear them.
+
+### Migrating from `adaptive_msteams_workflow`
+
+The standalone `adaptive_msteams_workflow` resource has been removed. Microsoft Teams workflow webhooks are now an `adaptive_resource` type, alongside every other integration:
+
+```hcl
+resource "adaptive_resource" "teams_alerts" {
+  name        = "teams-alerts"
+  type        = "msteams_workflow"
+  webhook_url = var.teams_webhook_url
+}
+```
+
+To migrate without recreating the integration, remove the old resource from state and import it under the new address:
+
+```bash
+terraform state rm adaptive_msteams_workflow.example
+terraform import adaptive_resource.teams_alerts <resource-id>
+```
+
+`webhook_url` is sensitive and is not returned by the API, so set it in your configuration before applying.
 
 ## Documentation
 
+- [Terraform Guide](https://documentation.adaptive.live/developer-guide/terraform)
 - [Getting Started Guide](docs/guides/getting-started.md)
 - [Integration Guide](docs/guides/integrations.md)
 - [Access Control Guide](docs/guides/access-control.md)

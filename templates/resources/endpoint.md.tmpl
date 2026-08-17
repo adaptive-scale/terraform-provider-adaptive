@@ -159,6 +159,31 @@ resource "adaptive_group" "developers" {
 }
 ```
 
+### Approval Workflow and Session Hardening
+
+```terraform
+resource "adaptive_endpoint" "regulated" {
+  name           = "prod-database-regulated"
+  resource       = adaptive_resource.prod_db.name
+  is_jit_enabled = true
+  jit_mode       = "both" # session and script access both need approval
+
+  jit_approvers       = ["security@example.com", "manager@example.com"]
+  jit_multi_approver  = true
+  jit_total_approvers = 2
+
+  # Hide the in-browser access paths and stop retaining terminal output.
+  disable_web_cli        = true
+  disable_data_studio    = true
+  disable_output_capture = true
+
+  users = ["oncall@example.com"]
+  tags  = ["production", "regulated"]
+}
+```
+
+`disable_output_capture` is OR'd with the workspace-level setting: an endpoint can switch capture off, but it cannot re-enable capture the workspace has disabled. `disable_data_studio` and `disable_web_cli` only affect `cli` endpoints. Set `auto_approval` to approve Just-In-Time requests without a human in the loop.
+
 {{ .SchemaMarkdown | trimspace }}
 
 ## TTL Format
@@ -176,3 +201,5 @@ Endpoints can be imported using the endpoint ID:
 ```shell
 terraform import adaptive_endpoint.example endpoint-id
 ```
+
+Import reads the full endpoint back from the platform, so the arguments above are populated from what the server holds. Refresh is more conservative: optional arguments your configuration never set (`cluster`, `memory`, `cpu`, `ttl`) keep their workspace defaults rather than being written into state, and a toggle that is off locally is never flipped on by a server-side value, since several of them are OR'd with workspace settings.

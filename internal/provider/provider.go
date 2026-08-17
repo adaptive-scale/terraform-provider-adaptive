@@ -11,9 +11,10 @@ import (
 	"io/ioutil"
 	"os"
 	"path"
+	"sort"
+	"strings"
 
 	"github.com/adaptive-scale/terraform-provider-adaptive/internal/provider/components"
-	"github.com/adaptive-scale/terraform-provider-adaptive/internal/provider/integrations"
 	client "github.com/adaptive-scale/terraform-provider-adaptive/internal/terraform-client"
 	"github.com/hashicorp/terraform-plugin-log/tflog"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/diag"
@@ -55,13 +56,13 @@ func New(version string) func() *schema.Provider {
 			},
 
 			ResourcesMap: map[string]*schema.Resource{
-				"adaptive_endpoint":         components.ResourceAdaptiveSession(),
-				"adaptive_resource":         components.ResourceAdaptiveResource(),
-				"adaptive_authorization":    components.ResourceAdaptiveAuthorization(),
-				"adaptive_group":            components.ResourceAdaptiveTeam(),
-				"adaptive_script":           components.ResourceAdaptiveScript(),
-				"adaptive_schedule":         components.ResourceAdaptiveSchedule(),
-				"adaptive_msteams_workflow": integrations.ResourceAdaptiveMSTeamsWorkflow(),
+				"adaptive_endpoint":       components.ResourceAdaptiveSession(),
+				"adaptive_resource":       components.ResourceAdaptiveResource(),
+				"adaptive_authorization":  components.ResourceAdaptiveAuthorization(),
+				"adaptive_group":          components.ResourceAdaptiveTeam(),
+				"adaptive_script":         components.ResourceAdaptiveScript(),
+				"adaptive_schedule":       components.ResourceAdaptiveSchedule(),
+				"adaptive_dataprotection": components.ResourceAdaptiveDataProtection(),
 			}, ConfigureContextFunc: providerConfigure,
 		}
 		return p
@@ -91,17 +92,24 @@ func tryReadingServiceToken(potentialToken, workspaceURL string) (string, string
 
 	// First, try to parse as deployments config
 	var deploymentsConfig AdaptiveDeploymentsConfig
-	if err := json.Unmarshal([]byte(potentialToken), &deploymentsConfig); err == nil {
-		// Find the default deployment
+	if err := json.Unmarshal([]byte(potentialToken), &deploymentsConfig); err == nil && len(deploymentsConfig.Deployments) > 0 {
 		for _, deployment := range deploymentsConfig.Deployments {
 			if deployment.Default {
 				return deployment.Token, deployment.URL, nil
 			}
 		}
-		// If no default found, use the first deployment
-		for _, deployment := range deploymentsConfig.Deployments {
-			return deployment.Token, deployment.URL, nil
+		// A single deployment is unambiguous even without the default marker.
+		if len(deploymentsConfig.Deployments) == 1 {
+			for _, deployment := range deploymentsConfig.Deployments {
+				return deployment.Token, deployment.URL, nil
+			}
 		}
+		// Several deployments and none marked default: picking one would be a
+		// coin flip over which workspace gets written to, so refuse instead.
+		return "", "", fmt.Errorf(
+			"the adaptive-cli config holds several deployments (%s) and none is marked default; "+
+				"mark one as \"default\": true, or set ADAPTIVE_SVC_TOKEN and ADAPTIVE_URL",
+			strings.Join(deploymentNames(deploymentsConfig.Deployments), ", "))
 	}
 
 	// Fallback: try to parse as simple token config
@@ -112,6 +120,24 @@ func tryReadingServiceToken(potentialToken, workspaceURL string) (string, string
 
 	// Final fallback: treat as plain token string
 	return potentialToken, workspaceURL, nil
+}
+
+// deploymentNames labels the configured deployments for an error message,
+// preferring the config key and falling back to the entry's own name or URL.
+func deploymentNames(deployments map[string]AdaptiveDeploymentConfig) []string {
+	names := make([]string, 0, len(deployments))
+	for key, deployment := range deployments {
+		label := key
+		if label == "" {
+			label = deployment.Name
+		}
+		if label == "" {
+			label = deployment.URL
+		}
+		names = append(names, label)
+	}
+	sort.Strings(names)
+	return names
 }
 
 func providerConfigure(ctx context.Context, d *schema.ResourceData) (interface{}, diag.Diagnostics) {
@@ -135,7 +161,7 @@ func providerConfigure(ctx context.Context, d *schema.ResourceData) (interface{}
 
 	svcToken, wsURL, err := tryReadingServiceToken(serviceToken, workspaceURL)
 	if err != nil {
-		return nil, diag.Errorf(fmt.Sprintf("bad service token: %s", err))
+		return nil, diag.Errorf("bad service token: %s", err)
 	}
 	c := client.NewClient(svcToken, wsURL)
 

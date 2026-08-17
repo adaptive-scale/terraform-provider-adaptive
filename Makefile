@@ -3,10 +3,14 @@ HOSTNAME=adaptive-scale
 NAMESPACE=local
 NAME=adaptive
 BINARY=terraform-provider-${NAME}
-VERSION=0.1.48
+VERSION=0.2.0
 OS_ARCH=darwin_arm64
 
 default: install
+
+# docs and test share their names with directories in the tree, so they must be
+# declared phony or make considers them already built.
+.PHONY: build release install test testacc docs test-examples test-examples-apply
 
 build:
 	go build -o ${BINARY}
@@ -30,8 +34,7 @@ install: build
 	mv ${BINARY} ~/.terraform.d/plugins/${HOSTNAME}/${NAMESPACE}/${NAME}/${VERSION}/${OS_ARCH}
 
 test:
-	go test -i $(TEST) || exit 1
-	echo $(TEST) | xargs -t -n4 go test $(TESTARGS) -timeout=30s -parallel=4
+	go test ./... $(TESTARGS) -timeout=120s -parallel=4
 
 testacc:
 	TF_ACC=1 go test $(TEST) -v $(TESTARGS) -timeout 120m

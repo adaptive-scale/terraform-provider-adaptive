@@ -1,0 +1,98 @@
+---
+page_title: "adaptive_schedule Resource - terraform-provider-adaptive"
+subcategory: ""
+description: |-
+  Manages an Adaptive schedule, which auto-approves or auto-rejects access requests during a recurring time window.
+---
+
+# adaptive_schedule (Resource)
+
+The `adaptive_schedule` resource defines a recurring window in which access requests for the listed endpoints are decided without a human approver. A schedule with `operation_type = "autoapprove"` grants matching requests; `autoreject` denies them, which is the usual way to close off production outside working hours.
+
+Schedules apply to the users, teams and endpoints they name. A request only matches when it falls inside the window in the schedule's timezone and the schedule is active.
+
+## Example Usage
+
+### Business Hours Auto-Approval
+
+```terraform
+resource "adaptive_schedule" "business_hours" {
+  name          = "business-hours"
+  description   = "Auto-approve staging access during working hours"
+  schedule_type = "weekdays"
+
+  start_hour   = 9
+  start_minute = 0
+  end_hour     = 18
+  end_minute   = 0
+  timezone     = "America/Los_Angeles"
+
+  users     = ["dev1@example.com", "dev2@example.com"]
+  endpoints = [adaptive_endpoint.staging_db.name]
+}
+```
+
+### Freeze Window
+
+```terraform
+resource "adaptive_schedule" "weekend_freeze" {
+  name           = "weekend-freeze"
+  schedule_type  = "weekends"
+  all_day        = true
+  operation_type = "autoreject"
+
+  teams     = [adaptive_group.developers.name]
+  endpoints = [adaptive_endpoint.prod_db.name]
+}
+```
+
+### Specific Dates
+
+```terraform
+resource "adaptive_schedule" "migration_window" {
+  name          = "migration-window"
+  schedule_type = "specific"
+
+  specific_dates = [
+    "2026-03-14T00:00:00Z",
+    "2026-03-15T00:00:00Z",
+  ]
+  all_day    = true
+  expires_at = "2026-04-01T00:00:00Z"
+
+  users           = ["dba@example.com"]
+  endpoints       = [adaptive_endpoint.prod_db.name]
+  max_access_time = 120
+}
+```
+
+### Custom Weekdays
+
+```terraform
+resource "adaptive_schedule" "oncall_window" {
+  name          = "oncall-window"
+  schedule_type = "custom"
+  weekdays      = ["Saturday", "Sunday"]
+
+  start_hour = 8
+  end_hour   = 20
+  timezone   = "UTC"
+
+  teams     = [adaptive_group.sre.name]
+  endpoints = [adaptive_endpoint.prod_k8s.name]
+}
+```
+
+`schedule_type` selects which of the pattern arguments matter: `custom` reads `weekdays`, `monthly` reads `start_day`/`end_day`, `specific` reads `specific_dates`, and `weekdays`, `weekends` and `everyday` need none of them. Set `all_day` to cover the whole day instead of the start/end time-of-day arguments.
+
+{{ .SchemaMarkdown | trimspace }}
+
+## Import
+
+Schedules can be imported using the schedule ID:
+
+```shell
+terraform import adaptive_schedule.example schedule-id
+```
+
+The read endpoint returns a lossy view of a schedule: it reports the name, type, active flag, all-day flag, timezone, operation type and expiry, but not the pattern arguments. Those are left as your configuration wrote them on refresh, and stay empty after an import until you fill them in.

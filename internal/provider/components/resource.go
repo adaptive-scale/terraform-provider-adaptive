@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"sort"
 	"strings"
 	"time"
 
@@ -71,6 +72,38 @@ var (
 		"rabbitmq",
 		"azurecosmosnosql",
 		"msteams_workflow",
+
+		"1password",
+		"adaptiveencrypt",
+		"adaptiveremotedesktop",
+		"avastbusinessedr",
+		"awscloudwatchlogs",
+		"awselasticcache",
+		"awsdocumentdb_aws_secret_manager",
+		"azure_documentdb",
+		"big_query",
+		"chrome",
+		"cockroachdb_aws_secrets_manager",
+		"confluent",
+		"digitalocean",
+		"fortinet_analyzer",
+		"fortinet_manager",
+		"heroku",
+		"ivanti",
+		"juniper_sw",
+		"kafka",
+		"ldap",
+		"mongodb-do",
+		"mongodb36",
+		"oracle",
+		"proxysql",
+		"rdpldap",
+		"redis",
+		"securetunnels",
+		"slack_webhook",
+		"sophos_fw",
+		"vnc",
+		"windows-server-groups",
 	}
 )
 
@@ -112,6 +145,9 @@ func ResourceAdaptiveResource() *schema.Resource {
 			Update: schema.DefaultTimeout(10 * time.Minute),
 			Delete: schema.DefaultTimeout(10 * time.Minute),
 		},
+		Importer: &schema.ResourceImporter{
+			StateContext: schema.ImportStatePassthroughContext,
+		},
 		Schema: map[string]*schema.Schema{
 			"type": {
 				Type:             schema.TypeString,
@@ -135,6 +171,7 @@ func ResourceAdaptiveResource() *schema.Resource {
 			"uri": {
 				Type:        schema.TypeString,
 				Optional:    true,
+				Sensitive:   true,
 				Description: "Connection string to a resource. Used by MongoDB",
 			},
 			"namespace": {
@@ -165,6 +202,7 @@ func ResourceAdaptiveResource() *schema.Resource {
 			"password": {
 				Type:        schema.TypeString,
 				Optional:    true,
+				Sensitive:   true,
 				Description: "Password for the adaptive integration authentication.Used by CockroachDB, Postgres, Mysql, SSH resources",
 			},
 			"database_name": {
@@ -240,6 +278,7 @@ func ResourceAdaptiveResource() *schema.Resource {
 			"cluster_token": {
 				Type:        schema.TypeString,
 				Optional:    true,
+				Sensitive:   true,
 				Description: "The cluster token for Kubernetes API server. Used by Kubernetes resource",
 			},
 			"cluster_cert": {
@@ -280,6 +319,7 @@ func ResourceAdaptiveResource() *schema.Resource {
 			"secret_access_key": {
 				Type:        schema.TypeString,
 				Optional:    true,
+				Sensitive:   true,
 				Description: "The AWS secret access key in plaintext. Used by AWS resource.",
 			},
 			"tenant_id": {
@@ -295,6 +335,7 @@ func ResourceAdaptiveResource() *schema.Resource {
 			"client_secret": {
 				Type:        schema.TypeString,
 				Optional:    true,
+				Sensitive:   true,
 				Description: "The client secret for a resource. Used by Azure, Google, Okta resources.",
 			},
 			"api_client_id": {
@@ -305,6 +346,7 @@ func ResourceAdaptiveResource() *schema.Resource {
 			"api_client_secret": {
 				Type:        schema.TypeString,
 				Optional:    true,
+				Sensitive:   true,
 				Description: "The API client secret for a resource. Used by Azure resource.",
 			},
 			"login_url": {
@@ -325,6 +367,7 @@ func ResourceAdaptiveResource() *schema.Resource {
 			"clientcert": {
 				Type:        schema.TypeString,
 				Optional:    true,
+				Sensitive:   true,
 				Description: "The Snowflake client certificate. Used by Snowflake resource",
 			},
 			"role": {
@@ -345,6 +388,7 @@ func ResourceAdaptiveResource() *schema.Resource {
 			"key_file": {
 				Type:        schema.TypeString,
 				Optional:    true,
+				Sensitive:   true,
 				Description: "The content of GCP key file. Used by GCP resource",
 			},
 			"domain": {
@@ -379,6 +423,7 @@ func ResourceAdaptiveResource() *schema.Resource {
 			"key": {
 				Type:        schema.TypeString,
 				Optional:    true,
+				Sensitive:   true,
 				Description: "The SSH key to use when connecting to the instance. If not specified, password authentication will be used. Used by SSH resource",
 			},
 			"public_key": {
@@ -404,6 +449,7 @@ func ResourceAdaptiveResource() *schema.Resource {
 			"secret_id": {
 				Type:        schema.TypeString,
 				Optional:    true,
+				Sensitive:   true,
 				Description: "The AWS Secrets Manager secret ID",
 			},
 			"aws_arn": {
@@ -419,12 +465,14 @@ func ResourceAdaptiveResource() *schema.Resource {
 			"api_token": {
 				Type:        schema.TypeString,
 				Optional:    true,
+				Sensitive:   true,
 				Description: "The API token for the service",
 			},
 
 			"private_key": {
 				Type:        schema.TypeString,
 				Optional:    true,
+				Sensitive:   true,
 				Description: "The private key for the service",
 			},
 			"application_name": {
@@ -440,6 +488,7 @@ func ResourceAdaptiveResource() *schema.Resource {
 			"shared_secret": {
 				Type:        schema.TypeString,
 				Optional:    true,
+				Sensitive:   true,
 				Description: "The shared secret for the integration",
 			},
 			"image": {
@@ -460,6 +509,7 @@ func ResourceAdaptiveResource() *schema.Resource {
 			"dd_api_key": {
 				Type:        schema.TypeString,
 				Optional:    true,
+				Sensitive:   true,
 				Description: "The Datadog API key",
 			},
 			"index": {
@@ -505,11 +555,13 @@ func ResourceAdaptiveResource() *schema.Resource {
 			"tls_key_file": {
 				Type:        schema.TypeString,
 				Optional:    true,
+				Sensitive:   true,
 				Description: "The key file to use for the Postgres-like resources.",
 			},
 			"token_id": {
 				Type:        schema.TypeString,
 				Optional:    true,
+				Sensitive:   true,
 				Description: "The token ID for the service",
 			},
 			"url": {
@@ -520,6 +572,7 @@ func ResourceAdaptiveResource() *schema.Resource {
 			"api_key": {
 				Type:        schema.TypeString,
 				Optional:    true,
+				Sensitive:   true,
 				Description: "The API key",
 			},
 			"app_id": {
@@ -530,6 +583,7 @@ func ResourceAdaptiveResource() *schema.Resource {
 			"app_key": {
 				Type:        schema.TypeString,
 				Optional:    true,
+				Sensitive:   true,
 				Description: "The app key",
 			},
 			"version": {
@@ -550,6 +604,7 @@ func ResourceAdaptiveResource() *schema.Resource {
 			"database_password": {
 				Type:        schema.TypeString,
 				Optional:    true,
+				Sensitive:   true,
 				Description: "The database password",
 			},
 			"default_cluster": {
@@ -561,6 +616,238 @@ func ResourceAdaptiveResource() *schema.Resource {
 				Type:        schema.TypeBool,
 				Optional:    true,
 				Description: "Whether to use tenant for Azure Active Directory authentication",
+			},
+			"webhook_url": {
+				Type:        schema.TypeString,
+				Optional:    true,
+				Sensitive:   true,
+				Description: "Incoming webhook URL. Used by the msteams_workflow and slack_webhook resources.",
+			},
+			"service_account": {
+				Type:        schema.TypeString,
+				Optional:    true,
+				Description: "1Password service account token.",
+			},
+			"use_connect_server": {
+				Type:        schema.TypeBool,
+				Optional:    true,
+				Description: "Reach 1Password through a self-hosted Connect server instead of the service account API.",
+			},
+			"connect_server_url": {
+				Type:        schema.TypeString,
+				Optional:    true,
+				Description: "URL of the 1Password Connect server. Only used when `use_connect_server` is set.",
+			},
+			"value": {
+				Type:        schema.TypeString,
+				Optional:    true,
+				Description: "The value to encrypt. Used by the adaptiveencrypt resource.",
+			},
+			"cpu": {
+				Type:        schema.TypeString,
+				Optional:    true,
+				Description: "CPU request for the remote desktop pod. Used by the adaptiveremotedesktop resource.",
+			},
+			"memory": {
+				Type:        schema.TypeString,
+				Optional:    true,
+				Description: "Memory request for the remote desktop pod. Used by the adaptiveremotedesktop resource.",
+			},
+			"storage": {
+				Type:        schema.TypeString,
+				Optional:    true,
+				Description: "Persistent storage size for the remote desktop pod. Used by the adaptiveremotedesktop resource.",
+			},
+			"log_group_name": {
+				Type:        schema.TypeString,
+				Optional:    true,
+				Description: "CloudWatch log group to write to. Used by the awscloudwatchlogs resource.",
+			},
+			"log_stream_name": {
+				Type:        schema.TypeString,
+				Optional:    true,
+				Description: "CloudWatch log stream to write to. Used by the awscloudwatchlogs resource.",
+			},
+			"tls_enabled": {
+				Type:        schema.TypeBool,
+				Optional:    true,
+				Description: "Connect over TLS. Used by the redis, awselasticcache and awsdocumentdb_aws_secret_manager resources.",
+			},
+			"tls_skip_verify": {
+				Type:        schema.TypeBool,
+				Optional:    true,
+				Description: "Skip verification of the server certificate. Used by the redis and awselasticcache resources.",
+			},
+			"use_tls": {
+				Type:        schema.TypeBool,
+				Optional:    true,
+				Description: "Connect over TLS. Used by the mongodb36 resource.",
+			},
+			"tls_ca_cert": {
+				Type:        schema.TypeString,
+				Optional:    true,
+				Description: "CA certificate used to verify the server. Used by the redis resource.",
+			},
+			"client_cert": {
+				Type:        schema.TypeString,
+				Optional:    true,
+				Sensitive:   true,
+				Description: "Client certificate presented to the server. Used by the proxysql resource.",
+			},
+			"client_key": {
+				Type:        schema.TypeString,
+				Optional:    true,
+				Sensitive:   true,
+				Description: "Private key for `client_cert`. Used by the proxysql resource.",
+			},
+			"client_certificate": {
+				Type:        schema.TypeString,
+				Optional:    true,
+				Sensitive:   true,
+				Description: "Client certificate bundle. Used by the mongodb36 resource.",
+			},
+			"client_configuration": {
+				Type:        schema.TypeString,
+				Optional:    true,
+				Sensitive:   true,
+				Description: "Full client configuration (properties format). Used by the kafka resource.",
+			},
+			"access_control_method": {
+				Type:        schema.TypeString,
+				Optional:    true,
+				Description: "ElastiCache access-control method. Used by the awselasticcache resource.",
+			},
+			"access_control_group": {
+				Type:        schema.TypeString,
+				Optional:    true,
+				Description: "ElastiCache user-group id. Used by the awselasticcache resource.",
+			},
+			"credential_json": {
+				Type:        schema.TypeString,
+				Optional:    true,
+				Sensitive:   true,
+				Description: "Google service-account credentials JSON. Used by the big_query resource.",
+			},
+			"automation_mode": {
+				Type:        schema.TypeString,
+				Optional:    true,
+				Description: "Browser automation mode. Used by the chrome resource.",
+			},
+			"fields": {
+				Type:        schema.TypeString,
+				Optional:    true,
+				Description: "Form fields to fill during automated login. Used by the chrome resource.",
+			},
+			"script": {
+				Type:        schema.TypeString,
+				Optional:    true,
+				Description: "Automation script to run in the browser. Used by the chrome resource.",
+			},
+			"prestart": {
+				Type:        schema.TypeString,
+				Optional:    true,
+				Description: "Commands to run before the browser starts. Used by the chrome resource.",
+			},
+			"ldap_hostname": {
+				Type:        schema.TypeString,
+				Optional:    true,
+				Description: "Hostname of the LDAP server. Used by the rdpldap resource.",
+			},
+			"ldap_port": {
+				Type:        schema.TypeString,
+				Optional:    true,
+				Description: "Port of the LDAP server. Used by the rdpldap resource.",
+			},
+			"ldap_encryption_method": {
+				Type:        schema.TypeString,
+				Optional:    true,
+				Description: "LDAP encryption method (e.g. none, ssl, starttls). Used by the ldap and rdpldap resources.",
+			},
+			"ldap_search_bind_dn": {
+				Type:        schema.TypeString,
+				Optional:    true,
+				Description: "DN used to bind for user searches. Used by the ldap and rdpldap resources.",
+			},
+			"ldap_search_bind_password": {
+				Type:        schema.TypeString,
+				Optional:    true,
+				Sensitive:   true,
+				Description: "Password for `ldap_search_bind_dn`. Used by the ldap and rdpldap resources.",
+			},
+			"ldap_user_name_attribute": {
+				Type:        schema.TypeString,
+				Optional:    true,
+				Description: "Attribute holding the username. Used by the ldap and rdpldap resources.",
+			},
+			"ldap_user_base_dn": {
+				Type:        schema.TypeString,
+				Optional:    true,
+				Description: "Base DN user searches start from. Used by the ldap and rdpldap resources.",
+			},
+			"old_version": {
+				Type:        schema.TypeBool,
+				Optional:    true,
+				Description: "Target a pre-2.x ProxySQL admin interface. Used by the proxysql resource.",
+			},
+			"proxysql_admin_port": {
+				Type:        schema.TypeString,
+				Optional:    true,
+				Description: "Port of the ProxySQL admin interface. Used by the proxysql resource.",
+			},
+			"proxysql_admin_username": {
+				Type:        schema.TypeString,
+				Optional:    true,
+				Description: "Username for the ProxySQL admin interface. Used by the proxysql resource.",
+			},
+			"proxysql_admin_password": {
+				Type:        schema.TypeString,
+				Optional:    true,
+				Sensitive:   true,
+				Description: "Password for the ProxySQL admin interface. Used by the proxysql resource.",
+			},
+			"proxysql_hostgroup_id": {
+				Type:        schema.TypeString,
+				Optional:    true,
+				Description: "Hostgroup id queries are routed to. Used by the proxysql resource.",
+			},
+			"is_redis_labs": {
+				Type:        schema.TypeBool,
+				Optional:    true,
+				Description: "The target is a Redis Enterprise Cloud (Redis Labs) endpoint. Used by the redis resource.",
+			},
+			"machine": {
+				Type:        schema.TypeString,
+				Optional:    true,
+				Description: "Heroku API host. Used by the heroku resource.",
+			},
+			"token": {
+				Type:        schema.TypeString,
+				Optional:    true,
+				Sensitive:   true,
+				Description: "API token. Used by the heroku resource.",
+			},
+			"resource": {
+				Type:        schema.TypeString,
+				Optional:    true,
+				Description: "Confluent resource (cluster) identifier. Used by the confluent resource.",
+			},
+			"service_name": {
+				Type:        schema.TypeString,
+				Optional:    true,
+				Description: "Oracle service name. Used by the oracle resource.",
+			},
+			"api_secret": {
+				Type:        schema.TypeString,
+				Optional:    true,
+				Sensitive:   true,
+				Description: "API secret paired with `api_key`. Used by the confluent resource.",
+			},
+			"redacted_digests": {
+				Type:     schema.TypeMap,
+				Computed: true,
+				Elem:     &schema.Schema{Type: schema.TypeString},
+				Description: "Opaque server fingerprints of the write-only secret arguments, used to detect " +
+					"out-of-band secret changes on refresh. Not comparable across resources or workspaces.",
 			},
 			"targets": {
 				Type:        schema.TypeList,
@@ -626,12 +913,15 @@ func schemaToResourceIntegrationConfiguration(d *schema.ResourceData, intType st
 		return nil, fmt.Errorf("`targets` is only supported by resources of type \"adaptive_rdp\", not %q", intType)
 	}
 	// Same reasoning for the AWS RDS IAM block: only postgres reads it, so
-	// setting it on any other type would be silently dropped.
+	// setting it on any other type would be silently dropped. The static key
+	// pair is exempt for awselasticcache, which reads the same two arguments
+	// for its own AWS access-control lookups.
 	if intType != "postgres" {
-		for _, key := range []string{
-			"use_rds_iam", "use_irsa", "aws_region", "aws_role_arn",
-			"aws_access_key_id", "aws_secret_access_key", "aws_service_account",
-		} {
+		keys := []string{"use_rds_iam", "use_irsa", "aws_region", "aws_role_arn", "aws_service_account"}
+		if intType != "awselasticcache" {
+			keys = append(keys, "aws_access_key_id", "aws_secret_access_key")
+		}
+		for _, key := range keys {
 			if _, ok := d.GetOk(key); ok {
 				return nil, fmt.Errorf("`%s` is only supported by resources of type \"postgres\", not %q", key, intType)
 			}
@@ -744,6 +1034,68 @@ func schemaToResourceIntegrationConfiguration(d *schema.ResourceData, intType st
 		return integrations.SchemaToAzureCosmosNoSQLIntegrationConfiguration(d), nil
 	case "msteams_workflow":
 		return integrations.SchemaToMSTeamsWorkflowIntegrationConfiguration(d), nil
+	case "1password":
+		return integrations.SchemaToOnePasswordIntegrationConfiguration(d), nil
+	case "adaptiveencrypt":
+		return integrations.SchemaToAdaptiveEncryptIntegrationConfiguration(d), nil
+	case "adaptiveremotedesktop":
+		return integrations.SchemaToAdaptiveRemoteDesktopIntegrationConfiguration(d), nil
+	case "avastbusinessedr":
+		return integrations.SchemaToAvastBusinessEDRIntegrationConfiguration(d), nil
+	case "awscloudwatchlogs":
+		return integrations.SchemaToAWSCloudWatchLogsIntegrationConfiguration(d), nil
+	case "awselasticcache":
+		return integrations.SchemaToAWSElastiCacheIntegrationConfiguration(d), nil
+	case "awsdocumentdb_aws_secret_manager":
+		return integrations.SchemaToAWSDocumentDBSecretsManagerIntegrationConfiguration(d), nil
+	case "azure_documentdb":
+		return integrations.SchemaToAzureDocumentDBIntegrationConfiguration(d), nil
+	case "big_query":
+		return integrations.SchemaToBigQueryIntegrationConfiguration(d), nil
+	case "chrome":
+		return integrations.SchemaToChromeIntegrationConfiguration(d), nil
+	case "cockroachdb_aws_secrets_manager":
+		return integrations.SchemaToCockroachDBSecretsManagerIntegrationConfiguration(d), nil
+	case "confluent":
+		return integrations.SchemaToConfluentIntegrationConfiguration(d), nil
+	case "digitalocean":
+		return integrations.SchemaToDigitalOceanIntegrationConfiguration(d), nil
+	case "fortinet_analyzer":
+		return integrations.SchemaToFortinetAnalyzerIntegrationConfiguration(d), nil
+	case "fortinet_manager":
+		return integrations.SchemaToFortinetManagerIntegrationConfiguration(d), nil
+	case "heroku":
+		return integrations.SchemaToHerokuIntegrationConfiguration(d), nil
+	case "ivanti":
+		return integrations.SchemaToIvantiIntegrationConfiguration(d), nil
+	case "juniper_sw":
+		return integrations.SchemaToJuniperSWIntegrationConfiguration(d), nil
+	case "kafka":
+		return integrations.SchemaToKafkaIntegrationConfiguration(d), nil
+	case "ldap":
+		return integrations.SchemaToLDAPIntegrationConfiguration(d), nil
+	case "mongodb-do":
+		return integrations.SchemaToMongoDBDOIntegrationConfiguration(d), nil
+	case "mongodb36":
+		return integrations.SchemaToMongoDB36IntegrationConfiguration(d), nil
+	case "oracle":
+		return integrations.SchemaToOracleIntegrationConfiguration(d), nil
+	case "proxysql":
+		return integrations.SchemaToProxySQLIntegrationConfiguration(d), nil
+	case "rdpldap":
+		return integrations.SchemaToRDPLdapIntegrationConfiguration(d), nil
+	case "redis":
+		return integrations.SchemaToRedisIntegrationConfiguration(d), nil
+	case "securetunnels":
+		return integrations.SchemaToSecureTunnelsIntegrationConfiguration(d), nil
+	case "slack_webhook":
+		return integrations.SchemaToSlackWebhookIntegrationConfiguration(d), nil
+	case "sophos_fw":
+		return integrations.SchemaToSophosFWIntegrationConfiguration(d), nil
+	case "vnc":
+		return integrations.SchemaToVNCIntegrationConfiguration(d), nil
+	case "windows-server-groups":
+		return integrations.SchemaToWindowsServerGroupsIntegrationConfiguration(d), nil
 	default:
 		return nil, fmt.Errorf("invalid adaptive resource type %s", intType)
 	}
@@ -770,9 +1122,6 @@ func ResourceAdaptiveResourceCreate(ctx context.Context, d *schema.ResourceData,
 	if err != nil {
 		return diag.FromErr(err)
 	}
-	if iType == "services" {
-		iType = "servicelist"
-	}
 
 	userTags, err := integrations.TagsFromSchema(d)
 	if err != nil {
@@ -784,19 +1133,108 @@ func ResourceAdaptiveResourceCreate(ctx context.Context, d *schema.ResourceData,
 		return diag.FromErr(err)
 	}
 
-	resp, err := client.CreateResource(ctx, rName, iType, config, userTags, defaultCluster)
+	resp, err := client.CreateResource(ctx, rName, integrations.WireType(iType), config, userTags, defaultCluster)
 	if err != nil {
 		return diag.FromErr(err)
 	}
 
 	d.SetId(resp.ID)
-	ResourceAdaptiveResourceRead(ctx, d, m)
+
+	// Best-effort: capture the server's secret fingerprints so the next refresh
+	// can tell whether a credential changed out-of-band.
+	if r, rerr := client.ReadResource(ctx, resp.ID); rerr == nil && r != nil {
+		if err := d.Set("redacted_digests", r.RedactedDigests); err != nil {
+			return diag.FromErr(err)
+		}
+	}
 	return nil
 }
 
 func ResourceAdaptiveResourceRead(ctx context.Context, d *schema.ResourceData, m interface{}) diag.Diagnostics {
+	client := m.(*adaptive.Client)
+
+	r, err := client.ReadResource(ctx, d.Id())
+	if err != nil {
+		return diag.FromErr(err)
+	}
+	// Deleted out-of-band — drop it from state so Terraform recreates it.
+	if r == nil {
+		return notFoundGone(d)
+	}
+
+	// An import has no prior state to reconcile against, so everything comes
+	// from the server. On refresh we keep what the configuration wrote and
+	// overwrite only what the server actually reports, which is what preserves
+	// the credentials it withholds.
+	isImport := isImportRead(d, "name")
+
+	if err := d.Set("name", r.Name); err != nil {
+		return diag.FromErr(err)
+	}
+	if err := d.Set("type", integrations.ProviderType(r.IntegrationType)); err != nil {
+		return diag.FromErr(err)
+	}
+	if err := setStringSet(d, "tags", r.UserTags); err != nil {
+		return diag.FromErr(err)
+	}
+	if isImport || d.Get("default_cluster").(string) != "" {
+		if err := d.Set("default_cluster", r.DefaultCluster); err != nil {
+			return diag.FromErr(err)
+		}
+	}
+
+	// Secret drift detection: the server withholds secret values but returns an
+	// opaque fingerprint per redacted key. A fingerprint that differs from the
+	// recorded one means the secret changed out-of-band — surface that by
+	// blanking the corresponding argument, so the next plan shows the
+	// configuration's value being re-applied. Keys with no recorded fingerprint
+	// (import, first refresh after upgrade, older servers) are only recorded.
+	cfg := r.Configuration
+	if recorded := stateStringMap(d, "redacted_digests"); len(recorded) > 0 && len(r.RedactedDigests) > 0 {
+		if changed := changedDigestKeys(recorded, r.RedactedDigests); len(changed) > 0 {
+			cfg = make(map[string]interface{}, len(r.Configuration)+len(changed))
+			for k, v := range r.Configuration {
+				cfg[k] = v
+			}
+			for _, k := range changed {
+				cfg[k] = ""
+			}
+		}
+	}
+	if err := integrations.ApplyIntegrationConfig(d, r.IntegrationType, cfg); err != nil {
+		return diag.FromErr(err)
+	}
+	if err := d.Set("redacted_digests", r.RedactedDigests); err != nil {
+		return diag.FromErr(err)
+	}
+
+	if isImport && len(r.RedactedKeys) > 0 {
+		return diag.Diagnostics{{
+			Severity: diag.Warning,
+			Summary:  fmt.Sprintf("resource %q was imported without its credentials", r.Name),
+			Detail: fmt.Sprintf("The server withholds %s. Set the matching arguments in your configuration, "+
+				"or the next update will clear them.", strings.Join(r.RedactedKeys, ", ")),
+		}}
+	}
 	return nil
 }
+
+// changedDigestKeys returns the keys whose fingerprint differs between the
+// recorded and current digest maps. Keys present on only one side are not
+// drift: they show up when a secret argument is added or removed by the
+// configuration (the regular diff covers that), or when digests are recorded
+// for the first time.
+func changedDigestKeys(recorded, current map[string]string) []string {
+	var changed []string
+	for k, cur := range current {
+		if prev, ok := recorded[k]; ok && prev != cur {
+			changed = append(changed, k)
+		}
+	}
+	sort.Strings(changed)
+	return changed
+}
+
 
 func ResourceAdaptiveResourceUpdate(ctx context.Context, d *schema.ResourceData, m interface{}) diag.Diagnostics {
 	client := m.(*adaptive.Client)
@@ -817,10 +1255,6 @@ func ResourceAdaptiveResourceUpdate(ctx context.Context, d *schema.ResourceData,
 		return diag.FromErr(err)
 	}
 
-	if iType == "services" {
-		iType = "servicelist"
-	}
-
 	userTags, err := integrations.TagsFromSchema(d)
 	if err != nil {
 		return diag.FromErr(err)
@@ -831,13 +1265,18 @@ func ResourceAdaptiveResourceUpdate(ctx context.Context, d *schema.ResourceData,
 		return diag.FromErr(err)
 	}
 
-	_, err = client.UpdateResource(ctx, resourceID, iType, config, userTags, defaultCluster)
+	_, err = client.UpdateResource(ctx, resourceID, integrations.WireType(iType), config, userTags, defaultCluster)
 	if err != nil {
 		return diag.FromErr(err)
 	}
 
-	d.Set("last_updated", time.Now())
-	return ResourceAdaptiveResourceRead(ctx, d, m)
+	// Best-effort refresh of the secret fingerprints after the write.
+	if r, rerr := client.ReadResource(ctx, resourceID); rerr == nil && r != nil {
+		if err := d.Set("redacted_digests", r.RedactedDigests); err != nil {
+			return diag.FromErr(err)
+		}
+	}
+	return nil
 }
 
 func ResourceAdaptiveResourceDelete(ctx context.Context, d *schema.ResourceData, m interface{}) diag.Diagnostics {

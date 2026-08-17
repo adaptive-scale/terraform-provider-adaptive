@@ -16,6 +16,10 @@ func ResourceAdaptiveSchedule() *schema.Resource {
 		UpdateContext: ResourceAdaptiveScheduleUpdate,
 		DeleteContext: ResourceAdaptiveScheduleDelete,
 
+		Importer: &schema.ResourceImporter{
+			StateContext: schema.ImportStatePassthroughContext,
+		},
+
 		Schema: map[string]*schema.Schema{
 			"name": {
 				Type:        schema.TypeString,
@@ -223,11 +227,13 @@ func ResourceAdaptiveScheduleRead(ctx context.Context, d *schema.ResourceData, m
 	}
 	// Schedule was deleted out-of-band — drop it from state so Terraform recreates it.
 	if resp == nil {
-		d.SetId("")
-		return nil
+		return notFoundGone(d)
 	}
-	// The read endpoint returns a lossy view (no pattern fields), so we only
-	// refresh attributes it authoritatively reports to avoid spurious diffs.
+	// Older backends answer this route with a lossy view that omits the pattern
+	// and membership fields, and an omitted field is indistinguishable from a
+	// zero one after decoding. So every optional attribute below is refreshed
+	// only when the server actually reported a value: clobbering a configured
+	// window with zeros would produce a diff on every plan.
 	if err := d.Set("name", resp.Name); err != nil {
 		return diag.FromErr(err)
 	}
@@ -256,6 +262,67 @@ func ResourceAdaptiveScheduleRead(ctx context.Context, d *schema.ResourceData, m
 	if resp.ExpiresAt != "" {
 		if err := d.Set("expires_at", resp.ExpiresAt); err != nil {
 			return diag.FromErr(err)
+		}
+	}
+	if resp.Description != "" {
+		if err := d.Set("description", resp.Description); err != nil {
+			return diag.FromErr(err)
+		}
+	}
+
+	// The time-of-day window travels as four independent ints, so it is only
+	// refreshed when the server reported a window at all.
+	if resp.StartHour != 0 || resp.StartMinute != 0 || resp.EndHour != 0 || resp.EndMinute != 0 {
+		for key, v := range map[string]int{
+			"start_hour":   resp.StartHour,
+			"start_minute": resp.StartMinute,
+			"end_hour":     resp.EndHour,
+			"end_minute":   resp.EndMinute,
+		} {
+			if err := d.Set(key, v); err != nil {
+				return diag.FromErr(err)
+			}
+		}
+	}
+	if resp.StartDay != 0 {
+		if err := d.Set("start_day", resp.StartDay); err != nil {
+			return diag.FromErr(err)
+		}
+	}
+	if resp.EndDay != 0 {
+		if err := d.Set("end_day", resp.EndDay); err != nil {
+			return diag.FromErr(err)
+		}
+	}
+	if resp.MaxAccessTime != nil {
+		if err := d.Set("max_access_time", *resp.MaxAccessTime); err != nil {
+			return diag.FromErr(err)
+		}
+	}
+
+	// The backend lowercases weekday names, so only a genuine membership
+	// change — not a spelling difference — is written back.
+	if len(resp.Weekdays) > 0 && !sameStringSetFold(stringList(d, "weekdays"), resp.Weekdays) {
+		if err := d.Set("weekdays", resp.Weekdays); err != nil {
+			return diag.FromErr(err)
+		}
+	}
+	// specific_dates come back normalized to UTC; the configuration's spelling
+	// of the same instants is kept.
+	if len(resp.SpecificDates) > 0 && !sameInstantSet(stringList(d, "specific_dates"), resp.SpecificDates) {
+		if err := d.Set("specific_dates", resp.SpecificDates); err != nil {
+			return diag.FromErr(err)
+		}
+	}
+	for key, server := range map[string][]string{
+		"users":     resp.Users,
+		"teams":     resp.Teams,
+		"endpoints": resp.EndpointNames(),
+	} {
+		if len(server) > 0 && !sameStringSet(stringList(d, key), server) {
+			if err := d.Set(key, server); err != nil {
+				return diag.FromErr(err)
+			}
 		}
 	}
 	return nil
