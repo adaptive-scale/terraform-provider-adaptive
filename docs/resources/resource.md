@@ -43,6 +43,34 @@ The `adaptive_resource` resource allows you to create and manage connections to 
 | `zerotier` | ZeroTier network |
 | `services` | Generic services (URL list) |
 | `customintegration` | Custom integration |
+| `redis` | Redis / Redis Enterprise Cloud |
+| `awselasticcache` | AWS ElastiCache |
+| `oracle` | Oracle Database |
+| `proxysql` | ProxySQL (with admin interface) |
+| `mongodb36` | MongoDB 3.6 |
+| `mongodb-do` | MongoDB on DigitalOcean |
+| `azure_documentdb` | Azure Cosmos DB for MongoDB |
+| `big_query` | Google BigQuery |
+| `kafka` | Apache Kafka |
+| `confluent` | Confluent Cloud |
+| `ldap` | LDAP directory |
+| `rdpldap` | Windows RDP with LDAP authentication |
+| `vnc` | VNC hosts |
+| `windows-server-groups` | Windows server group |
+| `chrome` | Automated browser session |
+| `1password` | 1Password secrets |
+| `heroku` | Heroku |
+| `digitalocean` | DigitalOcean |
+| `slack_webhook` | Slack incoming webhook |
+| `msteams_workflow` | Microsoft Teams workflow webhook |
+| `awscloudwatchlogs` | AWS CloudWatch Logs |
+| `securetunnels` | Adaptive secure tunnels |
+
+The full list of accepted values is validated by the provider; `terraform plan` names them all if you get one wrong.
+
+## Secret Arguments
+
+Credential arguments (`password`, `key`, `api_token`, `client_secret`, `secret_id`, the LDAP and ProxySQL passwords, and the rest) are marked sensitive, so Terraform keeps them out of plan output. The platform never returns them on read either. Instead it reports an opaque fingerprint per withheld argument in the computed `redacted_digests` map, which the provider compares on refresh: if a credential is changed outside Terraform, the matching argument shows up in the next plan as being re-applied from your configuration.
 
 ## Example Usage
 
@@ -536,18 +564,22 @@ resource "adaptive_resource" "postgres_with_secrets" {
 
 ### Optional
 
+- `access_control_group` (String) ElastiCache user-group id. Used by the awselasticcache resource.
+- `access_control_method` (String) ElastiCache access-control method. Used by the awselasticcache resource.
 - `access_key_id` (String) The AWS access key id. Used by AWS resource.
 - `annotations` (String) The annotations configuration in YAML format. Used by Kubernetes resource
 - `api_client_id` (String) The API client ID for a resource. Used by Azure resource.
-- `api_client_secret` (String) The API client secret for a resource. Used by Azure resource.
-- `api_key` (String) The API key
+- `api_client_secret` (String, Sensitive) The API client secret for a resource. Used by Azure resource.
+- `api_key` (String, Sensitive) The API key
+- `api_secret` (String, Sensitive) API secret paired with `api_key`. Used by the confluent resource.
 - `api_server` (String) The url for Kubernetes API server. Used by Kubernetes resource
-- `api_token` (String) The API token for the service
+- `api_token` (String, Sensitive) The API token for the service
 - `app_id` (String) The app ID
-- `app_key` (String) The app key
+- `app_key` (String, Sensitive) The app key
 - `application_id` (String) The Azure application ID. Used by Azure resource.
 - `application_name` (String) The application name for the service
 - `arn` (String) The ARN of the AWS IAM role to assume to access AWS Secrets Manager secret
+- `automation_mode` (String) Browser automation mode. Used by the chrome resource.
 - `aws_access_key_id` (String) Static AWS access key id used to mint RDS IAM tokens. Requires `use_irsa = false`.
 - `aws_arn` (String) The ARN of the AWS IAM role to assume to access AWS Secrets Manager secret
 - `aws_region` (String) The AWS region used to mint RDS IAM tokens. Leave empty to auto-detect from an *.rds.amazonaws.com hostname. Only used when `use_rds_iam` is set.
@@ -555,76 +587,116 @@ resource "adaptive_resource" "postgres_with_secrets" {
 - `aws_role_arn` (String) An IAM role to assume when minting RDS IAM tokens. With IRSA it overrides the service account's eks.amazonaws.com/role-arn annotation. Only used when `use_rds_iam` is set.
 - `aws_secret_access_key` (String, Sensitive) Static AWS secret access key used to mint RDS IAM tokens. Requires `use_irsa = false`.
 - `aws_service_account` (String) Name of a Kubernetes ServiceAccount in the session cluster annotated with eks.amazonaws.com/role-arn; the platform mints RDS IAM tokens on its behalf. Requires `use_irsa = true`.
+- `client_cert` (String, Sensitive) Client certificate presented to the server. Used by the proxysql resource.
+- `client_certificate` (String, Sensitive) Client certificate bundle. Used by the mongodb36 resource.
+- `client_configuration` (String, Sensitive) Full client configuration (properties format). Used by the kafka resource.
 - `client_id` (String) The client ID of a OAuth application. Used by Google, Okta resource
-- `client_secret` (String) The client secret for a resource. Used by Azure, Google, Okta resources.
-- `clientcert` (String) The Snowflake client certificate. Used by Snowflake resource
+- `client_key` (String, Sensitive) Private key for `client_cert`. Used by the proxysql resource.
+- `client_secret` (String, Sensitive) The client secret for a resource. Used by Azure, Google, Okta resources.
+- `clientcert` (String, Sensitive) The Snowflake client certificate. Used by Snowflake resource
 - `cluster_cert` (String) The cluster token for Kubernetes API server. Used by Kubernetes resource
-- `cluster_token` (String) The cluster token for Kubernetes API server. Used by Kubernetes resource
+- `cluster_token` (String, Sensitive) The cluster token for Kubernetes API server. Used by Kubernetes resource
+- `connect_server_url` (String) URL of the 1Password Connect server. Only used when `use_connect_server` is set.
+- `cpu` (String) CPU request for the remote desktop pod. Used by the adaptiveremotedesktop resource.
 - `create_if_not_exists` (Boolean) Whether to create the Keyspaces keyspace if it does not exist
+- `credential_json` (String, Sensitive) Google service-account credentials JSON. Used by the big_query resource.
 - `database_account` (String) The database account
 - `database_name` (String) The name of the database to connect to. Used by CockroachDB, Postgres, Mysql resources
-- `database_password` (String) The database password
+- `database_password` (String, Sensitive) The database password
 - `database_username` (String) The database username
-- `dd_api_key` (String) The Datadog API key
+- `dd_api_key` (String, Sensitive) The Datadog API key
 - `dd_site` (String) The Datadog site to send data to
 - `default_cluster` (String) The default cluster
 - `default_user` (String) Default user for the Services resource
 - `domain` (String) The domain name for a resource. Used by Google, Okta resource
+- `fields` (String) Form fields to fill during automated login. Used by the chrome resource.
 - `host` (String) Hostname of the adaptive resource. Used by CockroachDB, Postgres, Mysql, SSH resources
 - `hostname` (String) Hostname of the adaptive resource. Used by CockroachDB, Postgres, Mysql, SSH resources
 - `hosts` (List of String) List of hosts. Used by Services resource
 - `image` (String) The Docker image to use for the YugabyteDB resource
 - `index` (String) The Elasticsearch index to send data to
-- `key` (String) The SSH key to use when connecting to the instance. If not specified, password authentication will be used. Used by SSH resource
-- `key_file` (String) The content of GCP key file. Used by GCP resource
+- `is_redis_labs` (Boolean) The target is a Redis Enterprise Cloud (Redis Labs) endpoint. Used by the redis resource.
+- `key` (String, Sensitive) The SSH key to use when connecting to the instance. If not specified, password authentication will be used. Used by SSH resource
+- `key_file` (String, Sensitive) The content of GCP key file. Used by GCP resource
+- `ldap_encryption_method` (String) LDAP encryption method (e.g. none, ssl, starttls). Used by the ldap and rdpldap resources.
+- `ldap_hostname` (String) Hostname of the LDAP server. Used by the rdpldap resource.
+- `ldap_port` (String) Port of the LDAP server. Used by the rdpldap resource.
+- `ldap_search_bind_dn` (String) DN used to bind for user searches. Used by the ldap and rdpldap resources.
+- `ldap_search_bind_password` (String, Sensitive) Password for `ldap_search_bind_dn`. Used by the ldap and rdpldap resources.
+- `ldap_user_base_dn` (String) Base DN user searches start from. Used by the ldap and rdpldap resources.
+- `ldap_user_name_attribute` (String) Attribute holding the username. Used by the ldap and rdpldap resources.
+- `log_group_name` (String) CloudWatch log group to write to. Used by the awscloudwatchlogs resource.
+- `log_stream_name` (String) CloudWatch log stream to write to. Used by the awscloudwatchlogs resource.
 - `login_url` (String) The login URL for a resource
+- `machine` (String) Heroku API host. Used by the heroku resource.
+- `memory` (String) Memory request for the remote desktop pod. Used by the adaptiveremotedesktop resource.
 - `namespace` (String) Namespace where pods will be created. Used by Kubernetes resource
 - `network_id` (String) The network ID for ZeroTier network
 - `node_affinity` (String) The node affinity configuration in YAML format. Used by Kubernetes resource
 - `node_selector` (String) The node selector configuration in YAML format. Used by Kubernetes resource
+- `old_version` (Boolean) Target a pre-2.x ProxySQL admin interface. Used by the proxysql resource.
 - `organization_id` (String)
-- `password` (String) Password for the adaptive integration authentication.Used by CockroachDB, Postgres, Mysql, SSH resources
+- `password` (String, Sensitive) Password for the adaptive integration authentication.Used by CockroachDB, Postgres, Mysql, SSH resources
 - `port` (String) Port number of the adaptive resource. Used by CockroachDB, Postgres, Mysql, SSH resources
-- `private_key` (String) The private key for the service
+- `prestart` (String) Commands to run before the browser starts. Used by the chrome resource.
+- `private_key` (String, Sensitive) The private key for the service
 - `project_id` (String) The GCP project ID. Used by GCP resource
 - `protocol` (String) The protocol to use when connecting to the resource
+- `proxysql_admin_password` (String, Sensitive) Password for the ProxySQL admin interface. Used by the proxysql resource.
+- `proxysql_admin_port` (String) Port of the ProxySQL admin interface. Used by the proxysql resource.
+- `proxysql_admin_username` (String) Username for the ProxySQL admin interface. Used by the proxysql resource.
+- `proxysql_hostgroup_id` (String) Hostgroup id queries are routed to. Used by the proxysql resource.
 - `public_key` (String)
 - `region` (String) The AWS region of the AWS Secrets Manager secret
 - `region_name` (String) The AWS region name. Used by AWS resource.
+- `resource` (String) Confluent resource (cluster) identifier. Used by the confluent resource.
 - `role` (String) The Snowflake role name. Used by Snowflake resource
 - `root_cert` (String) The root certificate to use for the CockroachDB instance.
 - `schema` (String) The Snowflake schema name. Used by Snowflake resource
-- `secret_access_key` (String) The AWS secret access key in plaintext. Used by AWS resource.
-- `secret_id` (String) The AWS Secrets Manager secret ID
+- `script` (String) Automation script to run in the browser. Used by the chrome resource.
+- `secret_access_key` (String, Sensitive) The AWS secret access key in plaintext. Used by AWS resource.
+- `secret_id` (String, Sensitive) The AWS Secrets Manager secret ID
+- `service_account` (String) 1Password service account token.
 - `service_account_name` (String) The service account name to use for the YugabyteDB resource
-- `shared_secret` (String) The shared secret for the integration
+- `service_name` (String) Oracle service name. Used by the oracle resource.
+- `shared_secret` (String, Sensitive) The shared secret for the integration
 - `ssl_mode` (String) The SSL mode to use when connecting to the database. Used by CockroachDB, Postgres, Mysql resources
+- `storage` (String) Persistent storage size for the remote desktop pod. Used by the adaptiveremotedesktop resource.
 - `sub_system_name` (String) The sub system name for the service
 - `tags` (List of String) Optional tags
 - `targets` (Block List) List of RDP targets. Used by the adaptive_rdp resource. Each block is one Windows host with its own credentials. Rejected on any other resource type. (see [below for nested schema](#nestedblock--targets))
 - `tenant_id` (String) The Azure tenant ID. Used by Azure resource.
 - `timeouts` (Block, Optional) (see [below for nested schema](#nestedblock--timeouts))
+- `tls_ca_cert` (String) CA certificate used to verify the server. Used by the redis resource.
 - `tls_cert_file` (String) The certificate file to use for the Postgres-like resources.
-- `tls_key_file` (String) The key file to use for the Postgres-like resources.
+- `tls_enabled` (Boolean) Connect over TLS. Used by the redis, awselasticcache and awsdocumentdb_aws_secret_manager resources.
+- `tls_key_file` (String, Sensitive) The key file to use for the Postgres-like resources.
 - `tls_root_cert` (String) The root certificate to use for the Postgres-like resources.
-- `token_id` (String) The token ID for the service
+- `tls_skip_verify` (Boolean) Skip verification of the server certificate. Used by the redis and awselasticcache resources.
+- `token` (String, Sensitive) API token. Used by the heroku resource.
+- `token_id` (String, Sensitive) The token ID for the service
 - `tolerations` (String) The tolerations configuration in YAML format. Used by Kubernetes resource
-- `uri` (String) Connection string to a resource. Used by MongoDB
+- `uri` (String, Sensitive) Connection string to a resource. Used by MongoDB
 - `url` (String) The URL for the service
 - `urls` (String) Comma-separated list of URLs. Used by Services resource
+- `use_connect_server` (Boolean) Reach 1Password through a self-hosted Connect server instead of the service account API.
 - `use_irsa` (Boolean) Mint RDS IAM tokens with `aws_service_account`, or with the platform's own IRSA / instance-profile identity when it is empty. Set to false to use `aws_access_key_id` / `aws_secret_access_key` instead. Only used when `use_rds_iam` is set.
 - `use_proxy` (Boolean) Whether to use proxy
 - `use_rds_iam` (Boolean) Authenticate with short-lived AWS RDS IAM auth tokens instead of a stored password. The database user must be granted rds_iam, the RDS instance must have IAM authentication enabled, and `ssl_mode` cannot be `disable`. Used by Postgres resources.
 - `use_service_account` (Boolean) Whether to use service account for authentication. Used by GCP resource
 - `use_tenant` (Boolean) Whether to use tenant for Azure Active Directory authentication
+- `use_tls` (Boolean) Connect over TLS. Used by the mongodb36 resource.
 - `username` (String) Username for the adaptive resource authentication. Used by CockroachDB, Postgres, Mysql, SSH resources
+- `value` (String) The value to encrypt. Used by the adaptiveencrypt resource.
 - `version` (String) The version
 - `warehouse` (String) The Snowflake warehouse name. Used by Snowflake resource
+- `webhook_url` (String, Sensitive) Incoming webhook URL. Used by the msteams_workflow and slack_webhook resources.
 - `webui_port` (String) The web UI port
 
 ### Read-Only
 
 - `id` (String) The ID of this resource.
+- `redacted_digests` (Map of String) Opaque server fingerprints of the write-only secret arguments, used to detect out-of-band secret changes on refresh. Not comparable across resources or workspaces.
 
 <a id="nestedblock--targets"></a>
 ### Nested Schema for `targets`
@@ -660,3 +732,5 @@ Resources can be imported using the resource ID:
 ```shell
 terraform import adaptive_resource.example resource-id
 ```
+
+Import brings back everything except the credentials the platform withholds, and warns naming the arguments it could not populate. Write those into your configuration before the next `terraform apply` — an update sends the whole configuration, so a credential left empty is cleared on the resource.

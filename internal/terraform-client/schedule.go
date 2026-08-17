@@ -1,7 +1,6 @@
 package client
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -43,6 +42,11 @@ type ScheduleRequest struct {
 
 // ScheduleResponse mirrors handler.TerraformScheduleResponse. On a 400 the
 // backend reuses this shape to report names it could not resolve to IDs.
+//
+// Servers that predate the full read DTO only populate the first block; the
+// pattern and membership fields are absent there and decode to zero values,
+// which is why ResourceAdaptiveScheduleRead only overwrites state from fields
+// the server actually reported.
 type ScheduleResponse struct {
 	ID              string   `json:"id"`
 	Name            string   `json:"name"`
@@ -54,9 +58,33 @@ type ScheduleResponse struct {
 	OperationType   string   `json:"operationType,omitempty"`
 	ExpiresAt       string   `json:"expiresAt,omitempty"`
 
+	Description   string   `json:"description,omitempty"`
+	StartHour     int      `json:"startHour"`
+	StartMinute   int      `json:"startMinute"`
+	EndHour       int      `json:"endHour"`
+	EndMinute     int      `json:"endMinute"`
+	Weekdays      []string `json:"weekdays,omitempty"`
+	StartDay      int      `json:"startDay,omitempty"`
+	EndDay        int      `json:"endDay,omitempty"`
+	SpecificDates []string `json:"specificDates,omitempty"`
+	Users         []string `json:"users,omitempty"`
+	Teams         []string `json:"teams,omitempty"`
+	Endpoints     []string `json:"endpoints,omitempty"`
+	MaxAccessTime *int     `json:"maxAccessTime,omitempty"`
+	UpdatedAt     string   `json:"updatedAt,omitempty"`
+
 	UnresolvedUsers     []string `json:"unresolvedUsers,omitempty"`
 	UnresolvedTeams     []string `json:"unresolvedTeams,omitempty"`
 	UnresolvedEndpoints []string `json:"unresolvedEndpoints,omitempty"`
+}
+
+// EndpointNames returns the endpoints the schedule applies to. The read DTO
+// reports them under "endpoints"; older payloads only carry "mappedEndpoints".
+func (r *ScheduleResponse) EndpointNames() []string {
+	if len(r.Endpoints) > 0 {
+		return r.Endpoints
+	}
+	return r.MappedEndpoints
 }
 
 func (c *Client) scheduleAPI() string {
@@ -82,15 +110,16 @@ func (r *ScheduleResponse) unresolvedErr() error {
 }
 
 func (c *Client) writeSchedule(ctx context.Context, method, url string, req *ScheduleRequest) (*ScheduleResponse, error) {
-	payloadBuf := bytes.NewBuffer([]byte{})
-	if err := json.NewEncoder(payloadBuf).Encode(req); err != nil {
-		return nil, fmt.Errorf("failed to json encode request body. err %w", err)
+	payloadBuf, err := encode(req)
+	if err != nil {
+		return nil, err
 	}
 
 	request, err := http.NewRequest(method, url, payloadBuf)
 	if err != nil {
 		return nil, err
 	}
+	request.Header.Set("Content-Type", "application/json")
 
 	response, err := c.do(ctx, request)
 	if err != nil {
@@ -139,29 +168,7 @@ func (c *Client) UpdateSchedule(ctx context.Context, id string, req *ScheduleReq
 // longer exists so callers can drop it from Terraform state.
 func (c *Client) GetSchedule(ctx context.Context, id string) (*ScheduleResponse, error) {
 	tflog.Debug(ctx, "GetSchedule called", map[string]interface{}{"id": id})
-	request, err := http.NewRequest("GET", fmt.Sprintf("%s/read/%s", c.scheduleAPI(), id), nil)
-	if err != nil {
-		return nil, err
-	}
-
-	response, err := c.do(ctx, request)
-	if err != nil {
-		return nil, err
-	}
-	defer response.Body.Close()
-
-	if response.StatusCode == http.StatusNotFound {
-		return nil, nil
-	}
-	if response.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("error reading schedule %s (status %d)", id, response.StatusCode)
-	}
-
-	var resp ScheduleResponse
-	if err := json.NewDecoder(response.Body).Decode(&resp); err != nil {
-		return nil, fmt.Errorf("failed to decode response body. err %w", err)
-	}
-	return &resp, nil
+	return readTyped[ScheduleResponse](c, ctx, fmt.Sprintf("%s/read/%s", c.scheduleAPI(), id), "schedule", id)
 }
 
 // DeleteSchedule removes a schedule. The backend delete is idempotent, so a

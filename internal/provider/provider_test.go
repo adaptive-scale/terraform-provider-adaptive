@@ -4,6 +4,7 @@
 package provider
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
@@ -32,6 +33,9 @@ func TestTryReadingServiceToken(t *testing.T) {
 		expectedToken string
 		expectedURL   string
 		expectError   bool
+		// errorContains are substrings the error message must carry, so the
+		// operator can tell which deployments were in play.
+		errorContains []string
 	}{
 		{
 			name:          "empty token",
@@ -84,7 +88,7 @@ func TestTryReadingServiceToken(t *testing.T) {
 			expectError:   false,
 		},
 		{
-			name: "deployments config without default",
+			name: "several deployments, the default one wins",
 			inputToken: `{
 				"deployments": {
 					"prod": {
@@ -102,9 +106,48 @@ func TestTryReadingServiceToken(t *testing.T) {
 				}
 			}`,
 			inputURL:      "https://app.adaptive.live",
-			expectedToken: "prod-token-789", // Should return first deployment
+			expectedToken: "prod-token-789",
 			expectedURL:   "https://prod.adaptive.live",
 			expectError:   false,
+		},
+		{
+			name: "single deployment without a default is unambiguous",
+			inputToken: `{
+				"deployments": {
+					"prod": {
+						"url": "https://prod.adaptive.live",
+						"token": "prod-token-789",
+						"name": "production",
+						"default": false
+					}
+				}
+			}`,
+			inputURL:      "https://app.adaptive.live",
+			expectedToken: "prod-token-789",
+			expectedURL:   "https://prod.adaptive.live",
+			expectError:   false,
+		},
+		{
+			name: "several deployments without a default is an error",
+			inputToken: `{
+				"deployments": {
+					"prod": {
+						"url": "https://prod.adaptive.live",
+						"token": "prod-token-789",
+						"name": "production",
+						"default": false
+					},
+					"dev": {
+						"url": "https://dev.adaptive.live",
+						"token": "dev-token-101",
+						"name": "development",
+						"default": false
+					}
+				}
+			}`,
+			inputURL:      "https://app.adaptive.live",
+			expectError:   true,
+			errorContains: []string{"dev", "prod", "default"},
 		},
 	}
 
@@ -114,7 +157,12 @@ func TestTryReadingServiceToken(t *testing.T) {
 
 			if tt.expectError {
 				if err == nil {
-					t.Errorf("expected error but got none")
+					t.Fatalf("expected error but got none")
+				}
+				for _, want := range tt.errorContains {
+					if !strings.Contains(err.Error(), want) {
+						t.Errorf("error %q does not mention %q", err, want)
+					}
 				}
 				return
 			}

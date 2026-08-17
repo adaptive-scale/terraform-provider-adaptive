@@ -222,6 +222,7 @@ resource "adaptive_group" "project" {
 
 - `endpoints` (List of String) List of names of endpoints to add to this group. If empty, the group will be created without endpoints.
 - `members` (List of String) List of emails to add to the team. If empty, the group will be created without members.
+- `slack_channel_id` (String) Slack channel ID access requests for this group are routed to.
 
 ### Read-Only
 
@@ -234,3 +235,5 @@ Groups can be imported using the group ID:
 ```shell
 terraform import adaptive_group.example group-id
 ```
+
+Members and endpoints are read back from the platform on import. Both are compared as sets on refresh, so reordering either list in your configuration does not produce a diff.

@@ -107,6 +107,8 @@ resource "adaptive_group" "db_admins" {
 - [adaptive_authorization](resources/authorization.md) - Define permission policies
 - [adaptive_group](resources/group.md) - Organize users and endpoints
 - [adaptive_script](resources/script.md) - Execute commands on endpoints
+- [adaptive_schedule](resources/schedule.md) - Auto-approve or auto-reject access during recurring windows
+- [adaptive_dataprotection](resources/dataprotection.md) - Mask columns of a database resource for session users
 
 ## Authentication Methods
 
@@ -116,22 +118,21 @@ The provider supports multiple authentication methods in order of precedence:
 2. **Environment variable** - `ADAPTIVE_SVC_TOKEN`
 3. **Adaptive CLI** - Uses token from `adaptive login` if available
 
+When the CLI config holds several deployments, the provider uses the one marked `"default": true`. If none is marked and there is more than one, it fails rather than guessing which workspace to write to — mark a default, or set `ADAPTIVE_SVC_TOKEN` and `ADAPTIVE_URL`.
+
 ## Supported Integrations
 
-The Adaptive provider supports 50+ integration types including:
+The Adaptive provider supports 80+ integration types including:
 
 | Category | Integrations |
 |----------|-------------|
 | **Databases** | PostgreSQL, MySQL, MongoDB, CockroachDB, ClickHouse, Snowflake, SQL Server, YugabyteDB |
 | **Cloud Platforms** | AWS, Azure, GCP |
 | **Container Orchestration** | Kubernetes |
-| **Identity Providers** | Okta, Azure Active Directory, OneLogin, JumpCloud, Google Workspace |
-| **Monitoring & Logging** | Datadog, Splunk, Elasticsearch, Coralogix, Syslog |
-| **Collaboration** | Microsoft Teams |
+| **Identity Providers** | Okta, OneLogin, JumpCloud, Google |
+| **Monitoring** | Datadog, Splunk, Elasticsearch, Coralogix |
 | **Message Queues** | RabbitMQ |
-| **Infrastructure** | SSH, Windows (RDP), ZeroTier |
-| **Network Security** | Cisco NGFW, Fortinet, Palo Alto |
-| **Custom** | Custom Integrations, Services |
+| **Network & Security** | SSH, ZeroTier, Cisco NGFW, Fortinet, Palo Alto |
 
 See the [examples directory](https://github.com/adaptive-scale/terraform-provider-adaptive/tree/master/examples) for integration-specific configurations.
 

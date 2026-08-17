@@ -193,12 +193,18 @@ resource "adaptive_script" "init" {
 
 ### Required
 
-- `command` (String)
-- `endpoint` (String)
-- `name` (String)
+- `command` (String, Sensitive) The command the script runs. Write-only: the Adaptive API never returns script bodies, so this value cannot be read back and an import leaves it empty.
+- `endpoint` (String) The endpoint the script is attached to. Cannot be changed after creation.
+- `name` (String) The name of the script.
+
+### Optional
+
+- `description` (String) An optional description of the script.
+- `parameter_descriptions` (Map of String) Descriptions for the script's parameters, keyed by parameter name.
 
 ### Read-Only
 
+- `command_digest` (String) Opaque server fingerprint of the script body, used to detect out-of-band changes to the command on refresh.
 - `id` (String) The ID of this resource.
 
 ## Import
@@ -208,3 +214,5 @@ Scripts can be imported using the script ID:
 ```shell
 terraform import adaptive_script.example script-id
 ```
+
+The Adaptive API does not return script bodies, so `command` comes back empty on import and has to be written into your configuration before the first apply. For the same reason a command edited outside Terraform cannot be read back; the provider instead records the server's fingerprint of the body and plans a rewrite once it stops matching.

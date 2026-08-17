@@ -1,0 +1,106 @@
+---
+page_title: "adaptive_dataprotection Resource - terraform-provider-adaptive"
+subcategory: ""
+description: |-
+  Manages an Adaptive data protection policy, which masks columns of a database resource for session users.
+---
+
+# adaptive_dataprotection (Resource)
+
+The `adaptive_dataprotection` resource defines a column-level masking policy for a database resource. Adaptive generates masked views over the tables you list and an authorization named `masked_<resource>` that serves them; attach that authorization to an endpoint and its users see the masked data instead of the raw tables.
+
+A resource can only carry one policy. Creating a policy for a resource that already has one — for example one configured in the UI — adopts and overwrites it rather than failing, so `terraform apply` is authoritative from that point on.
+
+## Example Usage
+
+### Masking Customer PII
+
+```terraform
+resource "adaptive_resource" "app_db" {
+  name          = "production-postgres"
+  type          = "postgres"
+  host          = "postgres.example.com"
+  port          = "5432"
+  username      = "admin"
+  password      = var.db_password
+  database_name = "myapp"
+}
+
+resource "adaptive_dataprotection" "app_db" {
+  resource = adaptive_resource.app_db.name
+
+  masks {
+    database_name = "myapp"
+
+    tables {
+      table_name = "customers"
+      schema     = "public"
+      masked     = true
+
+      masked_columns {
+        column_name  = "email"
+        masking_type = "email"
+      }
+      masked_columns {
+        column_name  = "ssn"
+        masking_type = "ssn"
+      }
+      masked_columns {
+        column_name  = "card_number"
+        masking_type = "cc"
+      }
+    }
+  }
+}
+
+# Serve masked sessions by attaching the generated authorization.
+resource "adaptive_endpoint" "support" {
+  name          = "app-db-support"
+  resource      = adaptive_resource.app_db.name
+  authorization = adaptive_dataprotection.app_db.authorization_name
+  users         = ["support@example.com"]
+}
+```
+
+### Unscoped Masking
+
+```terraform
+resource "adaptive_dataprotection" "warehouse" {
+  resource = adaptive_resource.warehouse.name
+  scoped   = false # users see everything except the raw masked tables
+
+  masks {
+    database_name = "analytics"
+
+    tables {
+      table_name = "events"
+      masked     = true
+
+      masked_columns {
+        column_name  = "user_email"
+        masking_type = "hash"
+      }
+    }
+  }
+}
+```
+
+With `scoped = true` (the default) session users only see the generated masked views. With `scoped = false` they see the rest of the database as well, minus the raw masked tables — that mode needs the resource's metadata to have been synced.
+
+## Masking Types
+
+`masking_type` accepts `name`, `email`, `ssn`, `phone`, `cc`, `aadhar`, `first4`, `last4`, `redact`, `hash`, and `disable`. The format-aware types keep the shape of the value (a masked email still looks like an email); `redact` blanks it, `hash` replaces it with a stable digest, and `disable` leaves the column readable while keeping it listed in the policy.
+
+{{ .SchemaMarkdown | trimspace }}
+
+## Destroying
+
+Destroying the policy turns masking off — the platform applies its documented "off" shape rather than deleting anything. The generated `masked_<resource>` authorization and any masked views that were already provisioned stay in place, so remove them separately if you no longer want them.
+
+## Import
+
+Data protection policies can be imported using the id of the resource they protect:
+
+```shell
+terraform import adaptive_dataprotection.example resource-id
+```

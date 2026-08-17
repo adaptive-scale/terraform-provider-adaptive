@@ -43,6 +43,34 @@ The `adaptive_resource` resource allows you to create and manage connections to 
 | `zerotier` | ZeroTier network |
 | `services` | Generic services (URL list) |
 | `customintegration` | Custom integration |
+| `redis` | Redis / Redis Enterprise Cloud |
+| `awselasticcache` | AWS ElastiCache |
+| `oracle` | Oracle Database |
+| `proxysql` | ProxySQL (with admin interface) |
+| `mongodb36` | MongoDB 3.6 |
+| `mongodb-do` | MongoDB on DigitalOcean |
+| `azure_documentdb` | Azure Cosmos DB for MongoDB |
+| `big_query` | Google BigQuery |
+| `kafka` | Apache Kafka |
+| `confluent` | Confluent Cloud |
+| `ldap` | LDAP directory |
+| `rdpldap` | Windows RDP with LDAP authentication |
+| `vnc` | VNC hosts |
+| `windows-server-groups` | Windows server group |
+| `chrome` | Automated browser session |
+| `1password` | 1Password secrets |
+| `heroku` | Heroku |
+| `digitalocean` | DigitalOcean |
+| `slack_webhook` | Slack incoming webhook |
+| `msteams_workflow` | Microsoft Teams workflow webhook |
+| `awscloudwatchlogs` | AWS CloudWatch Logs |
+| `securetunnels` | Adaptive secure tunnels |
+
+The full list of accepted values is validated by the provider; `terraform plan` names them all if you get one wrong.
+
+## Secret Arguments
+
+Credential arguments (`password`, `key`, `api_token`, `client_secret`, `secret_id`, the LDAP and ProxySQL passwords, and the rest) are marked sensitive, so Terraform keeps them out of plan output. The platform never returns them on read either. Instead it reports an opaque fingerprint per withheld argument in the computed `redacted_digests` map, which the provider compares on refresh: if a credential is changed outside Terraform, the matching argument shows up in the next plan as being re-applied from your configuration.
 
 ## Example Usage
 
@@ -535,3 +563,5 @@ Resources can be imported using the resource ID:
 ```shell
 terraform import adaptive_resource.example resource-id
 ```
+
+Import brings back everything except the credentials the platform withholds, and warns naming the arguments it could not populate. Write those into your configuration before the next `terraform apply` — an update sends the whole configuration, so a credential left empty is cleared on the resource.

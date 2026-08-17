@@ -66,6 +66,34 @@ func TagsFromSchema(d *schema.ResourceData) ([]string, error) {
 	return userTags, nil
 }
 
+// attrString reads an attribute as a string. A key the resource schema does not
+// declare, or one holding another type, reads as "" instead of panicking — the
+// integration builders share one schema and each reads only its own subset.
+func attrString(d *schema.ResourceData, key string) string {
+	v, _ := d.Get(key).(string)
+	return v
+}
+
+func attrBool(d *schema.ResourceData, key string) bool {
+	v, _ := d.Get(key).(bool)
+	return v
+}
+
+// attrStringList reads a TypeList of strings, skipping entries of other types.
+func attrStringList(d *schema.ResourceData, key string) []string {
+	raw, ok := d.Get(key).([]interface{})
+	if !ok {
+		return nil
+	}
+	out := make([]string, 0, len(raw))
+	for _, item := range raw {
+		if s, ok := item.(string); ok {
+			out = append(out, s)
+		}
+	}
+	return out
+}
+
 func DefaultClusterFromSchema(d *schema.ResourceData) (string, error) {
 	defaultClusterAttr, ok := d.GetOk("default_cluster")
 	if !ok {
