@@ -141,6 +141,9 @@ func ResourceAdaptiveAuthorizationRead(ctx context.Context, d *schema.ResourceDa
 	if resp == nil {
 		return notFoundGone(d)
 	}
+	if missingOnImport(d, isImportRead(d, "name"), resp.Name) {
+		return nil
+	}
 
 	if err := d.Set("name", resp.Name); err != nil {
 		return diag.FromErr(err)

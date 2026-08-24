@@ -22,6 +22,27 @@ func notFoundGone(d *schema.ResourceData) diag.Diagnostics {
 	return nil
 }
 
+// missingOnImport handles a read that answered 200 but carried nothing that
+// identifies the object — the shape a server would return for an unknown id if
+// it answered with an empty body instead of 404.
+//
+// On refresh this is left alone: state already holds the configuration's values,
+// and dropping a resource on a malformed response would be worse than the stale
+// read. On import there is no prior state, so adopting an identity-less response
+// writes an object of empty attributes into state under the id the user typed,
+// and every subsequent plan diffs the configuration against it. Clearing the id
+// instead is what makes Terraform report "Cannot import non-existent remote
+// object", which is the outcome the caller needs.
+//
+// Reports whether it acted, so callers return immediately when it did.
+func missingOnImport(d *schema.ResourceData, isImport bool, serverIdentity string) bool {
+	if isImport && serverIdentity == "" {
+		d.SetId("")
+		return true
+	}
+	return false
+}
+
 // isImportRead reports whether a Read is running against imported state.
 // ImportStatePassthroughContext seeds state with nothing but the ID, so a
 // required attribute reading back empty means nothing has been refreshed yet.

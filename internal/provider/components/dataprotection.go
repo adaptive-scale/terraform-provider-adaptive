@@ -262,7 +262,9 @@ func ResourceAdaptiveDataProtectionRead(ctx context.Context, d *schema.ResourceD
 	}
 	// Deleted out-of-band — drop it from state so Terraform recreates it.
 	if r == nil {
-		d.SetId("")
+		return notFoundGone(d)
+	}
+	if missingOnImport(d, isImportRead(d, "resource"), r.ResourceName) {
 		return nil
 	}
 

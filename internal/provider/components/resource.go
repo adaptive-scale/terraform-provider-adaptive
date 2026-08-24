@@ -1167,6 +1167,9 @@ func ResourceAdaptiveResourceRead(ctx context.Context, d *schema.ResourceData, m
 	// overwrite only what the server actually reports, which is what preserves
 	// the credentials it withholds.
 	isImport := isImportRead(d, "name")
+	if missingOnImport(d, isImport, r.Name) {
+		return nil
+	}
 
 	if err := d.Set("name", r.Name); err != nil {
 		return diag.FromErr(err)
@@ -1234,7 +1237,6 @@ func changedDigestKeys(recorded, current map[string]string) []string {
 	sort.Strings(changed)
 	return changed
 }
-
 
 func ResourceAdaptiveResourceUpdate(ctx context.Context, d *schema.ResourceData, m interface{}) diag.Diagnostics {
 	client := m.(*adaptive.Client)

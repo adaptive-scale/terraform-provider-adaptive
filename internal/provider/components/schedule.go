@@ -229,6 +229,9 @@ func ResourceAdaptiveScheduleRead(ctx context.Context, d *schema.ResourceData, m
 	if resp == nil {
 		return notFoundGone(d)
 	}
+	if missingOnImport(d, isImportRead(d, "name"), resp.Name) {
+		return nil
+	}
 	// Older backends answer this route with a lossy view that omits the pattern
 	// and membership fields, and an omitted field is indistinguishable from a
 	// zero one after decoding. So every optional attribute below is refreshed
