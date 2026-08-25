@@ -24,7 +24,15 @@ func ApplyIntegrationConfig(d *schema.ResourceData, integrationType string, cfg 
 		return nil
 	}
 	a := &configApplier{d: d, cfg: cfg}
+	applyIntegrationMapping(a, integrationType)
+	return a.err
+}
 
+// applyIntegrationMapping is the mapping itself, one arm per integration type.
+// Split from ApplyIntegrationConfig so AttrForConfigKey can run the exact same
+// switch in collect mode; the two can never disagree about which attribute a
+// config key feeds.
+func applyIntegrationMapping(a *configApplier, integrationType string) {
 	switch ProviderType(integrationType) {
 	case "aws":
 		a.str("aws_region_name", "region_name")
@@ -423,31 +431,76 @@ func ApplyIntegrationConfig(d *schema.ResourceData, integrationType string, cfg 
 		a.str("password", "password")
 		a.str("port", "port")
 	}
-
-	return a.err
 }
 
 // configApplier writes configuration values onto resource attributes, keeping
 // the first failure so a long mapping reads as a straight list of assignments.
+//
+// With collect non-nil it records the (config key -> attribute) pairs instead of
+// writing anything. That is how AttrForConfigKey answers which attribute a
+// server config key feeds without a second table: the mapping switch below is
+// long enough (~82 integration types) that a parallel copy would rot the first
+// time someone edited only one of the two.
 type configApplier struct {
-	d   *schema.ResourceData
-	cfg map[string]interface{}
-	err error
+	d       *schema.ResourceData
+	cfg     map[string]interface{}
+	err     error
+	collect map[string]string
 }
 
 func (a *configApplier) set(attr string, value interface{}) {
+	if a.collect != nil {
+		return
+	}
 	if err := a.d.Set(attr, value); err != nil && a.err == nil {
 		a.err = fmt.Errorf("could not set %q: %w", attr, err)
 	}
 }
 
+// record notes a mapping in collect mode. Called from the typed helpers, which
+// are the only places that know both halves of the pair.
+func (a *configApplier) record(cfgKey, attr string) bool {
+	if a.collect == nil {
+		return false
+	}
+	a.collect[cfgKey] = attr
+	return true
+}
+
+// AttrForConfigKey resolves the schema attribute a server config key feeds, by
+// running the real mapping switch in collect mode.
+//
+// Reports ok=false for a key the type does not map, and for the dotted or
+// indexed paths the server produces for nested secrets ("targets[0].password") —
+// those name no single attribute, so the caller reports them by name instead.
+func AttrForConfigKey(integrationType, cfgKey string) (attr string, ok bool) {
+	if cfgKey == "" {
+		return "", false
+	}
+	a := &configApplier{
+		// A non-empty cfg is required: ApplyIntegrationConfig returns early on
+		// an empty one, and the helpers only fire for keys that are present.
+		cfg:     map[string]interface{}{cfgKey: ""},
+		collect: map[string]string{},
+	}
+	applyIntegrationMapping(a, integrationType)
+	attr, ok = a.collect[cfgKey]
+	return attr, ok
+}
+
 func (a *configApplier) str(cfgKey, attr string) {
+	if a.record(cfgKey, attr) {
+		return
+	}
 	if s, ok := GetStr(a.cfg, cfgKey); ok {
 		a.set(attr, s)
 	}
 }
 
 func (a *configApplier) boolean(cfgKey, attr string) {
+	if a.record(cfgKey, attr) {
+		return
+	}
 	if b, ok := GetBool(a.cfg, cfgKey); ok {
 		a.set(attr, b)
 	}
@@ -457,6 +510,9 @@ func (a *configApplier) boolean(cfgKey, attr string) {
 // list the configuration wrote. Ordering is preserved, so a list that did not
 // drift compares equal.
 func (a *configApplier) hosts(cfgKey, attr string) {
+	if a.record(cfgKey, attr) {
+		return
+	}
 	s, ok := GetStr(a.cfg, cfgKey)
 	if !ok {
 		return
@@ -473,6 +529,9 @@ func (a *configApplier) hosts(cfgKey, attr string) {
 // rdpTargets parses the marshalled target list adaptive_rdp stores as a single
 // string back into the blocks the configuration declares.
 func (a *configApplier) rdpTargets(cfgKey, attr string) {
+	if a.record(cfgKey, attr) {
+		return
+	}
 	s, ok := GetStr(a.cfg, cfgKey)
 	if !ok {
 		return

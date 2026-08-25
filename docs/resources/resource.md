@@ -70,7 +70,14 @@ The full list of accepted values is validated by the provider; `terraform plan` 
 
 ## Secret Arguments
 
-Credential arguments (`password`, `key`, `api_token`, `client_secret`, `secret_id`, the LDAP and ProxySQL passwords, and the rest) are marked sensitive, so Terraform keeps them out of plan output. The platform never returns them on read either. Instead it reports an opaque fingerprint per withheld argument in the computed `redacted_digests` map, which the provider compares on refresh: if a credential is changed outside Terraform, the matching argument shows up in the next plan as being re-applied from your configuration.
+Credential arguments (`password`, `key`, `api_token`, `client_secret`, `secret_id`, the LDAP and ProxySQL passwords, and the rest) are marked sensitive, so Terraform keeps them out of plan output. The platform never returns them on read either. Instead it reports an opaque fingerprint per withheld argument. The provider records those fingerprints as of its last write in the computed `applied_digests` map and compares them on refresh, so a credential changed outside Terraform shows up in the next plan on the argument it belongs to — never as a value, only as the argument name.
+
+What the plan then does depends on your configuration, because the platform stores the configuration as a single blob and every apply replaces it whole:
+
+- the argument is in your configuration — the plan re-applies your value.
+- it is not — the plan clears it, because your configuration is the source of truth for the whole resource. This has always been what an apply does to an argument you do not set; it is now visible beforehand instead of happening silently on whatever unrelated apply ran first.
+
+A secret *added* outside Terraform is reported the same way. Nothing is reported on the first refresh after an import or a provider upgrade: with no recorded fingerprints there is no baseline, so they are recorded and compared from the next refresh on.
 
 ## Example Usage
 
@@ -695,8 +702,8 @@ resource "adaptive_resource" "postgres_with_secrets" {
 
 ### Read-Only
 
+- `applied_digests` (Map of String) Opaque server fingerprints of the write-only secret arguments as of the last write by this provider, used to detect out-of-band secret changes on refresh. Not comparable across resources or workspaces.
 - `id` (String) The ID of this resource.
-- `redacted_digests` (Map of String) Opaque server fingerprints of the write-only secret arguments, used to detect out-of-band secret changes on refresh. Not comparable across resources or workspaces.
 
 <a id="nestedblock--targets"></a>
 ### Nested Schema for `targets`
