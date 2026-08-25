@@ -570,6 +570,9 @@ func ResourceAdaptiveSessionRead(ctx context.Context, d *schema.ResourceData, m 
 	// configuration actually set: adopting a server-side default into an unset
 	// optional would create a perpetual diff.
 	isImport := isImportRead(d, "name")
+	if missingOnImport(d, isImport, r.Name) {
+		return nil
+	}
 
 	if err := d.Set("name", r.Name); err != nil {
 		return diag.FromErr(err)

@@ -125,6 +125,9 @@ func ResourceAdaptiveTeamRead(ctx context.Context, d *schema.ResourceData, m int
 		return notFoundGone(d)
 	}
 	isImport := isImportRead(d, "name")
+	if missingOnImport(d, isImport, team.Name) {
+		return nil
+	}
 
 	if err := d.Set("name", team.Name); err != nil {
 		return diag.FromErr(err)
