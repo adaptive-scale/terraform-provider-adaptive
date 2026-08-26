@@ -213,6 +213,7 @@ func ResourceAdaptiveResource() *schema.Resource {
 			"root_cert": {
 				Type:        schema.TypeString,
 				Optional:    true,
+				Sensitive:   true,
 				Description: "The root certificate to use for the CockroachDB instance.",
 			},
 			"ssl_mode": {
@@ -257,6 +258,7 @@ func ResourceAdaptiveResource() *schema.Resource {
 			"aws_access_key_id": {
 				Type:        schema.TypeString,
 				Optional:    true,
+				Sensitive:   true,
 				Description: "Static AWS access key id used to mint RDS IAM tokens. Requires `use_irsa = false`.",
 			},
 			"aws_secret_access_key": {
@@ -284,6 +286,7 @@ func ResourceAdaptiveResource() *schema.Resource {
 			"cluster_cert": {
 				Type:        schema.TypeString,
 				Optional:    true,
+				Sensitive:   true,
 				Description: "The cluster token for Kubernetes API server. Used by Kubernetes resource",
 			},
 			"tolerations": {
@@ -314,6 +317,7 @@ func ResourceAdaptiveResource() *schema.Resource {
 			"access_key_id": {
 				Type:        schema.TypeString,
 				Optional:    true,
+				Sensitive:   true,
 				Description: "The AWS access key id. Used by AWS resource.",
 			},
 			"secret_access_key": {
@@ -429,7 +433,8 @@ func ResourceAdaptiveResource() *schema.Resource {
 			"public_key": {
 				Type:        schema.TypeString,
 				Optional:    true,
-				Description: "",
+				Sensitive:   true,
+				Description: "Public key of the Atlas API key pair. Withheld by the server on read.",
 			},
 			"organization_id": {
 				Type:        schema.TypeString,
@@ -545,11 +550,13 @@ func ResourceAdaptiveResource() *schema.Resource {
 			"tls_root_cert": {
 				Type:        schema.TypeString,
 				Optional:    true,
+				Sensitive:   true,
 				Description: "The root certificate to use for the Postgres-like resources.",
 			},
 			"tls_cert_file": {
 				Type:        schema.TypeString,
 				Optional:    true,
+				Sensitive:   true,
 				Description: "The certificate file to use for the Postgres-like resources.",
 			},
 			"tls_key_file": {
@@ -842,12 +849,19 @@ func ResourceAdaptiveResource() *schema.Resource {
 				Sensitive:   true,
 				Description: "API secret paired with `api_key`. Used by the confluent resource.",
 			},
-			"redacted_digests": {
+			// Deliberately NOT refreshed by Read: these are the fingerprints as
+			// of the last write, and they are the baseline the live ones are
+			// compared against. Overwriting them on refresh (as the old
+			// redacted_digests field did) destroys the evidence the comparison
+			// just produced, which is why out-of-band secret changes never
+			// reached the plan.
+			"applied_digests": {
 				Type:     schema.TypeMap,
 				Computed: true,
 				Elem:     &schema.Schema{Type: schema.TypeString},
-				Description: "Opaque server fingerprints of the write-only secret arguments, used to detect " +
-					"out-of-band secret changes on refresh. Not comparable across resources or workspaces.",
+				Description: "Opaque server fingerprints of the write-only secret arguments as of the last " +
+					"write by this provider, used to detect out-of-band secret changes on refresh. " +
+					"Not comparable across resources or workspaces.",
 			},
 			"targets": {
 				Type:        schema.TypeList,
@@ -1143,7 +1157,7 @@ func ResourceAdaptiveResourceCreate(ctx context.Context, d *schema.ResourceData,
 	// Best-effort: capture the server's secret fingerprints so the next refresh
 	// can tell whether a credential changed out-of-band.
 	if r, rerr := client.ReadResource(ctx, resp.ID); rerr == nil && r != nil {
-		if err := d.Set("redacted_digests", r.RedactedDigests); err != nil {
+		if err := d.Set("applied_digests", r.RedactedDigests); err != nil {
 			return diag.FromErr(err)
 		}
 	}
@@ -1151,6 +1165,7 @@ func ResourceAdaptiveResourceCreate(ctx context.Context, d *schema.ResourceData,
 }
 
 func ResourceAdaptiveResourceRead(ctx context.Context, d *schema.ResourceData, m interface{}) diag.Diagnostics {
+	var diags diag.Diagnostics
 	client := m.(*adaptive.Client)
 
 	r, err := client.ReadResource(ctx, d.Id())
@@ -1186,56 +1201,128 @@ func ResourceAdaptiveResourceRead(ctx context.Context, d *schema.ResourceData, m
 		}
 	}
 
-	// Secret drift detection: the server withholds secret values but returns an
-	// opaque fingerprint per redacted key. A fingerprint that differs from the
-	// recorded one means the secret changed out-of-band — surface that by
-	// blanking the corresponding argument, so the next plan shows the
-	// configuration's value being re-applied. Keys with no recorded fingerprint
-	// (import, first refresh after upgrade, older servers) are only recorded.
-	cfg := r.Configuration
-	if recorded := stateStringMap(d, "redacted_digests"); len(recorded) > 0 && len(r.RedactedDigests) > 0 {
-		if changed := changedDigestKeys(recorded, r.RedactedDigests); len(changed) > 0 {
-			cfg = make(map[string]interface{}, len(r.Configuration)+len(changed))
-			for k, v := range r.Configuration {
-				cfg[k] = v
-			}
-			for _, k := range changed {
-				cfg[k] = ""
-			}
-		}
-	}
-	if err := integrations.ApplyIntegrationConfig(d, r.IntegrationType, cfg); err != nil {
-		return diag.FromErr(err)
-	}
-	if err := d.Set("redacted_digests", r.RedactedDigests); err != nil {
+	if err := integrations.ApplyIntegrationConfig(d, r.IntegrationType, r.Configuration); err != nil {
 		return diag.FromErr(err)
 	}
 
+	// Secret drift: the server withholds secret values but returns an opaque
+	// fingerprint per redacted key. A fingerprint that differs from the one
+	// recorded at our last write means the value changed out-of-band.
+	//
+	// The signal is the fingerprint written onto the argument it belongs to.
+	// Marking the argument rather than blanking it is what makes the drift reach
+	// the plan at all: an argument absent from the configuration reads back as
+	// "" either way, so blanking produced no diff and a secret the configuration
+	// does not manage drifted silently. The argument is Sensitive, so the marker
+	// renders as (sensitive value) and no value is disclosed — the attribute name
+	// carries the information.
+	//
+	// What the marker produces:
+	//   - configuration sets it -> ~ password, and apply re-applies its value
+	//   - it does not           -> ~ password -> "", and apply clears it
+	//                              server-side, because the configuration owns
+	//                              the whole config blob
+	//
+	// Nothing writes state back to the server (Create and Update build the blob
+	// from the configuration), so a fingerprint sitting in a secret argument can
+	// never be applied as one.
+	//
+	// An empty recorded map (import, a resource predating this field, an older
+	// server) is seeded by the d.Set below rather than reported: with no
+	// baseline, every key would look drifted.
+	// Two different reasons a drifted key cannot be marked, kept apart because
+	// they mean different things to whoever reads the warning.
+	var unmapped []string  // names no single attribute at all
+	var notSecret []string // names one, but the schema does not call it sensitive
+	if recorded := stateStringMap(d, "applied_digests"); len(recorded) > 0 && len(r.RedactedDigests) > 0 {
+		for _, k := range driftedDigestKeys(recorded, r.RedactedDigests) {
+			attr, ok := integrations.AttrForConfigKey(r.IntegrationType, k)
+			switch {
+			case !ok:
+				unmapped = append(unmapped, k)
+			case !isSecretStringAttr(attr):
+				// Writing a fingerprint into an attribute the schema shows in
+				// clear would render as the value turning into hex. The server
+				// withholding a key this provider does not treat as sensitive is
+				// a provider bug, so say so rather than blaming the key's shape.
+				notSecret = append(notSecret, fmt.Sprintf("%s (attribute %q)", k, attr))
+			default:
+				if err := d.Set(attr, r.RedactedDigests[k]); err != nil {
+					return diag.FromErr(err)
+				}
+			}
+		}
+	}
+
+	if err := d.Set("applied_digests", r.RedactedDigests); err != nil {
+		return diag.FromErr(err)
+	}
+
+	if len(unmapped) > 0 {
+		// The dotted and indexed paths the server emits for nested secrets, and
+		// the config keys that mirror another (ssh writes the key material to
+		// both sshKey and password, and the read arm reconciles via sshKey).
+		// Reporting them by name keeps the drift visible rather than dropping it.
+		diags = append(diags, diag.Diagnostic{
+			Severity: diag.Warning,
+			Summary:  fmt.Sprintf("resource %q: a secret changed outside this configuration", r.Name),
+			Detail: fmt.Sprintf("The value behind %s no longer matches what this provider last wrote, "+
+				"but it maps to no single attribute and so cannot be shown as a plan diff.",
+				strings.Join(unmapped, ", ")),
+		})
+	}
+	if len(notSecret) > 0 {
+		diags = append(diags, diag.Diagnostic{
+			Severity: diag.Warning,
+			Summary:  fmt.Sprintf("resource %q: a secret changed outside this configuration", r.Name),
+			Detail: fmt.Sprintf("The value behind %s no longer matches what this provider last wrote, "+
+				"but that attribute is not declared sensitive, so the change cannot be shown "+
+				"without printing a fingerprint in clear. This is a provider bug — please report it.",
+				strings.Join(notSecret, ", ")),
+		})
+	}
+
 	if isImport && len(r.RedactedKeys) > 0 {
-		return diag.Diagnostics{{
+		diags = append(diags, diag.Diagnostic{
 			Severity: diag.Warning,
 			Summary:  fmt.Sprintf("resource %q was imported without its credentials", r.Name),
 			Detail: fmt.Sprintf("The server withholds %s. Set the matching arguments in your configuration, "+
 				"or the next update will clear them.", strings.Join(r.RedactedKeys, ", ")),
-		}}
+		})
 	}
-	return nil
+	return diags
 }
 
-// changedDigestKeys returns the keys whose fingerprint differs between the
-// recorded and current digest maps. Keys present on only one side are not
-// drift: they show up when a secret argument is added or removed by the
-// configuration (the regular diff covers that), or when digests are recorded
-// for the first time.
-func changedDigestKeys(recorded, current map[string]string) []string {
-	var changed []string
+// isSecretStringAttr reports whether an attribute can carry a drift marker: a
+// sensitive string. A non-string attribute (the adaptive_rdp targets list) has
+// nowhere to put a fingerprint, and marking a non-sensitive one would print it.
+func isSecretStringAttr(attr string) bool {
+	sch, ok := ResourceAdaptiveResource().Schema[attr]
+	return ok && sch.Type == schema.TypeString && sch.Sensitive
+}
+
+// driftedDigestKeys returns the keys whose fingerprint no longer matches the one
+// recorded at the last write — either because the value behind it changed, or
+// because the server now holds a secret where it recorded none.
+//
+// A key that only appeared since the last write used to be dismissed as "not
+// drift". It is drift: someone setting a password in the UI where there was none
+// is exactly the change an operator needs to see. The wholesale empty-map guard
+// at the call site is what keeps an import or a first refresh after upgrade from
+// reporting every key as new.
+//
+// Keys that disappeared are not reported: the secret is gone, there is nothing
+// to reconcile, and the ordinary diff already covers a configuration removing
+// one.
+func driftedDigestKeys(applied, current map[string]string) []string {
+	var drifted []string
 	for k, cur := range current {
-		if prev, ok := recorded[k]; ok && prev != cur {
-			changed = append(changed, k)
+		if prev, ok := applied[k]; !ok || prev != cur {
+			drifted = append(drifted, k)
 		}
 	}
-	sort.Strings(changed)
-	return changed
+	sort.Strings(drifted)
+	return drifted
 }
 
 func ResourceAdaptiveResourceUpdate(ctx context.Context, d *schema.ResourceData, m interface{}) diag.Diagnostics {
@@ -1274,7 +1361,7 @@ func ResourceAdaptiveResourceUpdate(ctx context.Context, d *schema.ResourceData,
 
 	// Best-effort refresh of the secret fingerprints after the write.
 	if r, rerr := client.ReadResource(ctx, resourceID); rerr == nil && r != nil {
-		if err := d.Set("redacted_digests", r.RedactedDigests); err != nil {
+		if err := d.Set("applied_digests", r.RedactedDigests); err != nil {
 			return diag.FromErr(err)
 		}
 	}

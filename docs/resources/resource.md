@@ -70,7 +70,14 @@ The full list of accepted values is validated by the provider; `terraform plan` 
 
 ## Secret Arguments
 
-Credential arguments (`password`, `key`, `api_token`, `client_secret`, `secret_id`, the LDAP and ProxySQL passwords, and the rest) are marked sensitive, so Terraform keeps them out of plan output. The platform never returns them on read either. Instead it reports an opaque fingerprint per withheld argument in the computed `redacted_digests` map, which the provider compares on refresh: if a credential is changed outside Terraform, the matching argument shows up in the next plan as being re-applied from your configuration.
+Credential arguments (`password`, `key`, `api_token`, `client_secret`, `secret_id`, the LDAP and ProxySQL passwords, and the rest) are marked sensitive, so Terraform keeps them out of plan output. The platform never returns them on read either. Instead it reports an opaque fingerprint per withheld argument. The provider records those fingerprints as of its last write in the computed `applied_digests` map and compares them on refresh, so a credential changed outside Terraform shows up in the next plan on the argument it belongs to — never as a value, only as the argument name.
+
+What the plan then does depends on your configuration, because the platform stores the configuration as a single blob and every apply replaces it whole:
+
+- the argument is in your configuration — the plan re-applies your value.
+- it is not — the plan clears it, because your configuration is the source of truth for the whole resource. This has always been what an apply does to an argument you do not set; it is now visible beforehand instead of happening silently on whatever unrelated apply ran first.
+
+A secret *added* outside Terraform is reported the same way. Nothing is reported on the first refresh after an import or a provider upgrade: with no recorded fingerprints there is no baseline, so they are recorded and compared from the next refresh on.
 
 ## Example Usage
 
@@ -566,7 +573,7 @@ resource "adaptive_resource" "postgres_with_secrets" {
 
 - `access_control_group` (String) ElastiCache user-group id. Used by the awselasticcache resource.
 - `access_control_method` (String) ElastiCache access-control method. Used by the awselasticcache resource.
-- `access_key_id` (String) The AWS access key id. Used by AWS resource.
+- `access_key_id` (String, Sensitive) The AWS access key id. Used by AWS resource.
 - `annotations` (String) The annotations configuration in YAML format. Used by Kubernetes resource
 - `api_client_id` (String) The API client ID for a resource. Used by Azure resource.
 - `api_client_secret` (String, Sensitive) The API client secret for a resource. Used by Azure resource.
@@ -580,7 +587,7 @@ resource "adaptive_resource" "postgres_with_secrets" {
 - `application_name` (String) The application name for the service
 - `arn` (String) The ARN of the AWS IAM role to assume to access AWS Secrets Manager secret
 - `automation_mode` (String) Browser automation mode. Used by the chrome resource.
-- `aws_access_key_id` (String) Static AWS access key id used to mint RDS IAM tokens. Requires `use_irsa = false`.
+- `aws_access_key_id` (String, Sensitive) Static AWS access key id used to mint RDS IAM tokens. Requires `use_irsa = false`.
 - `aws_arn` (String) The ARN of the AWS IAM role to assume to access AWS Secrets Manager secret
 - `aws_region` (String) The AWS region used to mint RDS IAM tokens. Leave empty to auto-detect from an *.rds.amazonaws.com hostname. Only used when `use_rds_iam` is set.
 - `aws_region_name` (String) The AWS region of the AWS Secrets Manager secret
@@ -594,7 +601,7 @@ resource "adaptive_resource" "postgres_with_secrets" {
 - `client_key` (String, Sensitive) Private key for `client_cert`. Used by the proxysql resource.
 - `client_secret` (String, Sensitive) The client secret for a resource. Used by Azure, Google, Okta resources.
 - `clientcert` (String, Sensitive) The Snowflake client certificate. Used by Snowflake resource
-- `cluster_cert` (String) The cluster token for Kubernetes API server. Used by Kubernetes resource
+- `cluster_cert` (String, Sensitive) The cluster token for Kubernetes API server. Used by Kubernetes resource
 - `cluster_token` (String, Sensitive) The cluster token for Kubernetes API server. Used by Kubernetes resource
 - `connect_server_url` (String) URL of the 1Password Connect server. Only used when `use_connect_server` is set.
 - `cpu` (String) CPU request for the remote desktop pod. Used by the adaptiveremotedesktop resource.
@@ -646,12 +653,12 @@ resource "adaptive_resource" "postgres_with_secrets" {
 - `proxysql_admin_port` (String) Port of the ProxySQL admin interface. Used by the proxysql resource.
 - `proxysql_admin_username` (String) Username for the ProxySQL admin interface. Used by the proxysql resource.
 - `proxysql_hostgroup_id` (String) Hostgroup id queries are routed to. Used by the proxysql resource.
-- `public_key` (String)
+- `public_key` (String, Sensitive) Public key of the Atlas API key pair. Withheld by the server on read.
 - `region` (String) The AWS region of the AWS Secrets Manager secret
 - `region_name` (String) The AWS region name. Used by AWS resource.
 - `resource` (String) Confluent resource (cluster) identifier. Used by the confluent resource.
 - `role` (String) The Snowflake role name. Used by Snowflake resource
-- `root_cert` (String) The root certificate to use for the CockroachDB instance.
+- `root_cert` (String, Sensitive) The root certificate to use for the CockroachDB instance.
 - `schema` (String) The Snowflake schema name. Used by Snowflake resource
 - `script` (String) Automation script to run in the browser. Used by the chrome resource.
 - `secret_access_key` (String, Sensitive) The AWS secret access key in plaintext. Used by AWS resource.
@@ -668,10 +675,10 @@ resource "adaptive_resource" "postgres_with_secrets" {
 - `tenant_id` (String) The Azure tenant ID. Used by Azure resource.
 - `timeouts` (Block, Optional) (see [below for nested schema](#nestedblock--timeouts))
 - `tls_ca_cert` (String) CA certificate used to verify the server. Used by the redis resource.
-- `tls_cert_file` (String) The certificate file to use for the Postgres-like resources.
+- `tls_cert_file` (String, Sensitive) The certificate file to use for the Postgres-like resources.
 - `tls_enabled` (Boolean) Connect over TLS. Used by the redis, awselasticcache and awsdocumentdb_aws_secret_manager resources.
 - `tls_key_file` (String, Sensitive) The key file to use for the Postgres-like resources.
-- `tls_root_cert` (String) The root certificate to use for the Postgres-like resources.
+- `tls_root_cert` (String, Sensitive) The root certificate to use for the Postgres-like resources.
 - `tls_skip_verify` (Boolean) Skip verification of the server certificate. Used by the redis and awselasticcache resources.
 - `token` (String, Sensitive) API token. Used by the heroku resource.
 - `token_id` (String, Sensitive) The token ID for the service
@@ -695,8 +702,8 @@ resource "adaptive_resource" "postgres_with_secrets" {
 
 ### Read-Only
 
+- `applied_digests` (Map of String) Opaque server fingerprints of the write-only secret arguments as of the last write by this provider, used to detect out-of-band secret changes on refresh. Not comparable across resources or workspaces.
 - `id` (String) The ID of this resource.
-- `redacted_digests` (Map of String) Opaque server fingerprints of the write-only secret arguments, used to detect out-of-band secret changes on refresh. Not comparable across resources or workspaces.
 
 <a id="nestedblock--targets"></a>
 ### Nested Schema for `targets`
