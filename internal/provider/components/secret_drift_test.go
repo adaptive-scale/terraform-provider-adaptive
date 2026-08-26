@@ -171,3 +171,53 @@ func TestSecretDriftSeedsWhenNothingRecorded(t *testing.T) {
 		t.Errorf("fingerprints should be seeded from the server, got %v", seeded)
 	}
 }
+
+// The server withholds more than passwords: configexport's key policy treats
+// cert, crt, accesskey and publickey material as secret too. Every such
+// attribute has to be declared Sensitive here as well, or the marker cannot be
+// written to it and the drift degrades to a warning — which is what a rootCert
+// change on a postgres resource did in the Pulumi provider before this was
+// fixed there:
+//
+//	warning: the secret behind rootCert changed outside this program, but it
+//	         maps to no single argument and so cannot be shown as a diff
+//
+// The message was wrong too: rootCert *does* map to an attribute. It just was
+// not sensitive. Both halves are fixed; this pins the schema half.
+func TestServerWithheldAttributesAreSensitive(t *testing.T) {
+	// Derived by enumerating every type's config-key mappings and cross-checking
+	// them against the server's classifier. Deliberately a concrete list rather
+	// than a copy of that classifier: a mirrored copy would rot silently,
+	// whereas a key the server starts withholding later shows up at runtime in
+	// the warning above.
+	cases := []struct{ integrationType, cfgKey, wantAttr string }{
+		{"postgres", "rootCert", "tls_root_cert"},
+		{"cockroachdb", "rootCert", "tls_root_cert"},
+		{"yugabytedb", "rootCert", "root_cert"},
+		{"postgres", "crtText", "tls_cert_file"},
+		{"kubernetes", "cacrt", "cluster_cert"},
+		{"aws", "aws_access_key_id", "access_key_id"},
+		{"postgres", "awsAccessKeyId", "aws_access_key_id"},
+		{"mongodb_atlas", "public_key", "public_key"},
+		// Already sensitive; here so the list reads as the whole policy.
+		{"postgres", "password", "password"},
+		{"postgres", "keyText", "tls_key_file"},
+		{"aws", "aws_secret_access_key", "secret_access_key"},
+	}
+
+	for _, c := range cases {
+		t.Run(c.integrationType+"/"+c.cfgKey, func(t *testing.T) {
+			attr, ok := integrations.AttrForConfigKey(c.integrationType, c.cfgKey)
+			if !ok {
+				t.Fatalf("does not resolve to any attribute")
+			}
+			if attr != c.wantAttr {
+				t.Fatalf("resolves to %q, want %q", attr, c.wantAttr)
+			}
+			if !isSecretStringAttr(attr) {
+				t.Errorf("attribute %q is not declared sensitive, so a drifted %q can only be "+
+					"warned about, not shown as a plan diff", attr, c.cfgKey)
+			}
+		})
+	}
+}

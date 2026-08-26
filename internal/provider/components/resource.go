@@ -213,6 +213,7 @@ func ResourceAdaptiveResource() *schema.Resource {
 			"root_cert": {
 				Type:        schema.TypeString,
 				Optional:    true,
+				Sensitive:   true,
 				Description: "The root certificate to use for the CockroachDB instance.",
 			},
 			"ssl_mode": {
@@ -257,6 +258,7 @@ func ResourceAdaptiveResource() *schema.Resource {
 			"aws_access_key_id": {
 				Type:        schema.TypeString,
 				Optional:    true,
+				Sensitive:   true,
 				Description: "Static AWS access key id used to mint RDS IAM tokens. Requires `use_irsa = false`.",
 			},
 			"aws_secret_access_key": {
@@ -284,6 +286,7 @@ func ResourceAdaptiveResource() *schema.Resource {
 			"cluster_cert": {
 				Type:        schema.TypeString,
 				Optional:    true,
+				Sensitive:   true,
 				Description: "The cluster token for Kubernetes API server. Used by Kubernetes resource",
 			},
 			"tolerations": {
@@ -314,6 +317,7 @@ func ResourceAdaptiveResource() *schema.Resource {
 			"access_key_id": {
 				Type:        schema.TypeString,
 				Optional:    true,
+				Sensitive:   true,
 				Description: "The AWS access key id. Used by AWS resource.",
 			},
 			"secret_access_key": {
@@ -429,7 +433,8 @@ func ResourceAdaptiveResource() *schema.Resource {
 			"public_key": {
 				Type:        schema.TypeString,
 				Optional:    true,
-				Description: "",
+				Sensitive:   true,
+				Description: "Public key of the Atlas API key pair. Withheld by the server on read.",
 			},
 			"organization_id": {
 				Type:        schema.TypeString,
@@ -545,11 +550,13 @@ func ResourceAdaptiveResource() *schema.Resource {
 			"tls_root_cert": {
 				Type:        schema.TypeString,
 				Optional:    true,
+				Sensitive:   true,
 				Description: "The root certificate to use for the Postgres-like resources.",
 			},
 			"tls_cert_file": {
 				Type:        schema.TypeString,
 				Optional:    true,
+				Sensitive:   true,
 				Description: "The certificate file to use for the Postgres-like resources.",
 			},
 			"tls_key_file": {
@@ -1223,16 +1230,26 @@ func ResourceAdaptiveResourceRead(ctx context.Context, d *schema.ResourceData, m
 	// An empty recorded map (import, a resource predating this field, an older
 	// server) is seeded by the d.Set below rather than reported: with no
 	// baseline, every key would look drifted.
-	var unattributable []string
+	// Two different reasons a drifted key cannot be marked, kept apart because
+	// they mean different things to whoever reads the warning.
+	var unmapped []string  // names no single attribute at all
+	var notSecret []string // names one, but the schema does not call it sensitive
 	if recorded := stateStringMap(d, "applied_digests"); len(recorded) > 0 && len(r.RedactedDigests) > 0 {
 		for _, k := range driftedDigestKeys(recorded, r.RedactedDigests) {
 			attr, ok := integrations.AttrForConfigKey(r.IntegrationType, k)
-			if !ok || !isSecretStringAttr(attr) {
-				unattributable = append(unattributable, k)
-				continue
-			}
-			if err := d.Set(attr, r.RedactedDigests[k]); err != nil {
-				return diag.FromErr(err)
+			switch {
+			case !ok:
+				unmapped = append(unmapped, k)
+			case !isSecretStringAttr(attr):
+				// Writing a fingerprint into an attribute the schema shows in
+				// clear would render as the value turning into hex. The server
+				// withholding a key this provider does not treat as sensitive is
+				// a provider bug, so say so rather than blaming the key's shape.
+				notSecret = append(notSecret, fmt.Sprintf("%s (attribute %q)", k, attr))
+			default:
+				if err := d.Set(attr, r.RedactedDigests[k]); err != nil {
+					return diag.FromErr(err)
+				}
 			}
 		}
 	}
@@ -1241,18 +1258,27 @@ func ResourceAdaptiveResourceRead(ctx context.Context, d *schema.ResourceData, m
 		return diag.FromErr(err)
 	}
 
-	if len(unattributable) > 0 {
-		// Some keys name no single argument: the dotted and indexed paths the
-		// server emits for nested secrets, and the config keys that mirror
-		// another (ssh writes the key material to both sshKey and password, and
-		// the read arm reconciles via sshKey). Reporting them by name keeps the
-		// drift visible rather than dropping it on the floor.
+	if len(unmapped) > 0 {
+		// The dotted and indexed paths the server emits for nested secrets, and
+		// the config keys that mirror another (ssh writes the key material to
+		// both sshKey and password, and the read arm reconciles via sshKey).
+		// Reporting them by name keeps the drift visible rather than dropping it.
 		diags = append(diags, diag.Diagnostic{
 			Severity: diag.Warning,
 			Summary:  fmt.Sprintf("resource %q: a secret changed outside this configuration", r.Name),
 			Detail: fmt.Sprintf("The value behind %s no longer matches what this provider last wrote, "+
-				"but it maps to no single argument and so cannot be shown as a plan diff.",
-				strings.Join(unattributable, ", ")),
+				"but it maps to no single attribute and so cannot be shown as a plan diff.",
+				strings.Join(unmapped, ", ")),
+		})
+	}
+	if len(notSecret) > 0 {
+		diags = append(diags, diag.Diagnostic{
+			Severity: diag.Warning,
+			Summary:  fmt.Sprintf("resource %q: a secret changed outside this configuration", r.Name),
+			Detail: fmt.Sprintf("The value behind %s no longer matches what this provider last wrote, "+
+				"but that attribute is not declared sensitive, so the change cannot be shown "+
+				"without printing a fingerprint in clear. This is a provider bug — please report it.",
+				strings.Join(notSecret, ", ")),
 		})
 	}
 
