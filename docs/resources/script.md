@@ -29,9 +29,13 @@ resource "adaptive_script" "init_db" {
 
 ```terraform
 resource "adaptive_script" "migration" {
-  name     = "run-migrations"
-  endpoint = adaptive_endpoint.postgres.name
-  command  = <<-EOT
+  name      = "run-migrations"
+  help_text = <<-EOT
+    Run this script on the target database before deploying the application.
+    It creates the migration history table and records the initial version.
+  EOT
+  endpoint  = adaptive_endpoint.postgres.name
+  command   = <<-EOT
     CREATE TABLE IF NOT EXISTS schema_migrations (
       version VARCHAR(255) PRIMARY KEY,
       applied_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
@@ -196,6 +200,10 @@ resource "adaptive_script" "init" {
 - `command` (String)
 - `endpoint` (String)
 - `name` (String)
+
+### Optional
+
+- `help_text` (String) Optional instructions explaining how to use the script, including examples and prerequisites.
 
 ### Read-Only
 

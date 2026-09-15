@@ -270,7 +270,7 @@ func (c *Client) DeleteResource(ctx context.Context, resourceID, resourceName st
 	return true, nil
 }
 
-func (c *Client) CreateScript(ctx context.Context, name, command, endpoint string) (*CreateResourceResponse, error) {
+func (c *Client) CreateScript(ctx context.Context, name, command, endpoint, helpText string) (*CreateResourceResponse, error) {
 	tflog.Debug(ctx, "CreateScript called", map[string]interface{}{
 		"name":     name,
 		"endpoint": endpoint,
@@ -280,6 +280,7 @@ func (c *Client) CreateScript(ctx context.Context, name, command, endpoint strin
 		"Name":     name,
 		"Command":  command,
 		"Endpoint": endpoint,
+		"helpText": helpText,
 	}); err != nil {
 		tflog.Error(ctx, "Failed to encode request body for creating script", map[string]interface{}{
 			"name":  name,

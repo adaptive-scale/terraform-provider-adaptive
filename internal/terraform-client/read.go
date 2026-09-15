@@ -179,6 +179,7 @@ type ScriptResponse struct {
 	Name           string `json:"name"`
 	Endpoint       string `json:"endpoint"`
 	Description    string `json:"description,omitempty"`
+	HelpText       string `json:"helpText"`
 	CommandOmitted bool   `json:"commandOmitted"`
 }
 
