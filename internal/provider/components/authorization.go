@@ -69,6 +69,10 @@ func ResourceAdaptiveAuthorization() *schema.Resource {
 		ReadContext:   ResourceAdaptiveAuthorizationRead,
 		UpdateContext: ResourceAdaptiveAuthorizationUpdate,
 		DeleteContext: ResourceAdaptiveAuthorizationDelete,
+		// Import takes the object's id; Read then hydrates the rest of state.
+		Importer: &schema.ResourceImporter{
+			StateContext: schema.ImportStatePassthroughContext,
+		},
 
 		Schema: map[string]*schema.Schema{
 			"name": {
@@ -129,27 +133,29 @@ func ResourceAdaptiveAuthorizationRead(ctx context.Context, d *schema.ResourceDa
 	client := m.(*adaptive.Client)
 	authID := d.Id()
 
-	resp, err := client.ReadAuthorization(ctx, authID, false)
+	// GetAuthorization rather than ReadAuthorization: the latter polls for
+	// provisioning and errors on anything that is not Status == "created", which
+	// turns an out-of-band delete into a failed refresh instead of a recreate.
+	auth, err := client.GetAuthorization(ctx, authID)
 	if err != nil {
 		return diag.FromErr(err)
 	}
-
-	data, ok := resp.(map[string]interface{})
-	if !ok {
-		return diag.Errorf("invalid response format")
+	if auth == nil {
+		d.SetId("")
+		return nil
 	}
 
-	if name, ok := data["name"].(string); ok {
-		d.Set("name", name)
+	if err := d.Set("name", auth.Name); err != nil {
+		return diag.FromErr(err)
 	}
-	if description, ok := data["description"].(string); ok {
-		d.Set("description", description)
+	if err := d.Set("description", auth.Description); err != nil {
+		return diag.FromErr(err)
 	}
-	if resourceType, ok := data["resource_type"].(string); ok {
-		d.Set("resource_type", resourceType)
+	if err := d.Set("resource_type", auth.ResourceType); err != nil {
+		return diag.FromErr(err)
 	}
-	if permissions, ok := data["permissions"].(string); ok {
-		d.Set("permissions", permissions)
+	if err := d.Set("permissions", auth.Permissions); err != nil {
+		return diag.FromErr(err)
 	}
 
 	return nil
