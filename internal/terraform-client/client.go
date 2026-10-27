@@ -187,7 +187,7 @@ func _readResource(ctx context.Context, c *Client, resourceID string) (map[strin
 	return resp, nil
 }
 
-func (c *Client) UpdateScript(ctx context.Context, id, name, command, endpoint *string) (any, error) {
+func (c *Client) UpdateScript(ctx context.Context, id, name, command, endpoint *string, helpText string) (any, error) {
 	tflog.Debug(ctx, "UpdateScript called", map[string]interface{}{
 		"script_id": *id,
 		"name":      *name,
@@ -197,6 +197,7 @@ func (c *Client) UpdateScript(ctx context.Context, id, name, command, endpoint *
 		"Name":     name,
 		"Command":  command,
 		"Endpoint": endpoint,
+		"helpText": helpText,
 	}); err != nil {
 		tflog.Error(ctx, "Failed to encode request body for updating script", map[string]interface{}{
 			"script_id": *id,

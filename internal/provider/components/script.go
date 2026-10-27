@@ -26,6 +26,11 @@ func ResourceAdaptiveScript() *schema.Resource {
 				Required:    true,
 				Description: "",
 			},
+			"help_text": {
+				Type:        schema.TypeString,
+				Optional:    true,
+				Description: "Optional instructions explaining how to use the script, including examples and prerequisites.",
+			},
 			"command": {
 				Type:      schema.TypeString,
 				Required:  true,
@@ -61,7 +66,7 @@ func ResourceAdaptiveScriptCreate(ctx context.Context, d *schema.ResourceData, m
 		return diag.FromErr(err)
 	}
 
-	resp, err := client.CreateScript(ctx, *sName, *sCommand, *sEndpoint)
+	resp, err := client.CreateScript(ctx, *sName, *sCommand, *sEndpoint, d.Get("help_text").(string))
 	if err != nil {
 		return diag.FromErr(err)
 	}
@@ -86,6 +91,9 @@ func ResourceAdaptiveScriptRead(ctx context.Context, d *schema.ResourceData, m i
 		return diag.FromErr(err)
 	}
 	if err := d.Set("endpoint", script.Endpoint); err != nil {
+		return diag.FromErr(err)
+	}
+	if err := d.Set("help_text", script.HelpText); err != nil {
 		return diag.FromErr(err)
 	}
 	// command is intentionally not refreshed: a script body can embed
@@ -116,7 +124,7 @@ func ResourceAdaptiveScriptUpdate(ctx context.Context, d *schema.ResourceData, m
 		return diag.FromErr(err)
 	}
 
-	if _, err := client.UpdateScript(ctx, &scriptID, name, command, endpoint); err != nil {
+	if _, err := client.UpdateScript(ctx, &scriptID, name, command, endpoint, d.Get("help_text").(string)); err != nil {
 		return diag.FromErr(err)
 	}
 
