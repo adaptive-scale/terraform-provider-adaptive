@@ -469,8 +469,6 @@ func (c *Client) DeleteSession(ctx context.Context, sessionID string) (bool, err
 		})
 		return false, errors.New("could not delete session")
 	}
-
-	return true, nil
 }
 
 func (c *Client) deleteSession(ctx context.Context, sessionID string) (bool, error) {

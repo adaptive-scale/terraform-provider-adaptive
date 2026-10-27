@@ -135,7 +135,7 @@ func providerConfigure(ctx context.Context, d *schema.ResourceData) (interface{}
 
 	svcToken, wsURL, err := tryReadingServiceToken(serviceToken, workspaceURL)
 	if err != nil {
-		return nil, diag.Errorf(fmt.Sprintf("bad service token: %s", err))
+		return nil, diag.Errorf("bad service token: %s", err)
 	}
 	c := client.NewClient(svcToken, wsURL)
 
