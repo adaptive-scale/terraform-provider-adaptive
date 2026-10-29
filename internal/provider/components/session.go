@@ -233,6 +233,11 @@ func ResourceAdaptiveSession() *schema.Resource {
 				Elem:        &schema.Schema{Type: schema.TypeBool},
 				Description: "Whether Just-In-Time access is enabled for the session",
 			},
+			"jit_approver_groups": {
+				Type: schema.TypeSet, Optional: true, Computed: true,
+				Elem:        &schema.Schema{Type: schema.TypeString},
+				Description: "Workspace group names whose eligible members may approve JIT requests. Omit to preserve groups managed elsewhere; [] clears them. Requires server group support.",
+			},
 			"jit_approvers": {
 				Type:     schema.TypeList,
 				Optional: true,
@@ -464,6 +469,7 @@ func ResourceAdaptiveSessionCreate(ctx context.Context, d *schema.ResourceData, 
 		groupsVal,
 		idleTimeout.(string),
 		scriptOnlyAccess,
+		configuredJITApproverGroups(d),
 	)
 	if err != nil {
 		return diag.FromErr(err)
@@ -490,8 +496,18 @@ func ResourceAdaptiveSessionCreate(ctx context.Context, d *schema.ResourceData, 
 }
 
 func ResourceAdaptiveSessionRead(ctx context.Context, d *schema.ResourceData, m interface{}) diag.Diagnostics {
-	var diags diag.Diagnostics
-	return diags
+	// Leave the legacy no-op read unchanged unless the new field is managed.
+	if configuredJITApproverGroups(d) == nil {
+		return nil
+	}
+	groups, err := m.(*adaptive.Client).ReadJITApproverGroups(ctx, d.Id())
+	if err != nil {
+		return diag.FromErr(err)
+	}
+	if err := d.Set("jit_approver_groups", groups); err != nil {
+		return diag.FromErr(err)
+	}
+	return nil
 }
 
 func ResourceAdaptiveSessionUpdate(ctx context.Context, d *schema.ResourceData, m interface{}) diag.Diagnostics {
@@ -641,6 +657,7 @@ func ResourceAdaptiveSessionUpdate(ctx context.Context, d *schema.ResourceData, 
 		groupsVal,
 		idleTimeout.(string),
 		scriptOnlyAccess,
+		configuredJITApproverGroups(d),
 	)
 	if err != nil {
 		return diag.FromErr(err)
@@ -662,4 +679,26 @@ func ResourceAdaptiveSessionDelete(ctx context.Context, d *schema.ResourceData, 
 
 	d.SetId("")
 	return nil
+}
+
+// Raw configuration distinguishes omission from an explicitly empty set, which
+// GetOk cannot do. Unmanaged groups must never be erased by an unrelated update.
+func configuredJITApproverGroups(d *schema.ResourceData) *[]string {
+	raw := d.GetRawConfig()
+	if raw.IsNull() || !raw.IsKnown() {
+		return nil
+	}
+	value := raw.GetAttr("jit_approver_groups")
+	if value.IsNull() || !value.IsKnown() {
+		return nil
+	}
+	result := []string{}
+	for it := value.ElementIterator(); it.Next(); {
+		_, v := it.Element()
+		if !v.IsKnown() || v.IsNull() {
+			return nil
+		}
+		result = append(result, v.AsString())
+	}
+	return &result
 }

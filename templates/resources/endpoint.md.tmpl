@@ -47,6 +47,7 @@ resource "adaptive_endpoint" "jit_enabled" {
   resource       = adaptive_resource.production_postgres.name
   is_jit_enabled = true
   jit_approvers  = ["security@example.com", "manager@example.com"]
+  jit_approver_groups = ["Database on-call"]
   users          = ["developer@example.com", "oncall@example.com"]
   tags           = ["production", "jit"]
 }
@@ -176,3 +177,14 @@ Endpoints can be imported using the endpoint ID:
 ```shell
 terraform import adaptive_endpoint.example endpoint-id
 ```
+
+### JIT approver groups
+
+`jit_approver_groups` selects existing workspace groups by name. Members must
+already have the approver or admin role and an enabled account. This does not
+grant endpoint access. Omit the field to preserve groups configured elsewhere;
+set it to `[]` to clear groups. Existing `jit_approvers` remains an email list.
+The provider checks server capability before mutation and refuses unsupported
+servers. Deploy the group-aware API/workers and enable
+`JIT_APPROVER_GROUPS_ENABLED=true` before configuring groups. Group-only edits do
+not restart the endpoint. Group members can satisfy the existing server quorum.

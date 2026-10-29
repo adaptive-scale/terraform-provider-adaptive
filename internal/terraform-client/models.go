@@ -38,8 +38,9 @@ type CreateSessionRequest struct {
 	// List of user emails to add to the endpoint
 	SessionUsers []string `json:"sessionUsers,omitempty"`
 	// endpoint JIT access mode
-	IsJITEnabled    bool     `json:"is_jit_enabled"`
-	AccessApprovers []string `json:"access_approvers"`
+	IsJITEnabled         bool      `json:"is_jit_enabled"`
+	AccessApprovers      []string  `json:"access_approvers"`
+	AccessApproverGroups *[]string `json:"access_approver_groups,omitempty"`
 
 	Memory    string   `json:"memory"`
 	CPU       string   `json:"cpu"`
