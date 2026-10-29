@@ -47,6 +47,7 @@ resource "adaptive_endpoint" "jit_enabled" {
   resource       = adaptive_resource.production_postgres.name
   is_jit_enabled = true
   jit_approvers  = ["security@example.com", "manager@example.com"]
+  jit_approver_groups = ["Database on-call"]
   users          = ["developer@example.com", "oncall@example.com"]
   tags           = ["production", "jit"]
 }
@@ -173,12 +174,14 @@ resource "adaptive_group" "developers" {
 - `cluster` (String) The cluster in which this session should be created. If not provided will be set to default cluster set in workspace settings of the user's workspace
 - `cpu` (String) CPU of endpoint pod
 - `groups` (List of String) The list of groups associated with the adaptive endpoint
+- `idle_timeout` (String) The time after which the session will be automatically terminated if no user is connected. Defaults to never timeout.
 - `is_jit_enabled` (Boolean) Whether Just-In-Time access is enabled for the session
+- `jit_approver_groups` (Set of String) Workspace group names whose eligible members may approve JIT requests. Omit to preserve groups managed elsewhere; [] clears them. Requires server group support.
 - `jit_approvers` (List of String) The list of user emails who can approve Just-In-Time access requests
 - `last_updated` (String) The last time the session was updated.
 - `memory` (String) Memory of endpoint pod
 - `pause_timeout` (String) The time after which the session will be paused if no user has connected to it. Defaults to never pause.
-- `script_only_access` (Boolean) Whether the endpoint should only be accessible via script. Defaults to `false`.
+- `script_only_access` (Boolean) Whether the endpoint should only be accessible via script
 - `tags` (List of String) Optional tags
 - `timeouts` (Block, Optional) (see [below for nested schema](#nestedblock--timeouts))
 - `ttl` (String) The time-to-live (TTL) for the session. The session will be automatically terminated after this time period. If not set, defaults to 90 days.
@@ -213,3 +216,14 @@ Endpoints can be imported using the endpoint ID:
 ```shell
 terraform import adaptive_endpoint.example endpoint-id
 ```
+
+### JIT approver groups
+
+`jit_approver_groups` selects existing workspace groups by name. Members must
+already have the approver or admin role and an enabled account. This does not
+grant endpoint access. Omit the field to preserve groups configured elsewhere;
+set it to `[]` to clear groups. Existing `jit_approvers` remains an email list.
+The provider checks server capability before mutation and refuses unsupported
+servers. Deploy the group-aware API/workers and enable
+`JIT_APPROVER_GROUPS_ENABLED=true` before configuring groups. Group-only edits do
+not restart the endpoint. Group members can satisfy the existing server quorum.

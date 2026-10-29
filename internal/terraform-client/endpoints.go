@@ -32,6 +32,7 @@ func (c *Client) CreateSession(
 	groups []string,
 	idleTimeout string,
 	scriptOnlyAccess bool,
+	approverGroups ...*[]string,
 ) (*CreateSessionResponse, error) {
 	tflog.Debug(ctx, "CreateSession called", map[string]interface{}{
 		"name":          sessionName,
@@ -59,6 +60,12 @@ func (c *Client) CreateSession(
 		ScriptOnlyAccess:  scriptOnlyAccess,
 	}
 
+	if len(approverGroups) > 0 && approverGroups[0] != nil {
+		if err := c.RequireJITApproverGroups(ctx, len(*approverGroups[0]) > 0); err != nil {
+			return nil, err
+		}
+		req.AccessApproverGroups = approverGroups[0]
+	}
 	payloadBuf := bytes.NewBuffer([]byte{})
 	if err := json.NewEncoder(payloadBuf).Encode(req); err != nil {
 		tflog.Error(ctx, "Failed to encode request body for creating session", map[string]interface{}{
@@ -269,6 +276,7 @@ func (c *Client) UpdateSession(
 	groups []string,
 	idleTimeout string,
 	scriptOnlyAccess bool,
+	approverGroups ...*[]string,
 ) (*UpdateSessionResponse, error) {
 	tflog.Debug(ctx, "UpdateSession called", map[string]interface{}{
 		"session_id": sessionID,
@@ -294,6 +302,12 @@ func (c *Client) UpdateSession(
 		ScriptOnlyAccess:  scriptOnlyAccess,
 	}
 
+	if len(approverGroups) > 0 && approverGroups[0] != nil {
+		if err := c.RequireJITApproverGroups(ctx, len(*approverGroups[0]) > 0); err != nil {
+			return nil, err
+		}
+		req.AccessApproverGroups = approverGroups[0]
+	}
 	payloadBuf := bytes.NewBuffer([]byte{})
 	if err := json.NewEncoder(payloadBuf).Encode(req); err != nil {
 		tflog.Error(ctx, "Failed to encode request body for updating session", map[string]interface{}{
