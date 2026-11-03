@@ -14,6 +14,18 @@ Verification complete for this step: regression reproductions failed before fixe
 
 Deferred: native write-only input architecture and backend preserve/replace/delete semantics, atomic write-response fingerprints, comprehensive field expansion, endpoint security-ownership corrections, schedule/backend changes and the remaining roadmap packages. Existing sensitive arguments still persist plaintext in Terraform state. The field CSV below is the original pinned audit inventory, not regenerated current-branch schema output.
 
+## Second implementation step — canonical integration contracts
+
+Branch `feature/terraform-parity-mappings` is stacked on first-step commit `01bfc3c` (`feature/terraform-parity-hardening`). This step is implemented and locally verified; it does not change the backend or Pulumi checkout.
+
+- ClickHouse now writes/reads canonical `database` and `use-tls` keys. Nonempty legacy `ssl_mode` is rejected with `use_tls` migration guidance during planning and before HTTP writes; PostgreSQL-style modes are not silently collapsed into a boolean.
+- The existing shared `use_tls` argument is optional/computed for ClickHouse and MongoDB 3.6. Omission preserves observed TLS, including imported TLS-enabled resources; explicit false still disables it. Removing the argument no longer requests a reset to false. This shared-field ownership change is intentional and requires engine regressions for both types.
+- Aruba Instant On uses canonical hostname, browser-login and SSH fields. Existing Terraform `host` and alternative `hostname` ownership are handled explicitly; managed refresh without raw configuration must not move the configured alias. Unsupported API-token input and conflicting aliases are rejected rather than dropped. Browser automation expansion is deferred.
+- Redshift forwards and refreshes `sslMode`. This fixes provider payload parity, not every backend runtime: the proxy path honors the field while other connection-string paths still require TLS with a hardcoded `require` mode.
+- Read materializes an empty computed `applied_digests` map so empty-credential imports do not propose a write solely to initialize that output. Existing nonempty baselines still survive missing metadata; this state-shape fix does not establish backend digest completeness or prove that no credentials exist.
+
+Verification passed: independent backend-shaped wire fixtures; explicit false/empty and missing/withheld cases; real Terraform CLI TLS-enabled imports with clean first plans, unrelated updates, explicit disable and external drift/restore for ClickHouse and MongoDB 3.6; both managed Aruba aliases with repeated clean plans; Redshift SSL metadata/update convergence; plan-time rejection without credential-canary disclosure. The mapping suite failed against the safely built first-step baseline, and its empty-baseline import failures were separately reproduced before the Read fix. `make test`, full race-enabled Go tests with both CLI suites opted in, build, vet, formatting, documentation generation, workflow structure and diff checks pass. Independent review passed with no security or logic blockers. Nonblocking follow-up coverage: switching an established Aruba resource between aliases, and removing an explicit `use_tls` argument from an existing TLS-enabled resource. Remote CI and live connections were not exercised. The pinned field CSV remains the original audit inventory.
+
 Baselines inspected:
 
 - Terraform: `f3ddb78843c8ee2a736317c822ee122e6eeba33a`, branch `fix/secret-drift-visible`.

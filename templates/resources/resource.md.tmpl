@@ -68,6 +68,24 @@ The `adaptive_resource` resource allows you to create and manage connections to 
 
 The full list of accepted values is validated by the provider; `terraform plan` names them all if you get one wrong.
 
+## Integration-specific configuration
+
+### ClickHouse
+
+Use `database_name` for the database and `use_tls` for transport security. These map to the backend's `database` and `use-tls` keys. The old `ssl_mode` argument was not consumed by this integration; nonempty values are now rejected during planning and before a write rather than silently implying a PostgreSQL-style TLS policy. Remove it and set `use_tls` explicitly. A boolean TLS switch does not expose separate `require`, `verify-ca`, or `verify-full` modes.
+
+For both ClickHouse and MongoDB 3.6, `use_tls` is optional and computed: omission retains the observed setting on refresh/import and unrelated updates. Set `use_tls = false` explicitly to disable it; removing the argument no longer requests a reset to false. Existing resources with an explicit boolean retain that desired-state ownership.
+
+### Aruba Instant On
+
+Use `host` (the existing Terraform argument) or `hostname` for the device address. Both map to the backend's `hostname`; differing nonempty aliases are rejected. Imports default to `host`, while established managed alias ownership is retained on refresh. Use `username` with `password` or `key`; `key` selects SSH-key mode. The provider also maps `port`, `webui_port`, and `login_url` to their canonical backend fields.
+
+The old `api_token`/`apiToken` path has no consumed backend field and is now rejected rather than silently discarded. The backend form's `cloud_token` label does not establish runtime API-token support. Managed-browser automation fields are a separate planned expansion, not included here.
+
+### Redshift
+
+`ssl_mode` is forwarded as `sslMode` and refreshed from the same backend key. Runtime enforcement is backend-path dependent: the inspected PostgreSQL proxy path honors this value, while other Redshift execution paths still hardcode `require`. Provider mapping coverage is not a guarantee that every backend connection path implements every TLS mode.
+
 ## Secret Arguments
 
 Credential arguments (`password`, `key`, `api_token`, `client_secret`, `secret_id`, the LDAP and ProxySQL passwords, and the rest) are marked sensitive, so Terraform hides their values in ordinary plan output. For fields correctly classified as secret by the backend, reads withhold the value and report an opaque fingerprint when supported. The provider records those fingerprints as of its last write in the computed `applied_digests` map and compares them on refresh, so supported scalar credential drift can appear on the argument it belongs to without displaying its value. Provider sensitivity does not repair backend redaction gaps or supply missing fingerprints.

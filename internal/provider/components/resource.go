@@ -140,6 +140,7 @@ func ResourceAdaptiveResource() *schema.Resource {
 		ReadContext:   ResourceAdaptiveResourceRead,
 		UpdateContext: ResourceAdaptiveResourceUpdate,
 		DeleteContext: ResourceAdaptiveResourceDelete,
+		CustomizeDiff: resourceContractCustomizeDiff,
 		Timeouts: &schema.ResourceTimeout{
 			Create: schema.DefaultTimeout(10 * time.Minute),
 			Update: schema.DefaultTimeout(10 * time.Minute),
@@ -233,7 +234,7 @@ func ResourceAdaptiveResource() *schema.Resource {
 
 					return nil, nil
 				},
-				Description: "The SSL mode to use when connecting to the database. Used by CockroachDB, Postgres, Mysql resources",
+				Description: "The SSL mode to use when connecting to the database. Used by CockroachDB, Postgres, Mysql and Redshift resources. ClickHouse uses use_tls instead.",
 			},
 			"use_rds_iam": {
 				Type:        schema.TypeBool,
@@ -690,7 +691,8 @@ func ResourceAdaptiveResource() *schema.Resource {
 			"use_tls": {
 				Type:        schema.TypeBool,
 				Optional:    true,
-				Description: "Connect over TLS. Used by the mongodb36 resource.",
+				Computed:    true,
+				Description: "Connect over TLS. Used by ClickHouse and mongodb36. Omission preserves observed TLS on refresh/import; configure false explicitly to disable it. ClickHouse does not support ssl_mode.",
 			},
 			"tls_ca_cert": {
 				Type:        schema.TypeString,
@@ -925,6 +927,9 @@ func ResourceAdaptiveResource() *schema.Resource {
 
 // Returns a YAML marshallable struct for the integration configuration
 func schemaToResourceIntegrationConfiguration(d *schema.ResourceData, intType string) (any, error) {
+	if err := validateResourceContractInputs(intType, d.Get); err != nil {
+		return nil, err
+	}
 	// The provider shares one flat schema across all integration types, so a
 	// `targets` block on any other type would be accepted and then silently
 	// ignored. Reject it so the config can't drift from what actually runs.
@@ -1229,15 +1234,12 @@ func ResourceAdaptiveResourceRead(ctx context.Context, d *schema.ResourceData, m
 	// renders as (sensitive value) and no value is disclosed — the attribute name
 	// carries the information.
 	//
-	// What the marker produces:
-	//   - configuration sets it -> ~ password, and apply re-applies its value
-	//   - it does not           -> ~ password -> "", and apply clears it
-	//                              server-side, because the configuration owns
-	//                              the whole config blob
-	//
-	// Nothing writes state back to the server (Create and Update build the blob
-	// from the configuration), so a fingerprint sitting in a secret argument can
-	// never be applied as one.
+	// A configured legacy argument can propose restoration of its desired
+	// value. Omitted held credentials cannot safely be merged into a full
+	// replacement: Update rejects them rather than silently clearing them.
+	// Terraform may retain refreshed markers under ignore_changes, so Update
+	// validates planned/configured values and the actual serialized payload
+	// before sending any mutation; it does not assume Get reads raw input.
 	//
 	// An empty recorded map (import, a resource predating this field, an older
 	// server) is seeded by the d.Set below rather than reported: with no
@@ -1246,10 +1248,10 @@ func ResourceAdaptiveResourceRead(ctx context.Context, d *schema.ResourceData, m
 	// they mean different things to whoever reads the warning.
 	// An explicit empty value is authoritative evidence of a clear. Missing
 	// fields or digests are not: older servers and redacted reads omit them.
-	if applied := stateStringMap(d, "applied_digests"); len(applied) > 0 {
-		if err := d.Set("applied_digests", pruneClearedSecretDigests(applied, r.Configuration)); err != nil {
-			return diag.FromErr(err)
-		}
+	// Materialize an empty computed map too: an empty-credential import must
+	// not schedule a write just to change null into a known empty baseline.
+	if err := d.Set("applied_digests", pruneClearedSecretDigests(stateStringMap(d, "applied_digests"), r.Configuration)); err != nil {
+		return diag.FromErr(err)
 	}
 	var unmapped []string  // names no single attribute at all
 	var notSecret []string // names one, but the schema does not call it sensitive

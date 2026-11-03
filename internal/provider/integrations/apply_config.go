@@ -54,6 +54,7 @@ func applyIntegrationMapping(a *configApplier, integrationType string) {
 		a.str("databaseName", "database_name")
 		a.str("hostname", "host")
 		a.str("port", "port")
+		a.str("sslMode", "ssl_mode")
 	case "cockroachdb":
 		a.str("username", "username")
 		a.str("password", "password")
@@ -226,11 +227,18 @@ func applyIntegrationMapping(a *configApplier, integrationType string) {
 		a.str("username", "username")
 		a.str("password", "password")
 	case "aruba_instant_on":
-		a.str("host", "host")
+		a.arubaInstantOnAliases()
 		a.str("port", "port")
 		a.str("username", "username")
-		a.str("password", "password")
-		a.str("apiToken", "api_token")
+		// Null or missing credentials are withheld; explicit empty clears them.
+		if a.collect != nil || a.cfg["password"] != nil {
+			a.str("password", "password")
+		}
+		if a.collect != nil || a.cfg["sshKey"] != nil {
+			a.str("sshKey", "key")
+		}
+		a.str("webui_port", "webui_port")
+		a.str("login_url", "login_url")
 	case "syslog":
 		a.str("hostname", "hostname")
 		a.str("port", "port")
@@ -241,10 +249,10 @@ func applyIntegrationMapping(a *configApplier, integrationType string) {
 	case "clickhouse":
 		a.str("username", "username")
 		a.str("password", "password")
-		a.str("databaseName", "database_name")
+		a.str("database", "database_name")
 		a.str("hostname", "host")
 		a.str("port", "port")
-		a.str("sslMode", "ssl_mode")
+		a.boolean("use-tls", "use_tls")
 	case "keyspaces":
 		a.boolean("use_service_account", "use_service_account")
 		a.boolean("create_if_not_exists", "create_if_not_exists")

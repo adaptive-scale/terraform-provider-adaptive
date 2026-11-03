@@ -68,6 +68,24 @@ The `adaptive_resource` resource allows you to create and manage connections to 
 
 The full list of accepted values is validated by the provider; `terraform plan` names them all if you get one wrong.
 
+## Integration-specific configuration
+
+### ClickHouse
+
+Use `database_name` for the database and `use_tls` for transport security. These map to the backend's `database` and `use-tls` keys. The old `ssl_mode` argument was not consumed by this integration; nonempty values are now rejected during planning and before a write rather than silently implying a PostgreSQL-style TLS policy. Remove it and set `use_tls` explicitly. A boolean TLS switch does not expose separate `require`, `verify-ca`, or `verify-full` modes.
+
+For both ClickHouse and MongoDB 3.6, `use_tls` is optional and computed: omission retains the observed setting on refresh/import and unrelated updates. Set `use_tls = false` explicitly to disable it; removing the argument no longer requests a reset to false. Existing resources with an explicit boolean retain that desired-state ownership.
+
+### Aruba Instant On
+
+Use `host` (the existing Terraform argument) or `hostname` for the device address. Both map to the backend's `hostname`; differing nonempty aliases are rejected. Imports default to `host`, while established managed alias ownership is retained on refresh. Use `username` with `password` or `key`; `key` selects SSH-key mode. The provider also maps `port`, `webui_port`, and `login_url` to their canonical backend fields.
+
+The old `api_token`/`apiToken` path has no consumed backend field and is now rejected rather than silently discarded. The backend form's `cloud_token` label does not establish runtime API-token support. Managed-browser automation fields are a separate planned expansion, not included here.
+
+### Redshift
+
+`ssl_mode` is forwarded as `sslMode` and refreshed from the same backend key. Runtime enforcement is backend-path dependent: the inspected PostgreSQL proxy path honors this value, while other Redshift execution paths still hardcode `require`. Provider mapping coverage is not a guarantee that every backend connection path implements every TLS mode.
+
 ## Secret Arguments
 
 Credential arguments (`password`, `key`, `api_token`, `client_secret`, `secret_id`, the LDAP and ProxySQL passwords, and the rest) are marked sensitive, so Terraform hides their values in ordinary plan output. For fields correctly classified as secret by the backend, reads withhold the value and report an opaque fingerprint when supported. The provider records those fingerprints as of its last write in the computed `applied_digests` map and compares them on refresh, so supported scalar credential drift can appear on the argument it belongs to without displaying its value. Provider sensitivity does not repair backend redaction gaps or supply missing fingerprints.
@@ -672,7 +690,7 @@ resource "adaptive_resource" "postgres_with_secrets" {
 - `service_account_name` (String) The service account name to use for the YugabyteDB resource
 - `service_name` (String) Oracle service name. Used by the oracle resource.
 - `shared_secret` (String, Sensitive) The shared secret for the integration
-- `ssl_mode` (String) The SSL mode to use when connecting to the database. Used by CockroachDB, Postgres, Mysql resources
+- `ssl_mode` (String) The SSL mode to use when connecting to the database. Used by CockroachDB, Postgres, Mysql and Redshift resources. ClickHouse uses use_tls instead.
 - `storage` (String) Persistent storage size for the remote desktop pod. Used by the adaptiveremotedesktop resource.
 - `sub_system_name` (String) The sub system name for the service
 - `tags` (List of String) Optional tags
@@ -697,7 +715,7 @@ resource "adaptive_resource" "postgres_with_secrets" {
 - `use_rds_iam` (Boolean) Authenticate with short-lived AWS RDS IAM auth tokens instead of a stored password. The database user must be granted rds_iam, the RDS instance must have IAM authentication enabled, and `ssl_mode` cannot be `disable`. Used by Postgres resources.
 - `use_service_account` (Boolean) Whether to use service account for authentication. Used by GCP resource
 - `use_tenant` (Boolean) Whether to use tenant for Azure Active Directory authentication
-- `use_tls` (Boolean) Connect over TLS. Used by the mongodb36 resource.
+- `use_tls` (Boolean) Connect over TLS. Used by ClickHouse and mongodb36. Omission preserves observed TLS on refresh/import; configure false explicitly to disable it. ClickHouse does not support ssl_mode.
 - `username` (String) Username for the adaptive resource authentication. Used by CockroachDB, Postgres, Mysql, SSH resources
 - `value` (String, Sensitive) The value to encrypt. Used by the adaptiveencrypt resource.
 - `version` (String) The version
