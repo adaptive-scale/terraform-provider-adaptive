@@ -86,6 +86,32 @@ The old `api_token`/`apiToken` path has no consumed backend field and is now rej
 
 `ssl_mode` is forwarded as `sslMode` and refreshed from the same backend key. Runtime enforcement is backend-path dependent: the inspected PostgreSQL proxy path honors this value, while other Redshift execution paths still hardcode `require`. Provider mapping coverage is not a guarantee that every backend connection path implements every TLS mode.
 
+### AWS CLI and Keyspaces
+
+Both integrations forward role and service-account authentication controls as well as static credentials. Public input names remain integration-specific:
+
+| Purpose | AWS CLI (`type = "aws"`) | Keyspaces (`type = "keyspaces"`) |
+| --- | --- | --- |
+| Region | `region_name` | `aws_region_name` |
+| Static access key ID | `access_key_id` | `aws_access_key_id` |
+| Static secret access key | `secret_access_key` | `aws_secret_access_key` |
+| Role authentication | `use_role_arn`, `aws_role_arn` | `use_role_arn`, `aws_role_arn` |
+| Service-account authentication | `use_service_account`, `service_account` | `use_service_account`, `service_account` |
+
+The backend chooses role authentication before service-account authentication when both flags are true. `create_if_not_exists` controls Kubernetes service-account creation on that path, not Keyspaces keyspace creation. These inputs do not make Terraform provision an IAM role or prove that runtime identities have the needed permissions.
+
+Keyspaces also forwards `keyspace`, `keyspaces_endpoint`, and `version`. The shared `service_account` argument remains sensitive for 1Password compatibility; cloud usage is a Kubernetes service-account name. Its global schema and Postgres's `aws_role_arn` ownership were not converted to computed secret inputs.
+
+For these two types only, omitted nonsecret cloud settings retain observed values through bounded SDK diff suppression. Explicit false/empty values request resets, and refresh is not suppressed. This prevents unrelated imported-resource updates from silently changing auth modes or dropping command restrictions. Missing/null read fields preserve observations rather than proving a clear; legacy/incomplete response coverage still limits omission-as-removal detection. Held static credentials retain the separate resupply/explicit-clear guard.
+
+AWS CLI also supports `enable_allowed_commands` and comma-separated `allowed_commands`, for example `ec2:describe-instances,s3:ls`. When enabled and both CLI `command` and `parameter` are nonempty strings, the backend parses the request and checks its exact service/subcommand pair against the allowlist. If CLI parameters are absent or either value is missing, empty, or not a string, the backend falls back to an interactive `/bin/bash` shell before allowlist validation, even when enabled. This is not a command-only security boundary. Empty or whitespace-only `allowed_commands` means allow all, not deny all; explicitly clearing the value relaxes the command-request restriction. This is separate from authorization resource scoping and does not itself create a least-privilege IAM policy. Configuration API tests do not verify live enforcement, IAM permissions, or cloud connectivity.
+
+### Datadog
+
+Use `dd_api_key` for the API key and `app_key` for the separate application key. They are sent as the independent backend fields `dd_api_key` and `dd_app_key`; supplying one never substitutes it for the other. Both public arguments are sensitive. Missing or null credential fields on read preserve prior values; an explicit empty string represents a clear.
+
+Supported backend fingerprint metadata maps an application-key rotation to `app_key`. As with other held credentials, import cannot recover the plaintext key: supply the required matching credentials before an update, or explicitly clear a supported optional credential. Sensitive arguments still persist in Terraform state; this is not a native write-only input.
+
 ## Secret Arguments
 
 Credential arguments (`password`, `key`, `api_token`, `client_secret`, `secret_id`, the LDAP and ProxySQL passwords, and the rest) are marked sensitive, so Terraform hides their values in ordinary plan output. For fields correctly classified as secret by the backend, reads withhold the value and report an opaque fingerprint when supported. The provider records those fingerprints as of its last write in the computed `applied_digests` map and compares them on refresh, so supported scalar credential drift can appear on the argument it belongs to without displaying its value. Provider sensitivity does not repair backend redaction gaps or supply missing fingerprints.
@@ -597,6 +623,7 @@ resource "adaptive_resource" "postgres_with_secrets" {
 - `access_control_group` (String) ElastiCache user-group id. Used by the awselasticcache resource.
 - `access_control_method` (String) ElastiCache access-control method. Used by the awselasticcache resource.
 - `access_key_id` (String, Sensitive) The AWS access key id. Used by AWS resource.
+- `allowed_commands` (String) AWS CLI only: comma-separated service:subcommand entries, used when enable_allowed_commands is true. Empty means allow all, NOT deny all.
 - `annotations` (String) The annotations configuration in YAML format. Used by Kubernetes resource
 - `api_client_id` (String) The API client ID for a resource. Used by Azure resource.
 - `api_client_secret` (String, Sensitive) The API client secret for a resource. Used by Azure resource.
@@ -605,17 +632,17 @@ resource "adaptive_resource" "postgres_with_secrets" {
 - `api_server` (String) The url for Kubernetes API server. Used by Kubernetes resource
 - `api_token` (String, Sensitive) The API token for the service
 - `app_id` (String) The app ID
-- `app_key` (String, Sensitive) The app key
+- `app_key` (String, Sensitive) The application key. Used by Datadog (dd_app_key on the wire).
 - `application_id` (String) The Azure application ID. Used by Azure resource.
 - `application_name` (String) The application name for the service
 - `arn` (String) The ARN of the AWS IAM role to assume to access AWS Secrets Manager secret
 - `automation_mode` (String) Browser automation mode. Used by the chrome resource.
-- `aws_access_key_id` (String, Sensitive) Static AWS access key id used to mint RDS IAM tokens. Requires `use_irsa = false`.
+- `aws_access_key_id` (String, Sensitive) Keyspaces static AWS access key ID, or Postgres RDS IAM access key ID with use_irsa = false. AWS CLI uses access_key_id instead.
 - `aws_arn` (String) The ARN of the AWS IAM role to assume to access AWS Secrets Manager secret
 - `aws_region` (String) The AWS region used to mint RDS IAM tokens. Leave empty to auto-detect from an *.rds.amazonaws.com hostname. Only used when `use_rds_iam` is set.
-- `aws_region_name` (String) The AWS region of the AWS Secrets Manager secret
-- `aws_role_arn` (String) An IAM role to assume when minting RDS IAM tokens. With IRSA it overrides the service account's eks.amazonaws.com/role-arn annotation. Only used when `use_rds_iam` is set.
-- `aws_secret_access_key` (String, Sensitive) Static AWS secret access key used to mint RDS IAM tokens. Requires `use_irsa = false`.
+- `aws_region_name` (String) Keyspaces AWS region, or the AWS region of an AWS Secrets Manager secret. AWS CLI uses region_name instead.
+- `aws_role_arn` (String) AWS CLI/Keyspaces role ARN, or role to assume when minting Postgres RDS IAM tokens. With Postgres IRSA it overrides the service account role annotation. AWS CLI/Keyspaces: omit to preserve observation; explicit empty clears.
+- `aws_secret_access_key` (String, Sensitive) Keyspaces static AWS secret access key, or Postgres RDS IAM secret access key with use_irsa = false. AWS CLI uses secret_access_key instead.
 - `aws_service_account` (String) Name of a Kubernetes ServiceAccount in the session cluster annotated with eks.amazonaws.com/role-arn; the platform mints RDS IAM tokens on its behalf. Requires `use_irsa = true`.
 - `client_cert` (String, Sensitive) Client certificate presented to the server. Used by the proxysql resource.
 - `client_certificate` (String, Sensitive) Client certificate bundle. Used by the mongodb36 resource.
@@ -628,7 +655,7 @@ resource "adaptive_resource" "postgres_with_secrets" {
 - `cluster_token` (String, Sensitive) The cluster token for Kubernetes API server. Used by Kubernetes resource
 - `connect_server_url` (String) URL of the 1Password Connect server. Only used when `use_connect_server` is set.
 - `cpu` (String) CPU request for the remote desktop pod. Used by the adaptiveremotedesktop resource.
-- `create_if_not_exists` (Boolean) Whether to create the Keyspaces keyspace if it does not exist
+- `create_if_not_exists` (Boolean) AWS CLI/Keyspaces: create the Kubernetes service account if missing (NOT the keyspace). Omit to preserve observation; explicit false disables creation.
 - `credential_json` (String, Sensitive) Google service-account credentials JSON. Used by the big_query resource.
 - `database_account` (String) The database account
 - `database_name` (String) The name of the database to connect to. Used by CockroachDB, Postgres, Mysql resources
@@ -639,6 +666,7 @@ resource "adaptive_resource" "postgres_with_secrets" {
 - `default_cluster` (String) The default cluster
 - `default_user` (String) Default user for the Services resource
 - `domain` (String) The domain name for a resource. Used by Google, Okta resource
+- `enable_allowed_commands` (Boolean) AWS CLI only: when enabled and both command and parameter are nonempty strings, the backend checks the requested service/subcommand against allowed_commands. If CLI parameters are absent or either value is missing, empty, or not a string, it falls back to an interactive /bin/bash shell before allowlist validation, even when enabled. This is not a command-only security boundary. Empty or whitespace-only allowed_commands means allow all, not deny all. This is separate from authorization resource scoping.
 - `fields` (String, Sensitive) Form fields to fill during automated login. Used by the chrome resource.
 - `host` (String) Hostname of the adaptive resource. Used by CockroachDB, Postgres, Mysql, SSH resources
 - `hostname` (String) Hostname of the adaptive resource. Used by CockroachDB, Postgres, Mysql, SSH resources
@@ -648,6 +676,8 @@ resource "adaptive_resource" "postgres_with_secrets" {
 - `is_redis_labs` (Boolean) The target is a Redis Enterprise Cloud (Redis Labs) endpoint. Used by the redis resource.
 - `key` (String, Sensitive) The SSH key to use when connecting to the instance. If not specified, password authentication will be used. Used by SSH resource
 - `key_file` (String, Sensitive) The content of GCP key file. Used by GCP resource
+- `keyspace` (String) Keyspaces keyspace.
+- `keyspaces_endpoint` (String) Keyspaces Cassandra endpoint hostname.
 - `ldap_encryption_method` (String) LDAP encryption method (e.g. none, ssl, starttls). Used by the ldap and rdpldap resources.
 - `ldap_hostname` (String) Hostname of the LDAP server. Used by the rdpldap resource.
 - `ldap_port` (String) Port of the LDAP server. Used by the rdpldap resource.
@@ -686,7 +716,7 @@ resource "adaptive_resource" "postgres_with_secrets" {
 - `script` (String, Sensitive) Automation script to run in the browser. Used by the chrome resource.
 - `secret_access_key` (String, Sensitive) The AWS secret access key in plaintext. Used by AWS resource.
 - `secret_id` (String, Sensitive) The AWS Secrets Manager secret ID
-- `service_account` (String, Sensitive) 1Password service account token.
+- `service_account` (String, Sensitive) 1Password service account token, or AWS CLI/Keyspaces Kubernetes service account name. Remains sensitive for 1Password compatibility. AWS CLI/Keyspaces: omit to preserve observation; explicit empty clears.
 - `service_account_name` (String) The service account name to use for the YugabyteDB resource
 - `service_name` (String) Oracle service name. Used by the oracle resource.
 - `shared_secret` (String, Sensitive) The shared secret for the integration
@@ -713,7 +743,8 @@ resource "adaptive_resource" "postgres_with_secrets" {
 - `use_irsa` (Boolean) Mint RDS IAM tokens with `aws_service_account`, or with the platform's own IRSA / instance-profile identity when it is empty. Set to false to use `aws_access_key_id` / `aws_secret_access_key` instead. Only used when `use_rds_iam` is set.
 - `use_proxy` (Boolean) Whether to use proxy
 - `use_rds_iam` (Boolean) Authenticate with short-lived AWS RDS IAM auth tokens instead of a stored password. The database user must be granted rds_iam, the RDS instance must have IAM authentication enabled, and `ssl_mode` cannot be `disable`. Used by Postgres resources.
-- `use_service_account` (Boolean) Whether to use service account for authentication. Used by GCP resource
+- `use_role_arn` (Boolean) Use AWS role authentication for AWS CLI or Keyspaces. Role authentication takes precedence when use_service_account is also true.
+- `use_service_account` (Boolean) Whether to use service account authentication. Used by AWS CLI and Keyspaces; omit to preserve observation and explicitly set false to disable.
 - `use_tenant` (Boolean) Whether to use tenant for Azure Active Directory authentication
 - `use_tls` (Boolean) Connect over TLS. Used by ClickHouse and mongodb36. Omission preserves observed TLS on refresh/import; configure false explicitly to disable it. ClickHouse does not support ssl_mode.
 - `username` (String) Username for the adaptive resource authentication. Used by CockroachDB, Postgres, Mysql, SSH resources

@@ -135,7 +135,7 @@ func validateIntegrationType(i any, p cty.Path) diag.Diagnostics {
 // - Authorization
 
 func ResourceAdaptiveResource() *schema.Resource {
-	return &schema.Resource{
+	return withCloudConfigOwnership(&schema.Resource{
 		CreateContext: ResourceAdaptiveResourceCreate,
 		ReadContext:   ResourceAdaptiveResourceRead,
 		UpdateContext: ResourceAdaptiveResourceUpdate,
@@ -254,19 +254,19 @@ func ResourceAdaptiveResource() *schema.Resource {
 			"aws_role_arn": {
 				Type:        schema.TypeString,
 				Optional:    true,
-				Description: "An IAM role to assume when minting RDS IAM tokens. With IRSA it overrides the service account's eks.amazonaws.com/role-arn annotation. Only used when `use_rds_iam` is set.",
+				Description: "AWS CLI/Keyspaces role ARN, or role to assume when minting Postgres RDS IAM tokens. With Postgres IRSA it overrides the service account role annotation. AWS CLI/Keyspaces: omit to preserve observation; explicit empty clears.",
 			},
 			"aws_access_key_id": {
 				Type:        schema.TypeString,
 				Optional:    true,
 				Sensitive:   true,
-				Description: "Static AWS access key id used to mint RDS IAM tokens. Requires `use_irsa = false`.",
+				Description: "Keyspaces static AWS access key ID, or Postgres RDS IAM access key ID with use_irsa = false. AWS CLI uses access_key_id instead.",
 			},
 			"aws_secret_access_key": {
 				Type:        schema.TypeString,
 				Optional:    true,
 				Sensitive:   true,
-				Description: "Static AWS secret access key used to mint RDS IAM tokens. Requires `use_irsa = false`.",
+				Description: "Keyspaces static AWS secret access key, or Postgres RDS IAM secret access key with use_irsa = false. AWS CLI uses secret_access_key instead.",
 			},
 			"aws_service_account": {
 				Type:        schema.TypeString,
@@ -466,7 +466,7 @@ func ResourceAdaptiveResource() *schema.Resource {
 			"aws_region_name": {
 				Type:        schema.TypeString,
 				Optional:    true,
-				Description: "The AWS region of the AWS Secrets Manager secret",
+				Description: "Keyspaces AWS region, or the AWS region of an AWS Secrets Manager secret. AWS CLI uses region_name instead.",
 			},
 			"api_token": {
 				Type:        schema.TypeString,
@@ -536,12 +536,37 @@ func ResourceAdaptiveResource() *schema.Resource {
 			"use_service_account": {
 				Type:        schema.TypeBool,
 				Optional:    true,
-				Description: "Whether to use service account for authentication. Used by GCP resource",
+				Description: "Whether to use service account authentication. Used by AWS CLI and Keyspaces; omit to preserve observation and explicitly set false to disable.",
+			},
+			"use_role_arn": {
+				Type:        schema.TypeBool,
+				Optional:    true,
+				Description: "Use AWS role authentication for AWS CLI or Keyspaces. Role authentication takes precedence when use_service_account is also true.",
+			},
+			"enable_allowed_commands": {
+				Type:        schema.TypeBool,
+				Optional:    true,
+				Description: "AWS CLI only: when enabled and both command and parameter are nonempty strings, the backend checks the requested service/subcommand against allowed_commands. If CLI parameters are absent or either value is missing, empty, or not a string, it falls back to an interactive /bin/bash shell before allowlist validation, even when enabled. This is not a command-only security boundary. Empty or whitespace-only allowed_commands means allow all, not deny all. This is separate from authorization resource scoping.",
+			},
+			"allowed_commands": {
+				Type:        schema.TypeString,
+				Optional:    true,
+				Description: "AWS CLI only: comma-separated service:subcommand entries, used when enable_allowed_commands is true. Empty means allow all, NOT deny all.",
+			},
+			"keyspace": {
+				Type:        schema.TypeString,
+				Optional:    true,
+				Description: "Keyspaces keyspace.",
+			},
+			"keyspaces_endpoint": {
+				Type:        schema.TypeString,
+				Optional:    true,
+				Description: "Keyspaces Cassandra endpoint hostname.",
 			},
 			"create_if_not_exists": {
 				Type:        schema.TypeBool,
 				Optional:    true,
-				Description: "Whether to create the Keyspaces keyspace if it does not exist",
+				Description: "AWS CLI/Keyspaces: create the Kubernetes service account if missing (NOT the keyspace). Omit to preserve observation; explicit false disables creation.",
 			},
 			"network_id": {
 				Type:        schema.TypeString,
@@ -592,7 +617,7 @@ func ResourceAdaptiveResource() *schema.Resource {
 				Type:        schema.TypeString,
 				Optional:    true,
 				Sensitive:   true,
-				Description: "The app key",
+				Description: "The application key. Used by Datadog (dd_app_key on the wire).",
 			},
 			"version": {
 				Type:        schema.TypeString,
@@ -635,7 +660,7 @@ func ResourceAdaptiveResource() *schema.Resource {
 				Type:        schema.TypeString,
 				Optional:    true,
 				Sensitive:   true,
-				Description: "1Password service account token.",
+				Description: "1Password service account token, or AWS CLI/Keyspaces Kubernetes service account name. Remains sensitive for 1Password compatibility. AWS CLI/Keyspaces: omit to preserve observation; explicit empty clears.",
 			},
 			"use_connect_server": {
 				Type:        schema.TypeBool,
@@ -922,7 +947,7 @@ func ResourceAdaptiveResource() *schema.Resource {
 				},
 			},
 		},
-	}
+	})
 }
 
 // Returns a YAML marshallable struct for the integration configuration
@@ -936,13 +961,21 @@ func schemaToResourceIntegrationConfiguration(d *schema.ResourceData, intType st
 	if _, ok := d.GetOk("targets"); ok && intType != "adaptive_rdp" {
 		return nil, fmt.Errorf("`targets` is only supported by resources of type \"adaptive_rdp\", not %q", intType)
 	}
-	// Same reasoning for the AWS RDS IAM block: only postgres reads it, so
-	// setting it on any other type would be silently dropped. The static key
-	// pair is exempt for awselasticcache, which reads the same two arguments
-	// for its own AWS access-control lookups.
+	// Cloud omission ownership requires the raw Terraform configuration before
+	// this shared capability guard can permit a full-replacement update.
+	if err := validateCloudConfigOwnership(intType, d.Id() != "", d.GetRawConfig()); err != nil {
+		return nil, err
+	}
+	// Keep Postgres-only RDS IAM/IRSA controls closed. AWS CLI and Keyspaces
+	// also consume aws_role_arn; Keyspaces and awselasticcache consume the
+	// aws_* static key pair. AWS CLI retains its access_key_id/secret_access_key
+	// public inputs and must not silently accept those static-key aliases.
 	if intType != "postgres" {
-		keys := []string{"use_rds_iam", "use_irsa", "aws_region", "aws_role_arn", "aws_service_account"}
-		if intType != "awselasticcache" {
+		keys := []string{"use_rds_iam", "use_irsa", "aws_region", "aws_service_account"}
+		if intType != "aws" && intType != "keyspaces" {
+			keys = append(keys, "aws_role_arn")
+		}
+		if intType != "awselasticcache" && intType != "keyspaces" {
 			keys = append(keys, "aws_access_key_id", "aws_secret_access_key")
 		}
 		for _, key := range keys {

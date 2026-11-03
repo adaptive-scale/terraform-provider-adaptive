@@ -86,6 +86,32 @@ The old `api_token`/`apiToken` path has no consumed backend field and is now rej
 
 `ssl_mode` is forwarded as `sslMode` and refreshed from the same backend key. Runtime enforcement is backend-path dependent: the inspected PostgreSQL proxy path honors this value, while other Redshift execution paths still hardcode `require`. Provider mapping coverage is not a guarantee that every backend connection path implements every TLS mode.
 
+### AWS CLI and Keyspaces
+
+Both integrations forward role and service-account authentication controls as well as static credentials. Public input names remain integration-specific:
+
+| Purpose | AWS CLI (`type = "aws"`) | Keyspaces (`type = "keyspaces"`) |
+| --- | --- | --- |
+| Region | `region_name` | `aws_region_name` |
+| Static access key ID | `access_key_id` | `aws_access_key_id` |
+| Static secret access key | `secret_access_key` | `aws_secret_access_key` |
+| Role authentication | `use_role_arn`, `aws_role_arn` | `use_role_arn`, `aws_role_arn` |
+| Service-account authentication | `use_service_account`, `service_account` | `use_service_account`, `service_account` |
+
+The backend chooses role authentication before service-account authentication when both flags are true. `create_if_not_exists` controls Kubernetes service-account creation on that path, not Keyspaces keyspace creation. These inputs do not make Terraform provision an IAM role or prove that runtime identities have the needed permissions.
+
+Keyspaces also forwards `keyspace`, `keyspaces_endpoint`, and `version`. The shared `service_account` argument remains sensitive for 1Password compatibility; cloud usage is a Kubernetes service-account name. Its global schema and Postgres's `aws_role_arn` ownership were not converted to computed secret inputs.
+
+For these two types only, omitted nonsecret cloud settings retain observed values through bounded SDK diff suppression. Explicit false/empty values request resets, and refresh is not suppressed. This prevents unrelated imported-resource updates from silently changing auth modes or dropping command restrictions. Missing/null read fields preserve observations rather than proving a clear; legacy/incomplete response coverage still limits omission-as-removal detection. Held static credentials retain the separate resupply/explicit-clear guard.
+
+AWS CLI also supports `enable_allowed_commands` and comma-separated `allowed_commands`, for example `ec2:describe-instances,s3:ls`. When enabled and both CLI `command` and `parameter` are nonempty strings, the backend parses the request and checks its exact service/subcommand pair against the allowlist. If CLI parameters are absent or either value is missing, empty, or not a string, the backend falls back to an interactive `/bin/bash` shell before allowlist validation, even when enabled. This is not a command-only security boundary. Empty or whitespace-only `allowed_commands` means allow all, not deny all; explicitly clearing the value relaxes the command-request restriction. This is separate from authorization resource scoping and does not itself create a least-privilege IAM policy. Configuration API tests do not verify live enforcement, IAM permissions, or cloud connectivity.
+
+### Datadog
+
+Use `dd_api_key` for the API key and `app_key` for the separate application key. They are sent as the independent backend fields `dd_api_key` and `dd_app_key`; supplying one never substitutes it for the other. Both public arguments are sensitive. Missing or null credential fields on read preserve prior values; an explicit empty string represents a clear.
+
+Supported backend fingerprint metadata maps an application-key rotation to `app_key`. As with other held credentials, import cannot recover the plaintext key: supply the required matching credentials before an update, or explicitly clear a supported optional credential. Sensitive arguments still persist in Terraform state; this is not a native write-only input.
+
 ## Secret Arguments
 
 Credential arguments (`password`, `key`, `api_token`, `client_secret`, `secret_id`, the LDAP and ProxySQL passwords, and the rest) are marked sensitive, so Terraform hides their values in ordinary plan output. For fields correctly classified as secret by the backend, reads withhold the value and report an opaque fingerprint when supported. The provider records those fingerprints as of its last write in the computed `applied_digests` map and compares them on refresh, so supported scalar credential drift can appear on the argument it belongs to without displaying its value. Provider sensitivity does not repair backend redaction gaps or supply missing fingerprints.

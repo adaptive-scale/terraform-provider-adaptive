@@ -12,11 +12,11 @@ import (
 // ApplyIntegrationConfig is the inverse of the SchemaTo* builders: it folds the
 // configuration the read endpoint returned back onto the resource attributes.
 //
-// Secrets never appear in the returned configuration — the server strips them
-// and names them in the redacted-keys list — so a key that is absent leaves its
-// attribute untouched rather than clearing it. A key that is present is always
-// written, including an empty value, which is how a field cleared out-of-band
-// makes it back into state. Keys the forward mapping derives (usePassword, the
+// Correctly redacted backend responses omit credential values; do not assume
+// every backend format/classifier has complete coverage. A missing key leaves
+// its attribute untouched. Present values are normally written, including an
+// explicit empty value for a clear; mappings handle contract-specific nulls.
+// Keys the forward mapping derives (usePassword, the
 // hardcoded version/type constants, mysql's forced sslMode) are skipped: they
 // carry no user intent to reconcile.
 func ApplyIntegrationConfig(d *schema.ResourceData, integrationType string, cfg map[string]interface{}) error {
@@ -35,9 +35,16 @@ func ApplyIntegrationConfig(d *schema.ResourceData, integrationType string, cfg 
 func applyIntegrationMapping(a *configApplier, integrationType string) {
 	switch ProviderType(integrationType) {
 	case "aws":
-		a.str("aws_region_name", "region_name")
-		a.str("aws_access_key_id", "access_key_id")
-		a.str("aws_secret_access_key", "secret_access_key")
+		a.cloudString("aws_region_name", "region_name")
+		a.cloudString("aws_access_key_id", "access_key_id")
+		a.cloudString("aws_secret_access_key", "secret_access_key")
+		a.boolean("use_role_arn", "use_role_arn")
+		a.cloudString("aws_role_arn", "aws_role_arn")
+		a.boolean("use_service_account", "use_service_account")
+		a.cloudString("service_account", "service_account")
+		a.boolean("create_if_not_exists", "create_if_not_exists")
+		a.boolean("enable_allowed_commands", "enable_allowed_commands")
+		a.cloudString("allowed_commands", "allowed_commands")
 	case "azure":
 		a.str("tenantID", "tenant_id")
 		a.str("applicationID", "application_id")
@@ -162,7 +169,12 @@ func applyIntegrationMapping(a *configApplier, integrationType string) {
 		a.str("url", "url")
 	case "datadog":
 		a.str("dd_site", "dd_site")
-		a.str("dd_api_key", "dd_api_key")
+		if a.collect != nil || a.cfg["dd_api_key"] != nil {
+			a.str("dd_api_key", "dd_api_key")
+		}
+		if a.collect != nil || a.cfg["dd_app_key"] != nil {
+			a.str("dd_app_key", "app_key")
+		}
 	case "coralogix":
 		a.str("url", "uri")
 		a.str("privateKey", "private_key")
@@ -254,7 +266,16 @@ func applyIntegrationMapping(a *configApplier, integrationType string) {
 		a.str("port", "port")
 		a.boolean("use-tls", "use_tls")
 	case "keyspaces":
+		a.cloudString("keyspace", "keyspace")
+		a.cloudString("keyspaces_endpoint", "keyspaces_endpoint")
+		a.cloudString("version", "version")
+		a.cloudString("aws_region_name", "aws_region_name")
+		a.cloudString("aws_access_key_id", "aws_access_key_id")
+		a.cloudString("aws_secret_access_key", "aws_secret_access_key")
+		a.boolean("use_role_arn", "use_role_arn")
+		a.cloudString("aws_role_arn", "aws_role_arn")
 		a.boolean("use_service_account", "use_service_account")
+		a.cloudString("service_account", "service_account")
 		a.boolean("create_if_not_exists", "create_if_not_exists")
 	case "rabbitmq":
 		a.str("url", "uri")
