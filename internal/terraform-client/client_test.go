@@ -321,7 +321,7 @@ func TestCreateSessionSerializesNewFields(t *testing.T) {
 	rec := &recorder{}
 	c := serve(t, rec, func(w http.ResponseWriter, r *http.Request) {
 		if strings.Contains(r.URL.Path, "/read/") {
-			_, _ = w.Write([]byte(`{"id":"s-1","status":"created"}`))
+			_, _ = w.Write([]byte(`{"id":"s-1","name":"endpoint","status":"created"}`))
 			return
 		}
 		_, _ = w.Write([]byte(`{"id":"s-1"}`))
@@ -600,7 +600,7 @@ func TestDeleteSessionForceDeletesAfterTermination(t *testing.T) {
 		seen = append(seen, r.URL.Path)
 		mu.Unlock()
 		if strings.Contains(r.URL.Path, "/read/") {
-			_, _ = w.Write([]byte(`{"id":"s-1","status":"terminated"}`))
+			_, _ = w.Write([]byte(`{"id":"s-1","name":"endpoint","status":"terminated"}`))
 			return
 		}
 		_, _ = w.Write([]byte(`{}`))

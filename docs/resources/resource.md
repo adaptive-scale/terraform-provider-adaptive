@@ -70,14 +70,19 @@ The full list of accepted values is validated by the provider; `terraform plan` 
 
 ## Secret Arguments
 
-Credential arguments (`password`, `key`, `api_token`, `client_secret`, `secret_id`, the LDAP and ProxySQL passwords, and the rest) are marked sensitive, so Terraform keeps them out of plan output. The platform never returns them on read either. Instead it reports an opaque fingerprint per withheld argument. The provider records those fingerprints as of its last write in the computed `applied_digests` map and compares them on refresh, so a credential changed outside Terraform shows up in the next plan on the argument it belongs to — never as a value, only as the argument name.
+Credential arguments (`password`, `key`, `api_token`, `client_secret`, `secret_id`, the LDAP and ProxySQL passwords, and the rest) are marked sensitive, so Terraform hides their values in ordinary plan output. For fields correctly classified as secret by the backend, reads withhold the value and report an opaque fingerprint when supported. The provider records those fingerprints as of its last write in the computed `applied_digests` map and compares them on refresh, so supported scalar credential drift can appear on the argument it belongs to without displaying its value. Provider sensitivity does not repair backend redaction gaps or supply missing fingerprints.
 
-What the plan then does depends on your configuration, because the platform stores the configuration as a single blob and every apply replaces it whole:
+The platform stores configuration as a single blob. Before any update the provider re-reads the resource and rejects an update that would omit a credential known to be held by the server. This prevents an unrelated tags-only change after import from silently clearing known credentials:
 
-- the argument is in your configuration — the plan re-applies your value.
-- it is not — the plan clears it, because your configuration is the source of truth for the whole resource. This has always been what an apply does to an argument you do not set; it is now visible beforehand instead of happening silently on whatever unrelated apply ran first.
+- An argument supplied in configuration may be reapplied only when the actual planned credential payload agrees with that configuration. If `lifecycle.ignore_changes` retains a drift fingerprint instead, the update is rejected rather than sending the fingerprint or overriding the lifecycle policy. Secret-preserving metadata-only updates require the separately planned backend patch contract.
+- A credential supplied for an inactive authentication mode must not silently disappear from the replacement payload; the provider rejects that update unless a supported clear is explicitly authorized.
+- Omitting a known held argument is rejected before the mutation request. To intentionally clear a supported optional string credential, configure it explicitly as `""`; required RDP credentials cannot be cleared this way.
+- Once the server explicitly reports a credential as an empty string, its old fingerprint is pruned and a later update may omit it. Missing fields, JSON nulls, missing digests and failed reads do not prove a clear.
+- Unknown credential mappings are rejected conservatively. The opaque `adaptiveencrypt` resource requires an explicitly configured `value` on update because its read response cannot recover that payload.
 
-A secret *added* outside Terraform is reported the same way. Nothing is reported on the first refresh after an import or a provider upgrade: with no recorded fingerprints there is no baseline, so they are recorded and compared from the next refresh on.
+Refresh preserves the fingerprint baseline until a successful write, so unresolved changes and warning-only drift remain observable across repeated refreshes. An initial import or older state without a baseline seeds the currently reported fingerprints; that is an observation, not proof Terraform wrote those values. An entirely empty baseline cannot distinguish first initialization from a first externally added secret. Digest reporting still depends on backend redaction coverage and a stable fingerprint key; older/incomplete responses cannot establish that no secrets exist. A separate post-write read is best-effort and is not atomic with the write.
+
+`Sensitive` hides ordinary CLI presentation but does **not** remove these legacy credential values from Terraform state or saved plan artifacts. Protect state, plans, logs, and historical snapshots. Native write-only inputs and secret-preserving backend patch updates are planned separately; they are not provided by this change.
 
 ## Example Usage
 
@@ -616,7 +621,7 @@ resource "adaptive_resource" "postgres_with_secrets" {
 - `default_cluster` (String) The default cluster
 - `default_user` (String) Default user for the Services resource
 - `domain` (String) The domain name for a resource. Used by Google, Okta resource
-- `fields` (String) Form fields to fill during automated login. Used by the chrome resource.
+- `fields` (String, Sensitive) Form fields to fill during automated login. Used by the chrome resource.
 - `host` (String) Hostname of the adaptive resource. Used by CockroachDB, Postgres, Mysql, SSH resources
 - `hostname` (String) Hostname of the adaptive resource. Used by CockroachDB, Postgres, Mysql, SSH resources
 - `hosts` (List of String) List of hosts. Used by Services resource
@@ -645,7 +650,7 @@ resource "adaptive_resource" "postgres_with_secrets" {
 - `organization_id` (String)
 - `password` (String, Sensitive) Password for the adaptive integration authentication.Used by CockroachDB, Postgres, Mysql, SSH resources
 - `port` (String) Port number of the adaptive resource. Used by CockroachDB, Postgres, Mysql, SSH resources
-- `prestart` (String) Commands to run before the browser starts. Used by the chrome resource.
+- `prestart` (String, Sensitive) Commands to run before the browser starts. Used by the chrome resource.
 - `private_key` (String, Sensitive) The private key for the service
 - `project_id` (String) The GCP project ID. Used by GCP resource
 - `protocol` (String) The protocol to use when connecting to the resource
@@ -660,10 +665,10 @@ resource "adaptive_resource" "postgres_with_secrets" {
 - `role` (String) The Snowflake role name. Used by Snowflake resource
 - `root_cert` (String, Sensitive) The root certificate to use for the CockroachDB instance.
 - `schema` (String) The Snowflake schema name. Used by Snowflake resource
-- `script` (String) Automation script to run in the browser. Used by the chrome resource.
+- `script` (String, Sensitive) Automation script to run in the browser. Used by the chrome resource.
 - `secret_access_key` (String, Sensitive) The AWS secret access key in plaintext. Used by AWS resource.
 - `secret_id` (String, Sensitive) The AWS Secrets Manager secret ID
-- `service_account` (String) 1Password service account token.
+- `service_account` (String, Sensitive) 1Password service account token.
 - `service_account_name` (String) The service account name to use for the YugabyteDB resource
 - `service_name` (String) Oracle service name. Used by the oracle resource.
 - `shared_secret` (String, Sensitive) The shared secret for the integration
@@ -694,7 +699,7 @@ resource "adaptive_resource" "postgres_with_secrets" {
 - `use_tenant` (Boolean) Whether to use tenant for Azure Active Directory authentication
 - `use_tls` (Boolean) Connect over TLS. Used by the mongodb36 resource.
 - `username` (String) Username for the adaptive resource authentication. Used by CockroachDB, Postgres, Mysql, SSH resources
-- `value` (String) The value to encrypt. Used by the adaptiveencrypt resource.
+- `value` (String, Sensitive) The value to encrypt. Used by the adaptiveencrypt resource.
 - `version` (String) The version
 - `warehouse` (String) The Snowflake warehouse name. Used by Snowflake resource
 - `webhook_url` (String, Sensitive) Incoming webhook URL. Used by the msteams_workflow and slack_webhook resources.

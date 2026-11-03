@@ -348,6 +348,11 @@ func ResourceAdaptiveSession() *schema.Resource {
 					return nil, nil
 				},
 			},
+			"max_jit_request_duration": {
+				Type:        schema.TypeString,
+				Optional:    true,
+				Description: "Maximum duration of a Just-In-Time access request for this endpoint. Omit to preserve the existing setting; an empty string clears the endpoint override and inherits the workspace setting.",
+			},
 			"auto_approval": {
 				Type:        schema.TypeBool,
 				Optional:    true,
@@ -489,6 +494,10 @@ func sessionRequestFromSchema(d *schema.ResourceData) (adaptive.CreateSessionReq
 	if configHasAttr(d, "jit_total_approvers") {
 		v := d.Get("jit_total_approvers").(int)
 		req.JITTotalApprovers = &v
+	}
+	if configHasAttr(d, "max_jit_request_duration") {
+		v := d.Get("max_jit_request_duration").(string)
+		req.MaxJITRequestDuration = &v
 	}
 
 	return req, nil
@@ -659,6 +668,18 @@ func ResourceAdaptiveSessionRead(ctx context.Context, d *schema.ResourceData, m 
 
 	if isImport || d.Get("jit_mode").(string) != "" {
 		if err := d.Set("jit_mode", r.JITMode); err != nil {
+			return diag.FromErr(err)
+		}
+	}
+	// Raw configuration distinguishes an explicit clear from omission. Refresh
+	// has no configuration, so only a nonempty prior override establishes
+	// ownership; adopting a server value into empty state would create a diff.
+	refreshMaxJITDuration := configHasAttr(d, "max_jit_request_duration")
+	if raw := d.GetRawConfig(); raw.IsNull() {
+		refreshMaxJITDuration = d.Get("max_jit_request_duration").(string) != ""
+	}
+	if isImport || refreshMaxJITDuration {
+		if err := d.Set("max_jit_request_duration", r.MaxJITRequestDuration); err != nil {
 			return diag.FromErr(err)
 		}
 	}

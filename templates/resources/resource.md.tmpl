@@ -70,14 +70,19 @@ The full list of accepted values is validated by the provider; `terraform plan` 
 
 ## Secret Arguments
 
-Credential arguments (`password`, `key`, `api_token`, `client_secret`, `secret_id`, the LDAP and ProxySQL passwords, and the rest) are marked sensitive, so Terraform keeps them out of plan output. The platform never returns them on read either. Instead it reports an opaque fingerprint per withheld argument. The provider records those fingerprints as of its last write in the computed `applied_digests` map and compares them on refresh, so a credential changed outside Terraform shows up in the next plan on the argument it belongs to — never as a value, only as the argument name.
+Credential arguments (`password`, `key`, `api_token`, `client_secret`, `secret_id`, the LDAP and ProxySQL passwords, and the rest) are marked sensitive, so Terraform hides their values in ordinary plan output. For fields correctly classified as secret by the backend, reads withhold the value and report an opaque fingerprint when supported. The provider records those fingerprints as of its last write in the computed `applied_digests` map and compares them on refresh, so supported scalar credential drift can appear on the argument it belongs to without displaying its value. Provider sensitivity does not repair backend redaction gaps or supply missing fingerprints.
 
-What the plan then does depends on your configuration, because the platform stores the configuration as a single blob and every apply replaces it whole:
+The platform stores configuration as a single blob. Before any update the provider re-reads the resource and rejects an update that would omit a credential known to be held by the server. This prevents an unrelated tags-only change after import from silently clearing known credentials:
 
-- the argument is in your configuration — the plan re-applies your value.
-- it is not — the plan clears it, because your configuration is the source of truth for the whole resource. This has always been what an apply does to an argument you do not set; it is now visible beforehand instead of happening silently on whatever unrelated apply ran first.
+- An argument supplied in configuration may be reapplied only when the actual planned credential payload agrees with that configuration. If `lifecycle.ignore_changes` retains a drift fingerprint instead, the update is rejected rather than sending the fingerprint or overriding the lifecycle policy. Secret-preserving metadata-only updates require the separately planned backend patch contract.
+- A credential supplied for an inactive authentication mode must not silently disappear from the replacement payload; the provider rejects that update unless a supported clear is explicitly authorized.
+- Omitting a known held argument is rejected before the mutation request. To intentionally clear a supported optional string credential, configure it explicitly as `""`; required RDP credentials cannot be cleared this way.
+- Once the server explicitly reports a credential as an empty string, its old fingerprint is pruned and a later update may omit it. Missing fields, JSON nulls, missing digests and failed reads do not prove a clear.
+- Unknown credential mappings are rejected conservatively. The opaque `adaptiveencrypt` resource requires an explicitly configured `value` on update because its read response cannot recover that payload.
 
-A secret *added* outside Terraform is reported the same way. Nothing is reported on the first refresh after an import or a provider upgrade: with no recorded fingerprints there is no baseline, so they are recorded and compared from the next refresh on.
+Refresh preserves the fingerprint baseline until a successful write, so unresolved changes and warning-only drift remain observable across repeated refreshes. An initial import or older state without a baseline seeds the currently reported fingerprints; that is an observation, not proof Terraform wrote those values. An entirely empty baseline cannot distinguish first initialization from a first externally added secret. Digest reporting still depends on backend redaction coverage and a stable fingerprint key; older/incomplete responses cannot establish that no secrets exist. A separate post-write read is best-effort and is not atomic with the write.
+
+`Sensitive` hides ordinary CLI presentation but does **not** remove these legacy credential values from Terraform state or saved plan artifacts. Protect state, plans, logs, and historical snapshots. Native write-only inputs and secret-preserving backend patch updates are planned separately; they are not provided by this change.
 
 ## Example Usage
 

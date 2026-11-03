@@ -33,7 +33,7 @@ func SchemaToSSHIntegrationConfiguration(d *schema.ResourceData) SSHIntegrationC
 		Name:        d.Get("name").(string),
 		Username:    d.Get("username").(string),
 		UsePassword: d.Get("key").(string) == "",
-		Password:    d.Get("key").(string),
+		Password:    d.Get("password").(string),
 		HostName:    d.Get("host").(string),
 		Port:        d.Get("port").(string),
 		SSHKey:      d.Get("key").(string),

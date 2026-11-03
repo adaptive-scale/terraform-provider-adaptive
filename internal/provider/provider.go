@@ -44,6 +44,7 @@ func New(version string) func() *schema.Provider {
 				"service_token": {
 					Type:        schema.TypeString,
 					Optional:    true,
+					Sensitive:   true,
 					Description: "Service account token for authenticating with the Adaptive service. If not provided, provider will default to reading token from default adaptive-cli",
 					DefaultFunc: schema.EnvDefaultFunc("ADAPTIVE_SVC_TOKEN", ""),
 				},

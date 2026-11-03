@@ -100,10 +100,13 @@ func (c *Client) do(ctx context.Context, req *http.Request) (*http.Response, err
 	return res, nil
 }
 
-// identifiedRead is implemented by the read responses that carry the server's
-// own id for the record, so readTyped can check that a 200 actually describes
-// the object that was asked for.
-type identifiedRead interface{ readID() string }
+// identifiedRead describes the identity required before a successful read can
+// reach a state-writing callback. Legacy servers may omit IDs, but must still
+// name the object; an ID alone does not make an otherwise empty DTO usable.
+type identifiedRead interface {
+	readID() string
+	readIdentity() string
+}
 
 func (r *SessionReadResponse) readID() string        { return r.ID }
 func (r *ResourceReadResponse) readID() string       { return r.ID }
@@ -112,6 +115,14 @@ func (r *TeamReadResponse) readID() string           { return r.ID }
 func (r *ScriptReadResponse) readID() string         { return r.ID }
 func (r *ScheduleResponse) readID() string           { return r.ID }
 func (r *DataProtectionReadResponse) readID() string { return r.ID }
+
+func (r *SessionReadResponse) readIdentity() string        { return r.Name }
+func (r *ResourceReadResponse) readIdentity() string       { return r.Name }
+func (r *AuthorizationReadResponse) readIdentity() string  { return r.Name }
+func (r *TeamReadResponse) readIdentity() string           { return r.Name }
+func (r *ScriptReadResponse) readIdentity() string         { return r.Name }
+func (r *ScheduleResponse) readIdentity() string           { return r.Name }
+func (r *DataProtectionReadResponse) readIdentity() string { return r.ResourceName }
 
 // readTyped performs a GET against a /read/:id route and decodes the response
 // into T. Not-found (404) is reported as (nil, nil) so callers can treat it as
@@ -165,6 +176,12 @@ func readTyped[T any](c *Client, ctx context.Context, url, what, id string) (*T,
 				"type": what, "requested": id, "returned": got,
 			})
 			return nil, fmt.Errorf("read of %s %s returned %s instead", what, id, got)
+		}
+		// Reject null, empty objects, and unexpected envelopes atomically. This
+		// also fails malformed imports instead of adopting an empty object;
+		// only an actual 404 is evidence that state should be removed.
+		if v.readIdentity() == "" {
+			return nil, fmt.Errorf("malformed %s read response for %s: missing object identity", what, id)
 		}
 	}
 	return out, nil

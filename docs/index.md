@@ -141,7 +141,7 @@ See the [examples directory](https://github.com/adaptive-scale/terraform-provide
 
 ### Optional
 
-- `service_token` (String) Service account token for authenticating with the Adaptive service. If not provided, provider will default to reading token from default adaptive-cli
+- `service_token` (String, Sensitive) Service account token for authenticating with the Adaptive service. If not provided, provider will default to reading token from default adaptive-cli
 - `workspace_url` (String) The workspace to use for the provider. If not set, the default workspace will be used app.adaptive.live
 
 ## Additional Resources

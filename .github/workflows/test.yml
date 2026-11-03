@@ -41,6 +41,27 @@ jobs:
       run: |
         go build -v .
 
+  engine:
+    name: Terraform CLI secret lifecycle (offline)
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@cbb722410c2e876e24abbe8de2cc27693e501dcb # v4.0.0
+      - uses: actions/setup-go@3041bf56c941b39c61721a86cd11f3bb1338122a # v5.2.0
+        with:
+          go-version-file: 'go.mod'
+          cache: true
+      - uses: hashicorp/setup-terraform@b9cd54a3c349d3f38e8881555d616ced269862dd # v3.1.2
+        with:
+          terraform_version: '1.14.3'
+          terraform_wrapper: false
+      - run: go mod download
+      - name: Exercise real CLI with a local fake API
+        env:
+          ADAPTIVE_ENGINE_TEST: "1"
+        run: go test ./internal/provider -run '^TestSecretTerraformEngine$' -v -count=1 -timeout=180s
+
   generate:
     runs-on: ubuntu-latest
     steps:

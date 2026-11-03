@@ -633,6 +633,7 @@ func ResourceAdaptiveResource() *schema.Resource {
 			"service_account": {
 				Type:        schema.TypeString,
 				Optional:    true,
+				Sensitive:   true,
 				Description: "1Password service account token.",
 			},
 			"use_connect_server": {
@@ -648,6 +649,7 @@ func ResourceAdaptiveResource() *schema.Resource {
 			"value": {
 				Type:        schema.TypeString,
 				Optional:    true,
+				Sensitive:   true,
 				Description: "The value to encrypt. Used by the adaptiveencrypt resource.",
 			},
 			"cpu": {
@@ -743,16 +745,19 @@ func ResourceAdaptiveResource() *schema.Resource {
 			"fields": {
 				Type:        schema.TypeString,
 				Optional:    true,
+				Sensitive:   true,
 				Description: "Form fields to fill during automated login. Used by the chrome resource.",
 			},
 			"script": {
 				Type:        schema.TypeString,
 				Optional:    true,
+				Sensitive:   true,
 				Description: "Automation script to run in the browser. Used by the chrome resource.",
 			},
 			"prestart": {
 				Type:        schema.TypeString,
 				Optional:    true,
+				Sensitive:   true,
 				Description: "Commands to run before the browser starts. Used by the chrome resource.",
 			},
 			"ldap_hostname": {
@@ -1157,7 +1162,7 @@ func ResourceAdaptiveResourceCreate(ctx context.Context, d *schema.ResourceData,
 	// Best-effort: capture the server's secret fingerprints so the next refresh
 	// can tell whether a credential changed out-of-band.
 	if r, rerr := client.ReadResource(ctx, resp.ID); rerr == nil && r != nil {
-		if err := d.Set("applied_digests", r.RedactedDigests); err != nil {
+		if err := captureResourceSecretDigests(d, r); err != nil {
 			return diag.FromErr(err)
 		}
 	}
@@ -1184,6 +1189,13 @@ func ResourceAdaptiveResourceRead(ctx context.Context, d *schema.ResourceData, m
 	isImport := isImportRead(d, "name")
 	if missingOnImport(d, isImport, r.Name) {
 		return nil
+	}
+
+	// Decode nested configuration against a detached state first. A malformed
+	// targets document must not leave name, tags, or credentials half-refreshed.
+	staged := ResourceAdaptiveResource().Data(d.State())
+	if err := integrations.ApplyIntegrationConfig(staged, r.IntegrationType, r.Configuration); err != nil {
+		return diag.FromErr(err)
 	}
 
 	if err := d.Set("name", r.Name); err != nil {
@@ -1232,6 +1244,13 @@ func ResourceAdaptiveResourceRead(ctx context.Context, d *schema.ResourceData, m
 	// baseline, every key would look drifted.
 	// Two different reasons a drifted key cannot be marked, kept apart because
 	// they mean different things to whoever reads the warning.
+	// An explicit empty value is authoritative evidence of a clear. Missing
+	// fields or digests are not: older servers and redacted reads omit them.
+	if applied := stateStringMap(d, "applied_digests"); len(applied) > 0 {
+		if err := d.Set("applied_digests", pruneClearedSecretDigests(applied, r.Configuration)); err != nil {
+			return diag.FromErr(err)
+		}
+	}
 	var unmapped []string  // names no single attribute at all
 	var notSecret []string // names one, but the schema does not call it sensitive
 	if recorded := stateStringMap(d, "applied_digests"); len(recorded) > 0 && len(r.RedactedDigests) > 0 {
@@ -1254,14 +1273,17 @@ func ResourceAdaptiveResourceRead(ctx context.Context, d *schema.ResourceData, m
 		}
 	}
 
-	if err := d.Set("applied_digests", r.RedactedDigests); err != nil {
-		return diag.FromErr(err)
+	// Only seed an absent baseline. Refresh must not acknowledge an external
+	// change as our own write or discard evidence when a server omits digests.
+	if len(stateStringMap(d, "applied_digests")) == 0 && len(r.RedactedDigests) > 0 {
+		if err := captureResourceSecretDigests(d, r); err != nil {
+			return diag.FromErr(err)
+		}
 	}
 
 	if len(unmapped) > 0 {
-		// The dotted and indexed paths the server emits for nested secrets, and
-		// the config keys that mirror another (ssh writes the key material to
-		// both sshKey and password, and the read arm reconciles via sshKey).
+		// Dotted and indexed paths, or keys outside the reverse mapping,
+		// cannot be represented by a single scalar credential argument.
 		// Reporting them by name keeps the drift visible rather than dropping it.
 		diags = append(diags, diag.Diagnostic{
 			Severity: diag.Warning,
@@ -1286,11 +1308,37 @@ func ResourceAdaptiveResourceRead(ctx context.Context, d *schema.ResourceData, m
 		diags = append(diags, diag.Diagnostic{
 			Severity: diag.Warning,
 			Summary:  fmt.Sprintf("resource %q was imported without its credentials", r.Name),
-			Detail: fmt.Sprintf("The server withholds %s. Set the matching arguments in your configuration, "+
-				"or the next update will clear them.", strings.Join(r.RedactedKeys, ", ")),
+			Detail: fmt.Sprintf("The server withholds %s. Supply the matching arguments before updating this resource; "+
+				"updates that would omit known server-held credentials are rejected. Set a supported optional string argument explicitly to \"\" only to authorize clearing it.", strings.Join(r.RedactedKeys, ", ")),
 		})
 	}
 	return diags
+}
+
+// captureResourceSecretDigests records an acknowledged write (or initial read).
+// Incomplete post-write reads retain the previous evidence, except for fields
+// explicitly confirmed clear. Capture remains best-effort until the backend
+// returns fingerprints atomically with the write response.
+func captureResourceSecretDigests(d *schema.ResourceData, r *adaptive.ResourceReadResponse) error {
+	applied := pruneClearedSecretDigests(stateStringMap(d, "applied_digests"), r.Configuration)
+	for key, digest := range r.RedactedDigests {
+		applied[key] = digest
+	}
+	return d.Set("applied_digests", applied)
+}
+
+// pruneClearedSecretDigests keeps last-write evidence unless the server
+// explicitly reports the corresponding value as an empty string. Never infer
+// a clear from an absent key, an omitted digest, or a failed read.
+func pruneClearedSecretDigests(applied map[string]string, cfg map[string]interface{}) map[string]string {
+	out := make(map[string]string, len(applied))
+	for key, digest := range applied {
+		if value, ok := cfg[key].(string); ok && value == "" {
+			continue
+		}
+		out[key] = digest
+	}
+	return out
 }
 
 // isSecretStringAttr reports whether an attribute can carry a drift marker: a
@@ -1354,6 +1402,10 @@ func ResourceAdaptiveResourceUpdate(ctx context.Context, d *schema.ResourceData,
 		return diag.FromErr(err)
 	}
 
+	if err := validateResourceSecretUpdate(ctx, d, client, config); err != nil {
+		return diag.FromErr(err)
+	}
+
 	_, err = client.UpdateResource(ctx, resourceID, integrations.WireType(iType), config, userTags, defaultCluster)
 	if err != nil {
 		return diag.FromErr(err)
@@ -1361,7 +1413,7 @@ func ResourceAdaptiveResourceUpdate(ctx context.Context, d *schema.ResourceData,
 
 	// Best-effort refresh of the secret fingerprints after the write.
 	if r, rerr := client.ReadResource(ctx, resourceID); rerr == nil && r != nil {
-		if err := d.Set("applied_digests", r.RedactedDigests); err != nil {
+		if err := captureResourceSecretDigests(d, r); err != nil {
 			return diag.FromErr(err)
 		}
 	}

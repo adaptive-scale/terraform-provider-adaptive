@@ -208,6 +208,7 @@ resource "adaptive_endpoint" "regulated" {
 - `jit_mode` (String) Which access paths require Just-In-Time approval. One of: session, script, both.
 - `jit_multi_approver` (Boolean) Require more than one approver for Just-In-Time access requests.
 - `jit_total_approvers` (Number) Number of approvals required when `jit_multi_approver` is enabled.
+- `max_jit_request_duration` (String) Maximum duration of a Just-In-Time access request for this endpoint. Omit to preserve the existing setting; an empty string clears the endpoint override and inherits the workspace setting.
 - `memory` (String) Memory of endpoint pod
 - `pause_timeout` (String) The time after which the session will be paused if no user has connected to it. Defaults to never pause.
 - `script_only_access` (Boolean) Whether the endpoint should only be accessible via script

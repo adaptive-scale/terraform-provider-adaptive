@@ -100,8 +100,9 @@ func applyIntegrationMapping(a *configApplier, integrationType string) {
 		a.str("awsSecretAccessKey", "aws_secret_access_key")
 		a.str("awsServiceAccount", "aws_service_account")
 	case "ssh":
-		// usePassword is derived from key, and password mirrors the key.
+		// Authentication mode is derived from key; credentials are independent.
 		a.str("username", "username")
+		a.str("password", "password")
 		a.str("hostname", "host")
 		a.str("port", "port")
 		a.str("sshKey", "key")

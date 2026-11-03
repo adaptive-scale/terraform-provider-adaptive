@@ -112,7 +112,7 @@ The provider includes 7 resource types:
 
 Every resource now reads its real state back from the platform, so `terraform plan` reports changes made outside Terraform and a resource deleted out-of-band is planned for recreation instead of failing the refresh. All seven support `terraform import` by ID.
 
-Refresh is deliberately conservative about optional arguments: one your configuration never set is not populated from a server-side default, since that would show up as a diff on every plan. Two values the API never returns are handled through server-side fingerprints instead — the credentials on `adaptive_resource` (see its `redacted_digests` output) and the body of an `adaptive_script` — so a secret or script changed outside Terraform still surfaces as a pending change. Importing an `adaptive_resource` warns which credentials the platform withheld; write them into your configuration before the next apply, or the update will clear them.
+Refresh is conservative about optional arguments: one your configuration never set is generally not populated from a server-side default, since that would show up as a diff on every plan. Resource credentials and script bodies depend on backend redaction; backend fingerprints detect supported out-of-band changes without returning the withheld values. `adaptive_resource.applied_digests` retains the recorded baseline across refreshes. Import cannot recover withheld credentials, and resource updates now reject omission of known held credentials before replacing configuration; explicitly setting a supported optional string credential to `""` authorizes clearing it. Missing fingerprint metadata is not evidence that a credential is absent. Credential arguments marked sensitive still persist in Terraform state: protect state and saved plans. See the resource's Secret Arguments section for coverage and compatibility limits.
 
 ### Migrating from `adaptive_msteams_workflow`
 
@@ -160,6 +160,14 @@ terraform plan
 ## Development
 
 For contributors and local development:
+
+The ordinary offline suite is `make test`; `make build` compiles the provider. To exercise actual Terraform plan/apply/import behavior against a loopback fake API (no Adaptive account or live infrastructure), install Terraform and run:
+
+```bash
+ADAPTIVE_ENGINE_TEST=1 go test ./internal/provider -run '^TestSecretTerraformEngine$' -v -count=1 -timeout=180s
+```
+
+The opt-in test builds the local plugin, isolates CLI configuration and credentials, and verifies repeated secret-drift refreshes, saved-plan reconciliation, import update protection, and explicit clearing. It uses the existing sensitive-state credential path, not native Terraform write-only arguments. The dedicated offline CLI CI job runs this test with Terraform 1.14.3; without the opt-in flag the engine test is skipped.
 
 ```bash
 # Build and install locally
