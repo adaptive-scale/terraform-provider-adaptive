@@ -3,7 +3,6 @@ package components
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"github.com/hashicorp/go-cty/cty"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/terraform"
@@ -16,8 +15,8 @@ func TestMaxJITDurationSchema(t *testing.T) {
 	if s == nil {
 		t.Fatal("missing max_jit_request_duration schema")
 	}
-	if s.Type != schema.TypeString || !s.Optional || s.Computed || s.Required || s.Default != nil || s.DefaultFunc != nil {
-		t.Fatalf("duration must be an optional string without a default: %+v", s)
+	if s.Type != schema.TypeString || !s.Optional || !s.Computed || s.Required || s.Default != nil || s.DefaultFunc != nil {
+		t.Fatalf("duration must be an optional computed string without a default: %+v", s)
 	}
 }
 
@@ -73,21 +72,23 @@ func TestMaxJITDurationReadOwnership(t *testing.T) {
 		prior, server, want string
 		isImport            bool
 	}{
-		{"omitted config", cty.ObjectVal(map[string]cty.Value{"max_jit_request_duration": cty.NullVal(cty.String)}), "", "2h", "", false},
+		{"omitted config observes", cty.ObjectVal(map[string]cty.Value{"max_jit_request_duration": cty.NullVal(cty.String)}), "", "2h", "2h", false},
 		{"configured drift", cty.ObjectVal(map[string]cty.Value{"max_jit_request_duration": cty.StringVal("1h")}), "1h", "2h", "2h", false},
 		{"configured empty catches drift", cty.ObjectVal(map[string]cty.Value{"max_jit_request_duration": cty.StringVal("")}), "", "2h", "2h", false},
 		{"configured clear remains empty", cty.ObjectVal(map[string]cty.Value{"max_jit_request_duration": cty.StringVal("")}), "", "", "", false},
-		{"refresh omitted", cty.NilVal, "", "2h", "", false},
+		{"refresh omitted observes", cty.NilVal, "", "2h", "2h", false},
 		{"refresh owned drift", cty.NilVal, "1h", "2h", "2h", false},
 		{"refresh cleared override", cty.NilVal, "1h", "", "", false},
-		{"refresh empty avoids diff", cty.NilVal, "", "2h", "", false},
+		{"refresh empty observes", cty.NilVal, "", "2h", "2h", false},
 		{"import recovers override", cty.NilVal, "", "2h", "2h", true},
 		{"import inherited", cty.NilVal, "", "", "", true},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			api := &fakeAPI{}
 			client := api.start(t, func(w http.ResponseWriter, r *http.Request) {
-				_, _ = fmt.Fprintf(w, `{"id":"ep-1","name":"endpoint","resource":"database","sessionType":"cli","maxJitRequestDuration":%q}`, tc.server)
+				frame := completeEndpointPolicyFrame()
+				frame["maxJitRequestDuration"] = tc.server
+				_ = json.NewEncoder(w).Encode(frame)
 			})
 			d := maxJITDurationData(tc.raw, tc.prior, tc.isImport)
 			if diags := ResourceAdaptiveSessionRead(context.Background(), d, client); diags.HasError() {

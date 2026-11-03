@@ -60,7 +60,7 @@ jobs:
       - name: Exercise real CLI with a local fake API
         env:
           ADAPTIVE_ENGINE_TEST: "1"
-        run: go test ./internal/provider -run '^Test(Secret|Mappings)TerraformEngine$' -v -count=1 -timeout=180s
+        run: go test ./internal/provider -run '^Test(Secret|Mappings|Endpoint)TerraformEngine$' -v -count=1 -timeout=180s
 
   generate:
     runs-on: ubuntu-latest

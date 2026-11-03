@@ -156,6 +156,7 @@ type ResourceReadResponse struct {
 }
 
 type SessionReadResponse struct {
+	policyFields          map[string]bool
 	ID                    string   `json:"id"`
 	Name                  string   `json:"name"`
 	Resource              string   `json:"resource"` // integration name, not id
