@@ -2,9 +2,26 @@
 
 ## Decision and scope
 
-The providers have matching integration/resource/route breadth, but **are not yet at functional parity**. Keep the existing lifecycle stack as the starting point; close state/credential-safety gaps before expanding field coverage. Treat the backend contract—not either provider's implementation—as the authority when the providers disagree.
+The baseline audit found matching integration/resource/route breadth but substantive state, credential, field and lifecycle differences. The staged implementation below uses the backend contract—not either provider—as authority. Current delivery is explicitly Terraform-only: Pulumi-compatible omitted-credential resupply/explicit-clear behavior is retained, while backend/Pulumi changes and native write-only migration are excluded by the user's scope decision.
 
-This document is the staged remediation roadmap. The first provider-only implementation step is implemented and locally verified on `feature/terraform-parity-hardening`, based on `fix/secret-drift-visible`; the complete roadmap is not implemented. No live workspace operations have been performed.
+Sections titled First through Sixth record independently reviewed implementation batches; the numbered roadmap below them preserves the original audit and future platform proposals. The Terraform-only delivery is locally implemented, verified and independently reviewed. Runtime changes are committed through `7df8a22`; the final release-contract batch completes documentation, inventory and coverage reconciliation on `feature/terraform-parity-release`. No live workspace operations, publishing or pushes have been performed.
+
+## Current Terraform-only delivery status
+
+| Original work package | Current disposition |
+| --- | --- |
+| Atomic reads and durable secret drift | Implemented, independently reviewed and tested across the seven families; malformed success is not deletion. |
+| Native secret architecture | Deferred by user. Keep recognized-held-secret resupply/explicit clear and stronger serialized-payload/lifecycle guards. Sensitive legacy state/plans remain sensitive storage. |
+| Broken SSH/ClickHouse/Aruba/Redshift mappings | Implemented with canonical fixtures and compatibility diagnostics. Backend runtime TLS limitations remain documented. |
+| Endpoint policy ownership | Implemented with presence-aware policy reads, preflight/post-write validation, supported resets and safe type-transition rejection. |
+| Remaining integration fields | Implemented/justified original key deltas plus managed-device browser fields, unused-input diagnostics and RDP validation. Current metadata inventory contains 82 types and 599 top-level integration/key rows; this is not exhaustive conditional-state or live connection proof. |
+| Schedule contract | Compatible full/legacy reads and supported clears implemented. Unsupported backend timezone and duration-removal writes are rejected rather than falsely acknowledged. |
+| Remaining family/client lifecycle | Implemented with immutable-binding planning, partial-ID recovery, bounded/sanitized responses, cancellable polling and route-specific positive acknowledgments. Backend description-clear limitations are explicit. |
+| Shared platform follow-ups | Terraform browser/unused-input work implemented. Backend redaction, atomicity/completeness and Pulumi corrections remain excluded, not claimed complete. |
+| Offline release gate | Completed locally: seven real CLI suites pass on Terraform 1.11.4 and 1.14.3, including CRUD lifecycles across all seven families; unit/race, build, vet, docs generation and consistency checks pass. Current field/disposition inventories and final documentation passed independent review with no blocking findings. CI is configured; remote CI has not been run. |
+| Live release gate | Not authorized or performed; configuration-API tests do not prove live authentication, connection, permission, masking or Kubernetes cleanup behavior. |
+
+Current inventory and limitations are recorded in `parity-completion-report.json`, `parity-current-integration-fields.csv`, `parity-field-dispositions.csv` and `parity-rdp-target-fields.csv`. The original 570-row `parity-integration-fields.csv` remains unchanged as historical evidence.
 
 ## First implementation step
 
