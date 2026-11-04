@@ -14,7 +14,10 @@ import (
 )
 
 type GoogleOAuthIntegrationConfiguration struct {
-	Version      string `yaml:"Version"`
+	ServiceAccount string `yaml:"serviceAccount"`
+	AdminEmail     string `yaml:"adminEmail"`
+
+	Version      string `yaml:"version"`
 	Name         string `yaml:"name"`
 	Domain       string `yaml:"domain"`
 	ClientID     string `yaml:"clientID"`
@@ -23,10 +26,12 @@ type GoogleOAuthIntegrationConfiguration struct {
 
 func SchemaToGoogleOAuthIntegrationConfiguration(d *schema.ResourceData) GoogleOAuthIntegrationConfiguration {
 	return GoogleOAuthIntegrationConfiguration{
-		Version:      "1",
-		Name:         d.Get("name").(string),
-		Domain:       d.Get("domain").(string),
-		ClientID:     d.Get("client_id").(string),
-		ClientSecret: d.Get("client_secret").(string),
+		ServiceAccount: attrString(d, "service_account"),
+		AdminEmail:     attrString(d, "admin_email"),
+		Version:        "1",
+		Name:           d.Get("name").(string),
+		Domain:         d.Get("domain").(string),
+		ClientID:       d.Get("client_id").(string),
+		ClientSecret:   d.Get("client_secret").(string),
 	}
 }

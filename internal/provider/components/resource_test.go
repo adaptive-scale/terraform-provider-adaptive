@@ -46,7 +46,7 @@ func TestSchemaToResourceIntegrationConfiguration_RDPWindowsEmptyPassword(t *tes
 	}
 }
 
-func TestSchemaToResourceIntegrationConfiguration_RDSIAMOnlyForPostgres(t *testing.T) {
+func TestSchemaToResourceIntegrationConfiguration_RDSIAMForMySQL(t *testing.T) {
 	d := schema.TestResourceDataRaw(t, ResourceAdaptiveResource().Schema, map[string]interface{}{
 		"name":        "my-1",
 		"type":        "mysql",
@@ -57,11 +57,8 @@ func TestSchemaToResourceIntegrationConfiguration_RDSIAMOnlyForPostgres(t *testi
 	})
 
 	_, err := schemaToResourceIntegrationConfiguration(d, "mysql")
-	if err == nil {
-		t.Fatal("expected an error when `use_rds_iam` is set on a non-postgres resource")
-	}
-	if !strings.Contains(err.Error(), "postgres") {
-		t.Fatalf("expected the error to mention postgres, got: %v", err)
+	if err != nil {
+		t.Fatalf("MySQL RDS IAM rejected: %v", err)
 	}
 }
 
@@ -103,7 +100,7 @@ func TestSchemaToResourceIntegrationConfiguration_PostgresRDSIAM(t *testing.T) {
 			raw: map[string]interface{}{
 				"aws_service_account": "adaptive-rds-access",
 			},
-			wantIRSA:    "useIrsa: true",
+			wantIRSA:    "",
 			wantPresent: []string{"awsServiceAccount: adaptive-rds-access"},
 		},
 		{
@@ -112,7 +109,7 @@ func TestSchemaToResourceIntegrationConfiguration_PostgresRDSIAM(t *testing.T) {
 				"aws_access_key_id":     "AKID",
 				"aws_secret_access_key": "secret",
 			},
-			wantIRSA:    "useIrsa: false",
+			wantIRSA:    "",
 			wantPresent: []string{"awsAccessKeyId: AKID"},
 		},
 		{
@@ -158,7 +155,10 @@ func TestSchemaToResourceIntegrationConfiguration_PostgresRDSIAM(t *testing.T) {
 			if !strings.Contains(string(out), "useRdsIam: true") {
 				t.Errorf("expected useRdsIam: true in:\n%s", out)
 			}
-			if !strings.Contains(string(out), tt.wantIRSA) {
+			if tt.wantIRSA == "" && strings.Contains(string(out), "useIrsa:") {
+				t.Error("omitted IRSA switch must remain nil; backend infers identity")
+			}
+			if tt.wantIRSA != "" && !strings.Contains(string(out), tt.wantIRSA) {
 				t.Errorf("expected %q in:\n%s", tt.wantIRSA, out)
 			}
 			for _, want := range tt.wantPresent {

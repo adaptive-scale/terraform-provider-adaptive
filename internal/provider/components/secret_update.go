@@ -41,6 +41,15 @@ func validateResourceSecretUpdate(ctx context.Context, d *schema.ResourceData, c
 	for _, key := range live.RedactedKeys {
 		held[key] = ""
 	}
+	// The backend's contextual serviceAccount classifier is not complete for
+	// Google directory documents. Treat an observed nonempty/null credential as
+	// held even without digest metadata. This is a provider-side write safeguard,
+	// not a claim that backend read redaction or fingerprint coverage is fixed.
+	if integrations.ProviderType(live.IntegrationType) == "google" {
+		if value, present := live.Configuration["serviceAccount"]; present && value != "" {
+			held["serviceAccount"] = ""
+		}
+	}
 
 	// Inspect the exact YAML that will be sent, not just the flat schema:
 	// conditional builders may discard otherwise configured arguments.

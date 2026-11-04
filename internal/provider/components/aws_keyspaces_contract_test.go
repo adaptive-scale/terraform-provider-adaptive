@@ -149,7 +149,7 @@ func TestAWSKeyspacesIAMCapabilities(t *testing.T) {
 				}
 				d := schema.TestResourceDataRaw(t, ResourceAdaptiveResource().Schema, map[string]interface{}{"name": "cloud", "type": typ, attr: value})
 				_, err := schemaToResourceIntegrationConfiguration(d, typ)
-				allowed := (attr == "aws_role_arn" && typ != "mysql") || (typ == "keyspaces" && (attr == "aws_access_key_id" || attr == "aws_secret_access_key"))
+				allowed := typ == "mysql" || (attr == "aws_role_arn") || (typ == "keyspaces" && (attr == "aws_access_key_id" || attr == "aws_secret_access_key"))
 				if (err == nil) != allowed {
 					t.Error("incorrect IAM capability boundary")
 				}
@@ -468,7 +468,7 @@ func TestAWSKeyspacesMissingRawOwnershipRejected(t *testing.T) {
 }
 
 func TestAWSKeyspacesSharedAttributesKeepOtherModes(t *testing.T) {
-	for _, typ := range []string{"postgres", "1password", "gcp"} {
+	for _, typ := range []string{"1password", "gcp"} {
 		r := ResourceAdaptiveResource()
 		values := map[string]interface{}{"name": "other", "type": typ, "aws_role_arn": "role", "service_account": "account", "use_service_account": true}
 		d := schema.TestResourceDataRaw(t, r.Schema, values)

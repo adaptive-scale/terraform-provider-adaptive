@@ -70,6 +70,10 @@ The full list of accepted values is validated by the provider; `terraform plan` 
 
 ## Integration-specific configuration
 
+### MySQL SSL modes
+
+For `type = "mysql"`, explicit `ssl_mode` values are `verify_identity`, `verify_ca`, `required`, `preferred`, or `disabled`. The backend forwards the token unchanged to `mysql --ssl-mode`; PostgreSQL spellings (`verify-full`, `verify-ca`, `allow`, `prefer`, and `disable`) are rejected during planning and before mutation. Use the canonical MySQL spellings instead. The sole legacy prefix `require` remains accepted because the MySQL CLI recognizes it as `REQUIRED`; it is preserved literally on write and refresh, not normalized to `required`. This compatibility exception does not establish equivalence across all backend TLS/certificate paths. A genuinely absent mode retains the historical `require` default; explicit `ssl_mode = ""` clears the setting so the backend omits the CLI SSL-mode flag. Omission on an existing resource preserves an observed mode, and `ignore_changes` continues to honor the planned value. These mappings do not guarantee live TLS negotiation or certificate validation.
+
 ### ClickHouse
 
 Use `database_name` for the database and `use_tls` for transport security. These map to the backend's `database` and `use-tls` keys. The old `ssl_mode` argument was not consumed by this integration; nonempty values are now rejected during planning and before a write rather than silently implying a PostgreSQL-style TLS policy. Remove it and set `use_tls` explicitly. A boolean TLS switch does not expose separate `require`, `verify-ca`, or `verify-full` modes.
@@ -105,6 +109,32 @@ Keyspaces also forwards `keyspace`, `keyspaces_endpoint`, and `version`. The sha
 For these two types only, omitted nonsecret cloud settings retain observed values through bounded SDK diff suppression. Explicit false/empty values request resets, and refresh is not suppressed. This prevents unrelated imported-resource updates from silently changing auth modes or dropping command restrictions. Missing/null read fields preserve observations rather than proving a clear; legacy/incomplete response coverage still limits omission-as-removal detection. Held static credentials retain the separate resupply/explicit-clear guard.
 
 AWS CLI also supports `enable_allowed_commands` and comma-separated `allowed_commands`, for example `ec2:describe-instances,s3:ls`. When enabled and both CLI `command` and `parameter` are nonempty strings, the backend parses the request and checks its exact service/subcommand pair against the allowlist. If CLI parameters are absent or either value is missing, empty, or not a string, the backend falls back to an interactive `/bin/bash` shell before allowlist validation, even when enabled. This is not a command-only security boundary. Empty or whitespace-only `allowed_commands` means allow all, not deny all; explicitly clearing the value relaxes the command-request restriction. This is separate from authorization resource scoping and does not itself create a least-privilege IAM policy. Configuration API tests do not verify live enforcement, IAM permissions, or cloud connectivity.
+
+### Expanded IAM, TLS, identity, and device fields
+
+The following integration-specific inputs are supported in both write and refresh mappings. Shared arguments are not automatically meaningful for every integration; unsupported IAM controls and unused legacy aliases are rejected rather than silently ignored.
+
+| Integration | Additional inputs |
+| --- | --- |
+| MySQL | `auth_mode`, `use_rds_iam`, `use_irsa`, `aws_region`, `aws_role_arn`, `aws_access_key_id`, `aws_secret_access_key`, `aws_service_account`, `root_cert`, `client_cert`, `client_key`, `old_version`; configured `ssl_mode` is now forwarded instead of ignored |
+| Postgres | `auth_mode` alongside the existing RDS IAM inputs |
+| Kafka | `use_msk_iam`, `use_irsa`, `aws_region`, `aws_role_arn`, `aws_access_key_id`, `aws_secret_access_key`, `aws_service_account`, `bootstrap_servers` (a comma-separated string, not a list) |
+| ElastiCache | `use_iam_auth`, `use_irsa`, `aws_role_arn`, `aws_service_account`, `cache_name`, `cache_type`, plus existing region/static credentials and TLS controls |
+| MongoDB | `use_tls`, `client_certificate`, `version` |
+| DocumentDB | `tls_enabled` |
+| Syslog | `tls_enabled`, `tls_ca_cert`, `client_certificate`, `client_key`, `tls_skip_verify` |
+| Services | `tls_enabled` |
+| SQL Server / Azure SQL Server | `ssl_mode` |
+| Google directory | `service_account` (the JSON credentials document, not a file path), `admin_email` |
+| Windows RDP | `allow_file_transfer` |
+
+For these integration-specific controls, omitted values retain observations where supported; explicit false/empty values request the corresponding backend reset. MySQL/Postgres `auth_mode` supports `password` or `aws_rds_iam`; an explicit `use_rds_iam` value takes precedence. Omitted IAM pointer switches retain backend inference instead of becoming false. Absent MySQL SSL mode retains the historical `require` default. None of these settings establishes that IAM, TLS validation, or a live connection succeeded.
+
+`aruba_instant_on`, `aruba_sw`, `cisco_ngfw`, `fortinet_ngfw`, `fortinet_analyzer`, `fortinet_manager`, `hpe_switch`, `ivanti`, `juniper_sw`, `paloalto_ngfw`, and `sophos_fw` support their backend SSH/browser fields and shared `automation_mode`, `fields`, and `script`. Browser fields/scripts are sensitive. Explicit empty browser credential strings are serialized so successful readback can acknowledge the clear; subsequent omission does not require resupplying an already-cleared credential. These devices do not support `prestart`. Cisco NGFW, Fortinet NGFW, and HPE retain the existing public `uri` input for backend `login_url`; use that input rather than public `login_url` for those types.
+
+Google service-account inputs are sensitive, but this provider cannot repair the backend exporter's contextual redaction or missing fingerprint coverage. A conservative update guard treats an observed account document as held even without fingerprint metadata. Do not interpret the configuration tests as proof that backend responses never expose credentials.
+
+The unused `app_id`, `database_account`, `database_username`, and `database_password` arguments are deprecated and rejected with canonical-input guidance. `app_key` is supported for Datadog; configurable `version` is supported for Keyspaces and MongoDB rather than being a generic integration-version override. Resource names remain mutable. Integration-type changes are rejected during planning and apply; migrate attached endpoints explicitly instead of relying on destructive replacement.
 
 ### Datadog
 

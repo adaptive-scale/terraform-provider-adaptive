@@ -5,6 +5,8 @@ import (
 )
 
 type AWSDocumentDBIntegrationConfiguration struct {
+	TLSEnabled bool `yaml:"tlsEnabled"`
+
 	Name string `yaml:"name"`
 	URI  string `yaml:"uri"`
 }
@@ -12,7 +14,8 @@ type AWSDocumentDBIntegrationConfiguration struct {
 // TODO: .(string) is assumption will cause problems
 func SchemaToAWSDocumentDBIntegrationConfiguration(d *schema.ResourceData) AWSDocumentDBIntegrationConfiguration {
 	return AWSDocumentDBIntegrationConfiguration{
-		Name: d.Get("name").(string),
-		URI:  d.Get("uri").(string),
+		TLSEnabled: attrBool(d, "tls_enabled"),
+		Name:       d.Get("name").(string),
+		URI:        d.Get("uri").(string),
 	}
 }

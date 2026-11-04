@@ -140,7 +140,7 @@ func ResourceAdaptiveResource() *schema.Resource {
 		ReadContext:   ResourceAdaptiveResourceRead,
 		UpdateContext: ResourceAdaptiveResourceUpdate,
 		DeleteContext: ResourceAdaptiveResourceDelete,
-		CustomizeDiff: resourceContractCustomizeDiff,
+		CustomizeDiff: rdpTargetCustomizeDiff,
 		Timeouts: &schema.ResourceTimeout{
 			Create: schema.DefaultTimeout(10 * time.Minute),
 			Update: schema.DefaultTimeout(10 * time.Minute),
@@ -215,7 +215,7 @@ func ResourceAdaptiveResource() *schema.Resource {
 				Type:        schema.TypeString,
 				Optional:    true,
 				Sensitive:   true,
-				Description: "The root certificate to use for the CockroachDB instance.",
+				Description: "Root certificate for MySQL, ProxySQL, YugabyteDB, or CockroachDB Secrets Manager. Plain Postgres/CockroachDB use tls_root_cert.",
 			},
 			"ssl_mode": {
 				Type:     schema.TypeString,
@@ -225,7 +225,7 @@ func ResourceAdaptiveResource() *schema.Resource {
 						return nil, nil
 					}
 					validValues := []string{
-						"prefer", "allow", "require", "verify-ca", "verify-full", "disable",
+						"prefer", "allow", "require", "verify-ca", "verify-full", "disable", "false", "skip-verify", "verify_identity", "verify_ca", "required", "preferred", "disabled",
 					}
 
 					if !slices.Contains(validValues, i.(string)) {
@@ -234,44 +234,52 @@ func ResourceAdaptiveResource() *schema.Resource {
 
 					return nil, nil
 				},
-				Description: "The SSL mode to use when connecting to the database. Used by CockroachDB, Postgres, Mysql and Redshift resources. ClickHouse uses use_tls instead.",
+				Description: "SSL mode for MySQL, Postgres, CockroachDB, Redshift, ProxySQL, SQL Server, and Azure SQL Server. SQL Server/Azure SQL additionally support false and skip-verify; MySQL accepts only verify_identity, verify_ca, required, preferred, disabled, the legacy CLI prefix require (preserved literally), or empty (omit the CLI SSL-mode flag). PostgreSQL spellings such as verify-full are not MySQL modes. Absent MySQL mode defaults to require for compatibility. ClickHouse uses use_tls.",
 			},
+			"admin_email":         {Type: schema.TypeString, Optional: true, Description: "Google directory delegated administrator email."},
+			"allow_file_transfer": {Type: schema.TypeBool, Optional: true, Description: "Allow Windows RDP file transfer; explicit false disables it."},
+			"auth_mode":           {Type: schema.TypeString, Optional: true, Description: "Legacy MySQL/Postgres authentication mode: password or aws_rds_iam. An explicitly configured use_rds_iam switch takes precedence; omit it to retain auth-mode-only configurations."},
+			"use_msk_iam":         {Type: schema.TypeBool, Optional: true, Description: "Use AWS MSK IAM authentication for Kafka. Omitted switches retain backend nil/inference; explicit false disables IAM."},
+			"use_iam_auth":        {Type: schema.TypeBool, Optional: true, Description: "Use AWS IAM authentication for ElastiCache. Omit to preserve observation; explicitly set false to disable."},
+			"bootstrap_servers":   {Type: schema.TypeString, Optional: true, Description: "Comma-separated Kafka broker host:port string for MSK IAM. Empty falls back to bootstrap.servers in client_configuration."},
+			"cache_name":          {Type: schema.TypeString, Optional: true, Description: "ElastiCache replication group or serverless cache identifier used for IAM token signing. Empty allows backend hostname inference."},
+			"cache_type":          {Type: schema.TypeString, Optional: true, Description: "ElastiCache IAM signing resource type: serverless or replication_group. Empty allows backend hostname inference."},
 			"use_rds_iam": {
 				Type:        schema.TypeBool,
 				Optional:    true,
-				Description: "Authenticate with short-lived AWS RDS IAM auth tokens instead of a stored password. The database user must be granted rds_iam, the RDS instance must have IAM authentication enabled, and `ssl_mode` cannot be `disable`. Used by Postgres resources.",
+				Description: "Authenticate Postgres/MySQL with short-lived AWS RDS IAM tokens. Enable IAM on RDS and provision the database user for the target engine. Omit to preserve backend auth-mode inference; explicit false overrides legacy auth_mode. TLS cannot be disabled.",
 			},
 			"use_irsa": {
 				Type:        schema.TypeBool,
 				Optional:    true,
-				Description: "Mint RDS IAM tokens with `aws_service_account`, or with the platform's own IRSA / instance-profile identity when it is empty. Set to false to use `aws_access_key_id` / `aws_secret_access_key` instead. Only used when `use_rds_iam` is set.",
+				Description: "Select the AWS identity source for Postgres/MySQL RDS IAM, Kafka MSK IAM, or ElastiCache IAM. False selects static keys. Omission preserves backend inference. Kafka sessions require a role or service account, not a bare platform identity.",
 			},
 			"aws_region": {
 				Type:        schema.TypeString,
 				Optional:    true,
-				Description: "The AWS region used to mint RDS IAM tokens. Leave empty to auto-detect from an *.rds.amazonaws.com hostname. Only used when `use_rds_iam` is set.",
+				Description: "AWS region for Postgres/MySQL RDS IAM or Kafka MSK IAM. Empty allows supported backend hostname/broker inference. ElastiCache and Keyspaces use aws_region_name.",
 			},
 			"aws_role_arn": {
 				Type:        schema.TypeString,
 				Optional:    true,
-				Description: "AWS CLI/Keyspaces role ARN, or role to assume when minting Postgres RDS IAM tokens. With Postgres IRSA it overrides the service account role annotation. AWS CLI/Keyspaces: omit to preserve observation; explicit empty clears.",
+				Description: "Role ARN for AWS CLI, Keyspaces, Postgres/MySQL RDS IAM, Kafka MSK IAM, or ElastiCache IAM. Omit to preserve observed ownership; explicit empty clears.",
 			},
 			"aws_access_key_id": {
 				Type:        schema.TypeString,
 				Optional:    true,
 				Sensitive:   true,
-				Description: "Keyspaces static AWS access key ID, or Postgres RDS IAM access key ID with use_irsa = false. AWS CLI uses access_key_id instead.",
+				Description: "Static AWS access key ID for Keyspaces, ElastiCache, Postgres/MySQL RDS IAM, or Kafka MSK IAM. AWS CLI uses access_key_id instead.",
 			},
 			"aws_secret_access_key": {
 				Type:        schema.TypeString,
 				Optional:    true,
 				Sensitive:   true,
-				Description: "Keyspaces static AWS secret access key, or Postgres RDS IAM secret access key with use_irsa = false. AWS CLI uses secret_access_key instead.",
+				Description: "Static AWS secret access key for Keyspaces, ElastiCache, Postgres/MySQL RDS IAM, or Kafka MSK IAM. AWS CLI uses secret_access_key instead.",
 			},
 			"aws_service_account": {
 				Type:        schema.TypeString,
 				Optional:    true,
-				Description: "Name of a Kubernetes ServiceAccount in the session cluster annotated with eks.amazonaws.com/role-arn; the platform mints RDS IAM tokens on its behalf. Requires `use_irsa = true`.",
+				Description: "Kubernetes ServiceAccount identity for Postgres/MySQL RDS IAM, Kafka MSK IAM, or ElastiCache IAM. Backend identity inference applies when use_irsa is omitted.",
 			},
 			"api_server": {
 				Type:        schema.TypeString,
@@ -609,6 +617,7 @@ func ResourceAdaptiveResource() *schema.Resource {
 				Description: "The API key",
 			},
 			"app_id": {
+				Deprecated:  "Unsupported legacy argument with no wire mapping; use client_id for OAuth integrations.",
 				Type:        schema.TypeString,
 				Optional:    true,
 				Description: "The app ID",
@@ -622,19 +631,22 @@ func ResourceAdaptiveResource() *schema.Resource {
 			"version": {
 				Type:        schema.TypeString,
 				Optional:    true,
-				Description: "The version",
+				Description: "Configuration version for Keyspaces or MongoDB. Other integration versions are provider-owned envelope constants.",
 			},
 			"database_account": {
+				Deprecated:  "Unsupported legacy argument with no wire mapping; use hostname for Snowflake.",
 				Type:        schema.TypeString,
 				Optional:    true,
 				Description: "The database account",
 			},
 			"database_username": {
+				Deprecated:  "Unsupported legacy argument with no wire mapping; use username.",
 				Type:        schema.TypeString,
 				Optional:    true,
 				Description: "The database username",
 			},
 			"database_password": {
+				Deprecated:  "Unsupported legacy argument with no wire mapping; use password.",
 				Type:        schema.TypeString,
 				Optional:    true,
 				Sensitive:   true,
@@ -660,7 +672,7 @@ func ResourceAdaptiveResource() *schema.Resource {
 				Type:        schema.TypeString,
 				Optional:    true,
 				Sensitive:   true,
-				Description: "1Password service account token, or AWS CLI/Keyspaces Kubernetes service account name. Remains sensitive for 1Password compatibility. AWS CLI/Keyspaces: omit to preserve observation; explicit empty clears.",
+				Description: "Google directory service-account JSON credential, 1Password service-account token, or AWS CLI/Keyspaces Kubernetes service-account name. Sensitive values remain in Terraform state. Directory backend redaction is not guaranteed for every representation.",
 			},
 			"use_connect_server": {
 				Type:        schema.TypeBool,
@@ -706,41 +718,41 @@ func ResourceAdaptiveResource() *schema.Resource {
 			"tls_enabled": {
 				Type:        schema.TypeBool,
 				Optional:    true,
-				Description: "Connect over TLS. Used by the redis, awselasticcache and awsdocumentdb_aws_secret_manager resources.",
+				Description: "Connect over TLS. Used by Redis, ElastiCache, DocumentDB (including Secrets Manager), syslog, and services.",
 			},
 			"tls_skip_verify": {
 				Type:        schema.TypeBool,
 				Optional:    true,
-				Description: "Skip verification of the server certificate. Used by the redis and awselasticcache resources.",
+				Description: "Skip verification of the server certificate. Used by Redis, ElastiCache, and syslog.",
 			},
 			"use_tls": {
 				Type:        schema.TypeBool,
 				Optional:    true,
 				Computed:    true,
-				Description: "Connect over TLS. Used by ClickHouse and mongodb36. Omission preserves observed TLS on refresh/import; configure false explicitly to disable it. ClickHouse does not support ssl_mode.",
+				Description: "Connect over TLS. Used by ClickHouse, MongoDB, and mongodb36. Omission preserves observed TLS on refresh/import; configure false explicitly to disable it. ClickHouse does not support ssl_mode.",
 			},
 			"tls_ca_cert": {
 				Type:        schema.TypeString,
 				Optional:    true,
-				Description: "CA certificate used to verify the server. Used by the redis resource.",
+				Description: "CA certificate used to verify the server. Used by Redis and syslog.",
 			},
 			"client_cert": {
 				Type:        schema.TypeString,
 				Optional:    true,
 				Sensitive:   true,
-				Description: "Client certificate presented to the server. Used by the proxysql resource.",
+				Description: "Client certificate presented to the server. Used by MySQL and ProxySQL.",
 			},
 			"client_key": {
 				Type:        schema.TypeString,
 				Optional:    true,
 				Sensitive:   true,
-				Description: "Private key for `client_cert`. Used by the proxysql resource.",
+				Description: "Client TLS private key. Used by MySQL, ProxySQL, and syslog (with client_certificate).",
 			},
 			"client_certificate": {
 				Type:        schema.TypeString,
 				Optional:    true,
 				Sensitive:   true,
-				Description: "Client certificate bundle. Used by the mongodb36 resource.",
+				Description: "Client certificate bundle. Used by MongoDB, mongodb36, and syslog.",
 			},
 			"client_configuration": {
 				Type:        schema.TypeString,
@@ -767,19 +779,19 @@ func ResourceAdaptiveResource() *schema.Resource {
 			"automation_mode": {
 				Type:        schema.TypeString,
 				Optional:    true,
-				Description: "Browser automation mode. Used by the chrome resource.",
+				Description: "Browser automation mode for Chrome and the eleven supported managed network-device integrations.",
 			},
 			"fields": {
 				Type:        schema.TypeString,
 				Optional:    true,
 				Sensitive:   true,
-				Description: "Form fields to fill during automated login. Used by the chrome resource.",
+				Description: "Form fields to fill during automated login for Chrome and managed network-device browser sessions.",
 			},
 			"script": {
 				Type:        schema.TypeString,
 				Optional:    true,
 				Sensitive:   true,
-				Description: "Automation script to run in the browser. Used by the chrome resource.",
+				Description: "Automation script to run for Chrome and managed network-device browser sessions.",
 			},
 			"prestart": {
 				Type:        schema.TypeString,
@@ -826,7 +838,7 @@ func ResourceAdaptiveResource() *schema.Resource {
 			"old_version": {
 				Type:        schema.TypeBool,
 				Optional:    true,
-				Description: "Target a pre-2.x ProxySQL admin interface. Used by the proxysql resource.",
+				Description: "Use the old-version client behavior for MySQL or ProxySQL.",
 			},
 			"proxysql_admin_port": {
 				Type:        schema.TypeString,
@@ -902,9 +914,10 @@ func ResourceAdaptiveResource() *schema.Resource {
 				Elem: &schema.Resource{
 					Schema: map[string]*schema.Schema{
 						"id": {
-							Type:        schema.TypeString,
-							Required:    true,
-							Description: "Unique identifier for the target within the fleet.",
+							Type:         schema.TypeString,
+							Required:     true,
+							ValidateFunc: integrations.ValidateAdaptiveRDPTargetString,
+							Description:  "Unique identifier for the target within the fleet.",
 						},
 						"name": {
 							Type:        schema.TypeString,
@@ -912,20 +925,23 @@ func ResourceAdaptiveResource() *schema.Resource {
 							Description: "Human-friendly name shown in the in-browser target picker.",
 						},
 						"host": {
-							Type:        schema.TypeString,
-							Required:    true,
-							Description: "Hostname or IP of the Windows server.",
+							Type:         schema.TypeString,
+							Required:     true,
+							ValidateFunc: integrations.ValidateAdaptiveRDPTargetString,
+							Description:  "Hostname or IP of the Windows server.",
 						},
 						"port": {
-							Type:        schema.TypeInt,
-							Optional:    true,
-							Default:     3389,
-							Description: "RDP port. Defaults to 3389.",
+							Type:         schema.TypeInt,
+							Optional:     true,
+							Default:      3389,
+							ValidateFunc: integrations.ValidateAdaptiveRDPTargetPort,
+							Description:  "RDP port. Defaults to 3389.",
 						},
 						"username": {
-							Type:        schema.TypeString,
-							Required:    true,
-							Description: "Username to authenticate with the target.",
+							Type:         schema.TypeString,
+							Required:     true,
+							ValidateFunc: integrations.ValidateAdaptiveRDPTargetString,
+							Description:  "Username to authenticate with the target.",
 						},
 						"password": {
 							Type:        schema.TypeString,
@@ -952,6 +968,9 @@ func ResourceAdaptiveResource() *schema.Resource {
 
 // Returns a YAML marshallable struct for the integration configuration
 func schemaToResourceIntegrationConfiguration(d *schema.ResourceData, intType string) (any, error) {
+	if err := validateResourceControlPresence(intType, d.GetRawConfig()); err != nil {
+		return nil, err
+	}
 	if err := validateResourceContractInputs(intType, d.Get); err != nil {
 		return nil, err
 	}
@@ -966,24 +985,7 @@ func schemaToResourceIntegrationConfiguration(d *schema.ResourceData, intType st
 	if err := validateCloudConfigOwnership(intType, d.Id() != "", d.GetRawConfig()); err != nil {
 		return nil, err
 	}
-	// Keep Postgres-only RDS IAM/IRSA controls closed. AWS CLI and Keyspaces
-	// also consume aws_role_arn; Keyspaces and awselasticcache consume the
-	// aws_* static key pair. AWS CLI retains its access_key_id/secret_access_key
-	// public inputs and must not silently accept those static-key aliases.
-	if intType != "postgres" {
-		keys := []string{"use_rds_iam", "use_irsa", "aws_region", "aws_service_account"}
-		if intType != "aws" && intType != "keyspaces" {
-			keys = append(keys, "aws_role_arn")
-		}
-		if intType != "awselasticcache" && intType != "keyspaces" {
-			keys = append(keys, "aws_access_key_id", "aws_secret_access_key")
-		}
-		for _, key := range keys {
-			if _, ok := d.GetOk(key); ok {
-				return nil, fmt.Errorf("`%s` is only supported by resources of type \"postgres\", not %q", key, intType)
-			}
-		}
-	}
+
 	switch intType {
 	case "aws":
 		return integrations.SchemaToAWSIntegrationConfiguration(d), nil
@@ -1409,6 +1411,10 @@ func driftedDigestKeys(applied, current map[string]string) []string {
 }
 
 func ResourceAdaptiveResourceUpdate(ctx context.Context, d *schema.ResourceData, m interface{}) diag.Diagnostics {
+	oldType, newType := d.GetChange("type")
+	if err := validateResourceTypeTransition(d.Id(), oldType, newType); err != nil {
+		return diag.FromErr(err)
+	}
 	client := m.(*adaptive.Client)
 	resourceID := d.Id()
 

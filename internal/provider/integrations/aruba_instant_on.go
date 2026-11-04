@@ -21,16 +21,17 @@ func ValidateArubaInstantOnInputs(host, hostname, apiToken string) error {
 // ArubaInstantOnIntegrationConfiguration matches the backend's consumed YAML.
 // Cloud/API tokens are not part of that contract.
 type ArubaInstantOnIntegrationConfiguration struct {
-	Version     string `yaml:"version"`
-	Name        string `yaml:"name"`
-	Hostname    string `yaml:"hostname"`
-	Username    string `yaml:"username"`
-	Password    string `yaml:"password"`
-	SSHKey      string `yaml:"sshKey"`
-	UsePassword bool   `yaml:"usePassword"`
-	Port        string `yaml:"port"`
-	WebUIPort   string `yaml:"webui_port"`
-	LoginURL    string `yaml:"login_url"`
+	ManagedBrowserSettings `yaml:",inline"`
+	Version                string `yaml:"version"`
+	Name                   string `yaml:"name"`
+	Hostname               string `yaml:"hostname"`
+	Username               string `yaml:"username"`
+	Password               string `yaml:"password"`
+	SSHKey                 string `yaml:"sshKey"`
+	UsePassword            bool   `yaml:"usePassword"`
+	Port                   string `yaml:"port"`
+	WebUIPort              string `yaml:"webui_port"`
+	LoginURL               string `yaml:"login_url"`
 }
 
 // arubaAliasOwners uses configuration, not refreshed state, to avoid making a
@@ -120,15 +121,16 @@ func (a *configApplier) arubaInstantOnAliases() {
 
 func SchemaToArubaInstantOnIntegrationConfiguration(d *schema.ResourceData) ArubaInstantOnIntegrationConfiguration {
 	return ArubaInstantOnIntegrationConfiguration{
-		Version:     "1.0",
-		Name:        d.Get("name").(string),
-		Hostname:    arubaInstantOnHostname(d),
-		Username:    d.Get("username").(string),
-		Password:    d.Get("password").(string),
-		SSHKey:      d.Get("key").(string),
-		UsePassword: d.Get("key").(string) == "",
-		Port:        d.Get("port").(string),
-		WebUIPort:   d.Get("webui_port").(string),
-		LoginURL:    d.Get("login_url").(string),
+		ManagedBrowserSettings: managedBrowserSettings(d),
+		Version:                "1.0",
+		Name:                   d.Get("name").(string),
+		Hostname:               arubaInstantOnHostname(d),
+		Username:               d.Get("username").(string),
+		Password:               d.Get("password").(string),
+		SSHKey:                 d.Get("key").(string),
+		UsePassword:            d.Get("key").(string) == "",
+		Port:                   d.Get("port").(string),
+		WebUIPort:              d.Get("webui_port").(string),
+		LoginURL:               d.Get("login_url").(string),
 	}
 }

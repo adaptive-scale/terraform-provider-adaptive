@@ -5,6 +5,10 @@ import (
 )
 
 type MongoIntegrationConfiguration struct {
+	ClientCertificate string `yaml:"clientCertificate"`
+	UseTLS            bool   `yaml:"useTLS"`
+	Version           string `yaml:"version"`
+
 	Name string `yaml:"name"`
 	URI  string `yaml:"uri"`
 }
@@ -12,7 +16,10 @@ type MongoIntegrationConfiguration struct {
 // TODO: .(string) is assumption will cause problems
 func SchemaToMongoIntegrationConfiguration(d *schema.ResourceData) MongoIntegrationConfiguration {
 	return MongoIntegrationConfiguration{
-		Name: d.Get("name").(string),
-		URI:  d.Get("uri").(string),
+		ClientCertificate: attrString(d, "client_certificate"),
+		UseTLS:            attrBool(d, "use_tls"),
+		Version:           attrString(d, "version"),
+		Name:              d.Get("name").(string),
+		URI:               d.Get("uri").(string),
 	}
 }

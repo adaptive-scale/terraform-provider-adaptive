@@ -3,6 +3,12 @@ package integrations
 import "github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
 
 type AWSElastiCacheIntegrationConfiguration struct {
+	UseIAMAuth           *bool  `yaml:"useIamAuth,omitempty"`
+	UseIRSA              *bool  `yaml:"useIrsa,omitempty"`
+	AWSRoleARN           string `yaml:"aws_role_arn,omitempty"`
+	AWSServiceAccount    string `yaml:"aws_service_account,omitempty"`
+	CacheName            string `yaml:"cache_name,omitempty"`
+	CacheType            string `yaml:"cache_type,omitempty"`
 	Version              string `yaml:"version"`
 	Name                 string `yaml:"name"`
 	Username             string `yaml:"username"`
@@ -20,6 +26,12 @@ type AWSElastiCacheIntegrationConfiguration struct {
 
 func SchemaToAWSElastiCacheIntegrationConfiguration(d *schema.ResourceData) AWSElastiCacheIntegrationConfiguration {
 	return AWSElastiCacheIntegrationConfiguration{
+		UseIAMAuth:           optionalBool(d, "use_iam_auth"),
+		UseIRSA:              optionalBool(d, "use_irsa"),
+		AWSRoleARN:           attrString(d, "aws_role_arn"),
+		AWSServiceAccount:    attrString(d, "aws_service_account"),
+		CacheName:            attrString(d, "cache_name"),
+		CacheType:            attrString(d, "cache_type"),
 		Version:              "1.0",
 		Name:                 attrString(d, "name"),
 		Username:             attrString(d, "username"),

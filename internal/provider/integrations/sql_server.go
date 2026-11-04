@@ -3,6 +3,8 @@ package integrations
 import "github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
 
 type SQLServerIntegrationConfiguration struct {
+	SSLMode string `yaml:"sslMode"`
+
 	Name         string `yaml:"name"`
 	DatabaseName string `yaml:"databaseName"`
 	Hostname     string `yaml:"hostname"`
@@ -13,6 +15,7 @@ type SQLServerIntegrationConfiguration struct {
 
 func SchemaToSQLServerIntegrationConfiguration(d *schema.ResourceData) SQLServerIntegrationConfiguration {
 	return SQLServerIntegrationConfiguration{
+		SSLMode:      attrString(d, "ssl_mode"),
 		Name:         d.Get("name").(string),
 		DatabaseName: d.Get("database_name").(string),
 		Hostname:     d.Get("host").(string),

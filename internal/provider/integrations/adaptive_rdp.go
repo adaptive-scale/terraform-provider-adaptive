@@ -3,6 +3,7 @@ package integrations
 import (
 	"errors"
 	"fmt"
+	"strings"
 
 	"github.com/hashicorp/go-cty/cty"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
@@ -33,6 +34,23 @@ type AdaptiveRDPIntegrationConfiguration struct {
 	Targets string `yaml:"targets"`
 }
 
+// ValidateAdaptiveRDPTargetString rejects blank required target values without
+// normalizing identifiers, hosts, usernames, or credentials.
+func ValidateAdaptiveRDPTargetString(value interface{}, key string) ([]string, []error) {
+	if v, ok := value.(string); !ok || strings.TrimSpace(v) == "" {
+		return nil, []error{fmt.Errorf("%s must not be empty or whitespace-only", key)}
+	}
+	return nil, nil
+}
+
+// ValidateAdaptiveRDPTargetPort accepts only usable TCP destination ports.
+func ValidateAdaptiveRDPTargetPort(value interface{}, key string) ([]string, []error) {
+	if v, ok := value.(int); !ok || v < 1 || v > 65535 {
+		return nil, []error{fmt.Errorf("%s must be a TCP port between 1 and 65535", key)}
+	}
+	return nil, nil
+}
+
 func SchemaToAdaptiveRDPIntegrationConfiguration(d *schema.ResourceData) (AdaptiveRDPIntegrationConfiguration, error) {
 	raw, ok := d.GetOk("targets")
 	if !ok {
@@ -52,7 +70,15 @@ func SchemaToAdaptiveRDPIntegrationConfiguration(d *schema.ResourceData) (Adapti
 		if !ok {
 			return AdaptiveRDPIntegrationConfiguration{}, errors.New("could not parse `targets` entry")
 		}
+		for _, field := range []string{"id", "host", "username"} {
+			if _, errs := ValidateAdaptiveRDPTargetString(m[field], fmt.Sprintf("targets.%d.%s", i, field)); len(errs) > 0 {
+				return AdaptiveRDPIntegrationConfiguration{}, errs[0]
+			}
+		}
 		id := m["id"].(string)
+		if _, errs := ValidateAdaptiveRDPTargetPort(m["port"], fmt.Sprintf("targets.%d.port", i)); len(errs) > 0 {
+			return AdaptiveRDPIntegrationConfiguration{}, errs[0]
+		}
 		if seenIDs[id] {
 			return AdaptiveRDPIntegrationConfiguration{}, fmt.Errorf("duplicate `targets` id %q: each target must have a unique id", id)
 		}

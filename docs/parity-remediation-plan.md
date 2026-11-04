@@ -51,6 +51,14 @@ Branch `feature/terraform-parity-cloud-fields` is stacked on endpoint-ownership 
 
 Evidence so far includes independent backend-shaped wire fixtures, observed RED→GREEN credential regressions, and the actual Terraform CLI loopback suite for cloud auth modes, imported policy preservation, false/empty resets and ignored changes, credential omission/markers, and Datadog application-key rotation/repeated refresh/saved-plan reconciliation/clear-then-omit. These are configuration API tests, not live IAM permission, allowlist-enforcement, Kubernetes provisioning, or connection proof. Native write-only and backend redaction/patch work remains deferred; the field CSV is still the pinned original inventory.
 
+## Fifth implementation step — remaining integration contracts
+
+Branch `feature/terraform-parity-integration-fields` is stacked on `0526880`. This batch covers remaining MySQL/Postgres/Kafka/ElastiCache IAM fields; MySQL, MongoDB, DocumentDB, syslog, services and SQL Server TLS fields; Google directory and Windows RDP controls; and the eleven managed network-device browser/SSH mappings. New public inputs are `auth_mode`, `bootstrap_servers` (string), `cache_name`, `cache_type`, `admin_email`, `use_msk_iam`, `use_iam_auth`, and `allow_file_transfer`. The resource documentation records the supported per-integration inputs and migration restrictions.
+
+Independent backend-shaped fixtures and real CLI checks exposed the ignored MySQL SSL mode, dropped inactive Kafka identity metadata, Google envelope spelling, and a test that incorrectly expected ignored credential drift to permit a full-blob metadata write. The latter now asserts safe rejection separately from ordinary nonsecret policy preservation. Additional regressions require explicit empty device browser credentials to survive YAML serialization so readback can acknowledge the clear and subsequent omission can converge. Resource integration-type changes are rejected during plan and apply; renames remain in-place. Final gates and independent review passed: make test, full race-enabled tests with all five real Terraform CLI suites (48 integration-field scenarios), build, vet, generated documentation, formatting and diff checks. Review corrected explicit MySQL SSL-mode vocabulary; the independent field audit additionally led to RDP blank-identity and port-range validation, with default port, literal values, unknown inputs and credential guards preserved.
+
+The user explicitly restricted remaining implementation to Terraform. Preserve Pulumi-compatible resupply/explicit-clear behavior for known held credentials, with Terraform's stronger payload/lifecycle guards. Do not implement or claim completed backend/Pulumi secret-patch, redaction, schedule persistence, or atomic-acknowledgment work. The original CSV remains the pinned baseline rather than a claim of delivered coverage. Live identity, TLS, SSH/RDP/browser behavior and backend credential redaction remain outside loopback configuration evidence.
+
 Baselines inspected:
 
 - Terraform: `f3ddb78843c8ee2a736317c822ee122e6eeba33a`, branch `fix/secret-drift-visible`.
@@ -112,7 +120,9 @@ Use focused PRs rather than one parity mega-PR. Prefer correcting #90/#91 defect
 
 ### 2. P0 — Terraform-native secret architecture, not a copy of Pulumi
 
-**Architecture decision:** functional parity must not require storing credentials in Terraform state or writing opaque drift fingerprints into password inputs. Preserve the existing mechanism only as a tested, time-bounded compatibility path. The preferred design follows HashiCorp's native write-only/ephemeral model and centralized secret-management principles.
+**Current delivery decision:** retain Pulumi-compatible omitted-credential behavior in Terraform: preserve withheld observations on refresh; reject a full-configuration update that omits a recognized server-held credential; accept an explicitly supplied value or supported explicit empty clear. Keep Terraform's additional serialized-payload and lifecycle protections rather than copying known Pulumi guard gaps. Omission does not request automatic server-side preservation or authorize silent credential deletion. The user selected this behavior instead of adding the proposed cross-repository secret-preserving update contract. Native write-only migration and its dependent backend contract remain future architecture, not completed work or a requirement of this compatibility delivery. Legacy sensitive arguments still persist in Terraform state/plans. Terraform 1.11+ was approved if a native write-only path is introduced; that approval alone does not require introducing one.
+
+**Future architecture decision:** functional parity must not require storing credentials in Terraform state or writing opaque drift fingerprints into password inputs. Preserve the existing mechanism only as a tested, time-bounded compatibility path. The preferred design follows HashiCorp's native write-only/ephemeral model and centralized secret-management principles.
 
 #### Preferred order
 
