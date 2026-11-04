@@ -12,6 +12,7 @@ import (
 
 func ResourceAdaptiveTeam() *schema.Resource {
 	return &schema.Resource{
+		CustomizeDiff: familyInputPlan([]string{"name"}, []string{"members", "endpoints"}),
 		CreateContext: ResourceAdaptiveTeamCreate,
 		ReadContext:   ResourceAdaptiveTeamRead,
 		UpdateContext: ResourceAdaptiveTeamUpdate,
@@ -46,7 +47,7 @@ func ResourceAdaptiveTeam() *schema.Resource {
 			"slack_channel_id": {
 				Type:        schema.TypeString,
 				Optional:    true,
-				Description: "Slack channel ID access requests for this group are routed to.",
+				Description: "Slack channel ID access requests for this group are routed to. A remote-only channel is not adopted on ordinary refresh; any group update sends the configured channel (empty when omitted), clearing an omitted remote channel. Import adopts the existing channel.",
 			},
 		},
 	}
@@ -84,6 +85,9 @@ func teamMembership(d *schema.ResourceData) (members, endpoints []string, err er
 }
 
 func ResourceAdaptiveTeamCreate(ctx context.Context, d *schema.ResourceData, m interface{}) diag.Diagnostics {
+	if err := validateFamilyInputs(d.Get, nil, []string{"name"}, []string{"members", "endpoints"}); err != nil {
+		return diag.FromErr(err)
+	}
 	client := m.(*adaptive.Client)
 
 	name, err := integrations.AttrFromSchema[string](d, "name", true)
@@ -100,13 +104,27 @@ func ResourceAdaptiveTeamCreate(ctx context.Context, d *schema.ResourceData, m i
 	if err != nil {
 		return diag.FromErr(err)
 	}
+	if resp == nil || resp.ID == "" {
+		return diag.Errorf("group create returned no trackable identity; inspect the remote object before retrying")
+	}
 	d.SetId(resp.ID)
 
 	// The create route has no slack channel field, so a configured channel is
 	// applied with a follow-up update.
 	if slack := d.Get("slack_channel_id").(string); slack != "" {
 		if err := client.UpdateTeam(ctx, resp.ID, *name, members, endpoints, slack); err != nil {
-			return diag.FromErr(err)
+			// The group already exists. An error here taints a newly created
+			// Terraform resource, causing a duplicate create on retry. Warn and
+			// record the authoritative channel so a later plan retries Update.
+			team, readErr := client.ReadTeam(ctx, resp.ID)
+			channel := ""
+			if readErr == nil && team != nil {
+				channel = team.SlackChannelID
+			}
+			// Do not use the normal refresh callback: a transient post-create
+			// 404 must not drop the ID acknowledged by the create response.
+			_ = d.Set("slack_channel_id", channel)
+			return diag.Diagnostics{{Severity: diag.Warning, Summary: "group created; Slack channel update needs retry", Detail: fmt.Sprintf("Group ID %s is retained. Run plan/apply again to retry the channel update without creating a duplicate group. Follow-up update: %v; read error: %v", resp.ID, err, readErr)}}
 		}
 	}
 
@@ -150,6 +168,9 @@ func ResourceAdaptiveTeamRead(ctx context.Context, d *schema.ResourceData, m int
 }
 
 func ResourceAdaptiveTeamUpdate(ctx context.Context, d *schema.ResourceData, m interface{}) diag.Diagnostics {
+	if err := validateFamilyInputs(d.Get, nil, []string{"name"}, []string{"members", "endpoints"}); err != nil {
+		return diag.FromErr(err)
+	}
 	client := m.(*adaptive.Client)
 	teamID := d.Id()
 

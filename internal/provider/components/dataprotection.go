@@ -18,6 +18,7 @@ var validMaskingTypes = []string{
 
 func ResourceAdaptiveDataProtection() *schema.Resource {
 	return &schema.Resource{
+		CustomizeDiff: familyPlan(familyInputPlan([]string{"resource"}, nil), rejectExistingChange("resource", "masking policy resource bindings are immutable; destroy turns masking off")),
 		Description: "Column-level masking policy for a database resource. Creating a policy for a resource " +
 			"that already has one (for example one configured in the UI) adopts and overwrites it rather than failing. " +
 			"Destroying it turns masking off; the generated `masked_<resource>` authorization and any masked views " +
@@ -234,6 +235,9 @@ func setDataProtectionOutputs(d *schema.ResourceData, r *adaptive.DataProtection
 }
 
 func ResourceAdaptiveDataProtectionCreate(ctx context.Context, d *schema.ResourceData, m interface{}) diag.Diagnostics {
+	if err := validateFamilyInputs(d.Get, nil, []string{"resource"}, nil); err != nil {
+		return diag.FromErr(err)
+	}
 	client := m.(*adaptive.Client)
 
 	resp, err := client.CreateDataProtection(ctx, dataProtectionRequestFromSchema(d))
@@ -296,6 +300,9 @@ func ResourceAdaptiveDataProtectionRead(ctx context.Context, d *schema.ResourceD
 }
 
 func ResourceAdaptiveDataProtectionUpdate(ctx context.Context, d *schema.ResourceData, m interface{}) diag.Diagnostics {
+	if err := validateFamilyInputs(d.Get, nil, []string{"resource"}, nil); err != nil {
+		return diag.FromErr(err)
+	}
 	client := m.(*adaptive.Client)
 
 	// The policy is bound to its resource; moving it means a new policy.

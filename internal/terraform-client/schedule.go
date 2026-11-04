@@ -44,10 +44,10 @@ type ScheduleRequest struct {
 // backend reuses this shape to report names it could not resolve to IDs.
 //
 // Servers that predate the full read DTO only populate the first block; the
-// pattern and membership fields are absent there and decode to zero values,
-// which is why ResourceAdaptiveScheduleRead only overwrites state from fields
-// the server actually reported.
+// pattern and membership fields are absent there. Retained JSON presence
+// distinguishes these unknown values from authoritative modern removals.
 type ScheduleResponse struct {
+	present         map[string]json.RawMessage
 	ID              string   `json:"id"`
 	Name            string   `json:"name"`
 	ScheduleType    string   `json:"scheduleType"`
@@ -78,14 +78,46 @@ type ScheduleResponse struct {
 	UnresolvedEndpoints []string `json:"unresolvedEndpoints,omitempty"`
 }
 
-// EndpointNames returns the endpoints the schedule applies to. The read DTO
-// reports them under "endpoints"; older payloads only carry "mappedEndpoints".
-func (r *ScheduleResponse) EndpointNames() []string {
-	if len(r.Endpoints) > 0 {
-		return r.Endpoints
+// UnmarshalJSON retains presence: absent legacy fields are not remote zeroes.
+func (r *ScheduleResponse) UnmarshalJSON(data []byte) error {
+	type wire ScheduleResponse
+	var decoded wire
+	if err := json.Unmarshal(data, &decoded); err != nil {
+		return err
 	}
-	return r.MappedEndpoints
+	var present map[string]json.RawMessage
+	if err := json.Unmarshal(data, &present); err != nil {
+		return err
+	}
+	for _, key := range []string{"startHour", "startMinute", "endHour", "endMinute", "isActive", "allDay", "users", "teams", "endpoints"} {
+		if raw, ok := present[key]; ok && strings.TrimSpace(string(raw)) == "null" {
+			return fmt.Errorf("schedule %s cannot be null", key)
+		}
+	}
+	*r = ScheduleResponse(decoded)
+	r.present = present
+	return nil
 }
+
+func (r *ScheduleResponse) HasField(key string) bool {
+	_, ok := r.present[key]
+	return ok
+}
+
+// FullRead recognizes the current backend DTO's non-omitempty fields, not a
+// guessed version flag. Its omitted optional scalars mean empty on this DTO.
+func (r *ScheduleResponse) FullRead() bool {
+	for _, key := range []string{"scheduleType", "isActive", "allDay", "startHour", "startMinute", "endHour", "endMinute", "users", "teams", "endpoints"} {
+		if !r.HasField(key) {
+			return false
+		}
+	}
+	return true
+}
+
+// EndpointNames returns canonical names only. mappedEndpoints contains IDs and
+// cannot be used as a name list without an authoritative resolver.
+func (r *ScheduleResponse) EndpointNames() []string { return r.Endpoints }
 
 func (c *Client) scheduleAPI() string {
 	return fmt.Sprintf("%s/terraform/schedule", c.workspaceURL)
@@ -129,7 +161,7 @@ func (c *Client) writeSchedule(ctx context.Context, method, url string, req *Sch
 
 	if response.StatusCode == http.StatusOK {
 		var resp ScheduleResponse
-		if err := json.NewDecoder(response.Body).Decode(&resp); err != nil {
+		if err := decodeResponse(response.Body, &resp); err != nil {
 			return nil, fmt.Errorf("failed to decode response body. err %w", err)
 		}
 		return &resp, nil
@@ -138,7 +170,7 @@ func (c *Client) writeSchedule(ctx context.Context, method, url string, req *Sch
 	// Non-200: try to surface the most specific reason we can.
 	if response.StatusCode == http.StatusBadRequest {
 		var resp ScheduleResponse
-		if err := json.NewDecoder(response.Body).Decode(&resp); err == nil {
+		if err := decodeResponse(response.Body, &resp); err == nil {
 			if unresolved := resp.unresolvedErr(); unresolved != nil {
 				return nil, unresolved
 			}
@@ -168,7 +200,14 @@ func (c *Client) UpdateSchedule(ctx context.Context, id string, req *ScheduleReq
 // longer exists so callers can drop it from Terraform state.
 func (c *Client) GetSchedule(ctx context.Context, id string) (*ScheduleResponse, error) {
 	tflog.Debug(ctx, "GetSchedule called", map[string]interface{}{"id": id})
-	return readTyped[ScheduleResponse](c, ctx, fmt.Sprintf("%s/read/%s", c.scheduleAPI(), id), "schedule", id)
+	resp, err := readTyped[ScheduleResponse](c, ctx, fmt.Sprintf("%s/read/%s", c.scheduleAPI(), id), "schedule", id)
+	if err != nil || resp == nil {
+		return resp, err
+	}
+	if err := resp.unresolvedErr(); err != nil {
+		return nil, fmt.Errorf("schedule read has incomplete name resolution: %w", err)
+	}
+	return resp, nil
 }
 
 // DeleteSchedule removes a schedule. The backend delete is idempotent, so a

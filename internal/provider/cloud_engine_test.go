@@ -630,5 +630,9 @@ func (a *cloudEngineAPI) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 	a.exists, a.cfg, a.tags = true, cloudCopy(cfg), dto.Tags
 	a.mutations++
-	_ = json.NewEncoder(w).Encode(map[string]any{"id": engineID})
+	if update {
+		_ = json.NewEncoder(w).Encode(map[string]any{"success": true})
+	} else {
+		_ = json.NewEncoder(w).Encode(map[string]any{"id": engineID})
+	}
 }

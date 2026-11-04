@@ -31,7 +31,7 @@ func TestResourceUpdateRejectsOmittedHeldSecretBeforeWriting(t *testing.T) {
 			_, _ = w.Write([]byte(`{"id":"r-1","name":"db","integrationType":"postgres","configuration":{"hostname":"h"},"redactedKeys":["password"],"redactedDigests":{"password":"held"}}`))
 			return
 		}
-		_, _ = w.Write([]byte(`{"id":"r-1"}`))
+		_, _ = w.Write([]byte(`{"success":true}`))
 	})
 	d := schema.TestResourceDataRaw(t, ResourceAdaptiveResource().Schema, map[string]interface{}{
 		"name": "db", "type": "postgres", "host": "h",
@@ -69,7 +69,7 @@ func TestResourceSecretUpdateConfigurationPresence(t *testing.T) {
 					_, _ = w.Write([]byte(`{"id":"r-1","name":"db","integrationType":"postgres","configuration":{"hostname":"h"},"redactedKeys":["password"],"redactedDigests":{"password":"held"}}`))
 					return
 				}
-				_, _ = w.Write([]byte(`{"id":"r-1"}`))
+				_, _ = w.Write([]byte(`{"success":true}`))
 			})
 			d := secretUpdateData(t, map[string]interface{}{
 				"name": "db", "type": "postgres", "host": "h", "password": tc.value,
@@ -144,6 +144,10 @@ func TestResourceSecretUpdateAllowsExistingBuilderNormalization(t *testing.T) {
 		t.Run(tc.typ+"/"+tc.key, func(t *testing.T) {
 			api := &fakeAPI{}
 			client := api.start(t, func(w http.ResponseWriter, r *http.Request) {
+				if strings.Contains(r.URL.Path, "/update/") {
+					_, _ = w.Write([]byte(`{"success":true}`))
+					return
+				}
 				_ = json.NewEncoder(w).Encode(map[string]interface{}{
 					"id": "r-1", "name": "normalized", "integrationType": tc.typ,
 					"redactedDigests": map[string]string{tc.key: "held"},
@@ -237,6 +241,10 @@ func TestResourceSecretUpdateValidatesSerializedIAMCredential(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			api := &fakeAPI{}
 			client := api.start(t, func(w http.ResponseWriter, r *http.Request) {
+				if strings.Contains(r.URL.Path, "/update/") {
+					_, _ = w.Write([]byte(`{"success":true}`))
+					return
+				}
 				_, _ = w.Write([]byte(`{"id":"r-1","name":"db","integrationType":"postgres","redactedDigests":{"awsSecretAccessKey":"held"}}`))
 			})
 			values := map[string]interface{}{"name": "db", "type": "postgres", "aws_secret_access_key": tc.value}
@@ -304,7 +312,7 @@ func TestResourceSecretUpdateAllowsOmissionAfterExplicitServerClear(t *testing.T
 			_, _ = w.Write([]byte(`{"id":"r-1","name":"db","integrationType":"postgres","configuration":{"password":""}}`))
 			return
 		}
-		_, _ = w.Write([]byte(`{"id":"r-1"}`))
+		_, _ = w.Write([]byte(`{"success":true}`))
 	})
 	d := secretUpdateData(t, map[string]interface{}{
 		"name": "db", "type": "postgres",
@@ -339,7 +347,7 @@ func TestOpaqueResourceUpdateRequiresConfiguredValue(t *testing.T) {
 			_, _ = w.Write([]byte(`{"id":"r-1","name":"encrypted","integrationType":"adaptiveencrypt"}`))
 			return
 		}
-		_, _ = w.Write([]byte(`{"id":"r-1"}`))
+		_, _ = w.Write([]byte(`{"success":true}`))
 	})
 	d := secretUpdateData(t, map[string]interface{}{
 		"name": "encrypted", "type": "adaptiveencrypt",
@@ -364,7 +372,7 @@ func TestResourceSecretUpdateCaptureWithoutDigestsPreservesEvidence(t *testing.T
 			}
 			return
 		}
-		_, _ = w.Write([]byte(`{"id":"r-1"}`))
+		_, _ = w.Write([]byte(`{"success":true}`))
 	})
 	d := secretUpdateData(t, map[string]interface{}{
 		"name": "db", "type": "postgres", "password": "synthetic-configured",

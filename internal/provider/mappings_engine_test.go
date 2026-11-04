@@ -402,5 +402,9 @@ func (a *mappingsEngineAPI) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	a.cfg, a.tags, a.exists = mappingsCopy(cfg), request.Tags, true
 	a.writes = append(a.writes, mappingsCopy(cfg))
 	a.mutations++
-	_ = json.NewEncoder(w).Encode(map[string]any{"id": engineID})
+	if update {
+		_ = json.NewEncoder(w).Encode(map[string]any{"success": true})
+	} else {
+		_ = json.NewEncoder(w).Encode(map[string]any{"id": engineID})
+	}
 }

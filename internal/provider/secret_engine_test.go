@@ -350,7 +350,11 @@ func (a *secretEngineAPI) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 	a.exists, a.password, a.tags = true, password, request.Tags
 	a.mutations++
-	_ = json.NewEncoder(w).Encode(map[string]any{"id": engineID})
+	if update {
+		_ = json.NewEncoder(w).Encode(map[string]any{"success": true})
+	} else {
+		_ = json.NewEncoder(w).Encode(map[string]any{"id": engineID})
+	}
 }
 func (a *secretEngineAPI) mutationCount() int { a.mu.Lock(); defer a.mu.Unlock(); return a.mutations }
 func (a *secretEngineAPI) assert(t *testing.T, password string, tags []string, mutations int) {

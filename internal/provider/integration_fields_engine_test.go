@@ -525,7 +525,11 @@ func (a *integrationFieldsAPI) ServeHTTP(w http.ResponseWriter, r *http.Request)
 	a.current = integrationFieldsClone(a.expected)
 	a.tag = req.Tags[0]
 	a.mutations++
-	_ = json.NewEncoder(w).Encode(map[string]any{"id": engineID})
+	if create {
+		_ = json.NewEncoder(w).Encode(map[string]any{"id": engineID})
+	} else {
+		_ = json.NewEncoder(w).Encode(map[string]any{"success": true})
+	}
 }
 func integrationFieldsClone(in map[string]any) map[string]any {
 	out := make(map[string]any, len(in))

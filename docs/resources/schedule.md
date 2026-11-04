@@ -11,6 +11,14 @@ The `adaptive_schedule` resource defines a recurring window in which access requ
 
 Schedules apply to the users, teams and endpoints they name. A request only matches when it falls inside the window in the schedule's timezone and the schedule is active.
 
+## Read, reset, and compatibility behavior
+
+Modern complete schedule responses refresh removals, including empty audiences and zero-valued windows. Legacy missing fields retain previous observations and produce compatibility warnings. `endpoints` contains canonical endpoint names; legacy `mappedEndpoints` IDs are never substituted for those names. Reported incomplete or unresolved sections fail before state is changed. Presence-based legacy recognition is not a guarantee against backend errors that are silently returned as complete data.
+
+Users, teams, endpoints, description, pattern and expiry retain full-replacement ownership: removing them resets the corresponding supported configuration. Removing `is_active` resets to the existing Terraform default `true`; removing `operation_type` resets to `autoapprove`.
+
+The current backend does not persist timezone updates or support removal of a previously set maximum access duration. Terraform rejects these changes instead of claiming success or attempting destructive name-keyed upsert replacement. Backend numeric zero is a real `0m` duration, not an unset value. Setting these fields when creating a schedule is distinct from later changing or clearing them. Backend persistence/mapping failures without a returned ID require remote reconciliation before retrying creation; do not assume a failed create was rolled back.
+
 ## Example Usage
 
 ### Business Hours Auto-Approval
@@ -103,14 +111,14 @@ resource "adaptive_schedule" "oncall_window" {
 - `endpoints` (List of String) Endpoint (session) names this schedule applies to.
 - `expires_at` (String) RFC3339 instant after which the schedule stops applying.
 - `is_active` (Boolean) Whether the schedule is active. Defaults to true.
-- `max_access_time` (Number) Maximum access time in minutes for sessions approved under this schedule.
+- `max_access_time` (Number) Maximum access time in minutes for sessions approved under this schedule. Removing an existing override is rejected: the backend preserves an omitted value, and a numeric zero is a real 0m TTL rather than an unset override.
 - `operation_type` (String) Whether a request covered by this schedule is auto-approved or auto-rejected. One of: autoapprove (default), autoreject.
 - `specific_dates` (List of String) RFC3339 timestamps. Used by schedule_type = specific.
 - `start_day` (Number) Start day of month (1-31). Used by schedule_type = monthly.
 - `start_hour` (Number) Window start hour (0-23). Ignored when all_day is true.
 - `start_minute` (Number) Window start minute (0-59). Ignored when all_day is true.
 - `teams` (List of String) Team names auto-approved by this schedule.
-- `timezone` (String) IANA timezone the window is evaluated in. Empty inherits the workspace default.
+- `timezone` (String) IANA timezone the window is evaluated in. Empty inherits the workspace default on create. Changes and clears are rejected for existing schedules because the current backend update route does not persist timezone.
 - `users` (List of String) User emails auto-approved by this schedule.
 - `weekdays` (List of String) Weekday names (e.g. Monday). Used by schedule_type = custom.
 

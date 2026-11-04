@@ -75,7 +75,11 @@ func TestDatadogHeldApplicationKeyUpdateGuard(t *testing.T) {
 	for _, supplied := range []bool{false, true} {
 		t.Run(map[bool]string{false: "omitted", true: "supplied"}[supplied], func(t *testing.T) {
 			api := &fakeAPI{}
-			client := api.start(t, func(w http.ResponseWriter, _ *http.Request) {
+			client := api.start(t, func(w http.ResponseWriter, r *http.Request) {
+				if r.Method == http.MethodPost {
+					_ = json.NewEncoder(w).Encode(map[string]interface{}{"success": true})
+					return
+				}
 				_ = json.NewEncoder(w).Encode(map[string]interface{}{
 					"id": "r-1", "name": "monitor", "integrationType": "datadog",
 					"redactedDigests": map[string]string{"dd_api_key": "held-api-digest", "dd_app_key": "held-application-digest"},

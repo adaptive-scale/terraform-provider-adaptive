@@ -59,6 +59,16 @@ Independent backend-shaped fixtures and real CLI checks exposed the ignored MySQ
 
 The user explicitly restricted remaining implementation to Terraform. Preserve Pulumi-compatible resupply/explicit-clear behavior for known held credentials, with Terraform's stronger payload/lifecycle guards. Do not implement or claim completed backend/Pulumi secret-patch, redaction, schedule persistence, or atomic-acknowledgment work. The original CSV remains the pinned baseline rather than a claim of delivered coverage. Live identity, TLS, SSH/RDP/browser behavior and backend credential redaction remain outside loopback configuration evidence.
 
+## Sixth implementation step — family lifecycle and transport contracts
+
+Branch `feature/terraform-parity-lifecycle` stacks the independently reviewed lifecycle/client batch on integration commit `c1f6ee3`. The original isolated batch is retained at local commit `1f3f285`. All 29 client routes have independent fixture coverage. Requests/polling honor cancellation; permanent failures stop retrying; response bodies are bounded and diagnostics sanitized; redirects do not replay create requests; partial creation retains an assigned identity; and mutations require route-specific positive acknowledgments instead of accepting arbitrary HTTP 200 bodies.
+
+Schedule reads distinguish full and legacy presence, preserve incomplete observations, and never substitute mapped endpoint IDs for canonical names. Script metadata maps support explicit empty removal and script fingerprint baselines survive repeated refresh. Group Slack follow-up failure retains the group and produces a retry warning; channel omission remains documented full-replacement ownership. Script endpoint, masking resource binding, and authorization integration-type changes reject at plan/apply without unsafe replacement. Data-protection destroy remains masking-off, not deletion of authorization or views.
+
+Backend limitations remain explicit Terraform diagnostics: schedule timezone updates, removal of an existing maximum duration, and empty script/authorization descriptions cannot be persisted by the pinned backend. These are not claimed fixed. Configuration deletion/readiness does not establish Kubernetes cleanup, live permission enforcement, or runtime masking. Generated family documentation and the CI engine selector include the new family suite; the documentation generator uses an explicit provider name so arbitrary worktree directory names work.
+
+The standalone batch passed unit/race tests, all five CLI suites then available in that worktree, build, vet, documentation generation and final independent review. Stacked verification now combines all six suites, including the integration-field suite. Its older update fake needed the actual backend `success: true` acknowledgment; no production weakening or payload/assertion removal was required. Final combined unit/race/build/vet/docs/formatting/diff checks and independent incremental review passed. All six real Terraform CLI suites pass on verified Terraform 1.11.4 and 1.14.3; the race-enabled combined run used 1.14.3.
+
 Baselines inspected:
 
 - Terraform: `f3ddb78843c8ee2a736317c822ee122e6eeba33a`, branch `fix/secret-drift-visible`.

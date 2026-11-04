@@ -27,6 +27,7 @@ type Client struct {
 	serviceToken string
 	workspaceURL string
 	httpClient   *http.Client
+	pollInterval time.Duration
 }
 
 // NewClient builds a Client. workspaceURL is the base workspace URL (e.g.
@@ -40,8 +41,9 @@ func NewClient(serviceToken, workspaceURL string) *Client {
 
 	return &Client{
 		serviceToken: serviceToken,
+		pollInterval: 10 * time.Second,
 		workspaceURL: workspaceURL,
-		httpClient:   &http.Client{Timeout: requestTimeout},
+		httpClient:   &http.Client{Timeout: requestTimeout, CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }},
 	}
 }
 
@@ -90,12 +92,64 @@ func (c *Client) do(ctx context.Context, req *http.Request) (*http.Response, err
 		"status_code": res.StatusCode,
 		"url":         req.URL.String(),
 	})
-	if res.StatusCode == http.StatusUnauthorized {
-		res.Body.Close()
-		tflog.Error(ctx, "Authentication failed: bad token", map[string]interface{}{
-			"url": req.URL.String(),
-		})
-		return nil, errors.New("bad token. please check your service token")
+	// Read once with a hard bound, and close the network body on every path.
+	// Callers receive an in-memory body, never an unbounded server stream.
+	body, readErr := io.ReadAll(io.LimitReader(res.Body, maxResponseBytes+1))
+	res.Body.Close()
+	if readErr != nil {
+		return nil, fmt.Errorf("reading API response: %w", readErr)
+	}
+	if len(body) > maxResponseBytes {
+		return nil, errors.New("API response exceeds size limit")
+	}
+	res.Body = io.NopCloser(bytes.NewReader(body))
+	if res.StatusCode < 200 || res.StatusCode >= 300 {
+		// A read 404 is authoritative absence. Endpoint deletion 404 races are
+		// handled by its caller; other errors are never retried here.
+		if res.StatusCode == 404 && (req.Method == "GET" || strings.Contains(req.URL.Path, "/session/delete/") || strings.Contains(req.URL.Path, "/session/forcedelete/")) {
+			return res, nil
+		}
+		return nil, newHTTPError(res.StatusCode, body, req)
+	}
+	if len(bytes.TrimSpace(body)) != 0 && !json.Valid(body) {
+		return nil, errors.New("malformed API JSON response")
+	}
+	if req.Method != "GET" && len(bytes.TrimSpace(body)) != 0 {
+		var envelope map[string]json.RawMessage
+		var message string
+		if string(bytes.TrimSpace(body)) == "null" {
+			return nil, errors.New("null API mutation response")
+		}
+		if json.Unmarshal(body, &message) == nil && message != "success" {
+			if message == "error while terminating session" && strings.Contains(req.URL.Path, "/session/delete/") {
+				return nil, &HTTPError{StatusCode: res.StatusCode, Reason: "error while terminating session"}
+			}
+			return nil, errors.New("API mutation returned an unsuccessful message")
+		}
+		if json.Unmarshal(body, &envelope) != nil && message != "success" {
+			return nil, errors.New("malformed API mutation response shape")
+		}
+		if envelope != nil {
+			if value, ok := envelope["error"]; ok && string(value) != "null" && string(value) != `""` {
+				return nil, errors.New("API mutation returned an error envelope")
+			}
+			for _, key := range []string{"ok", "success"} {
+				if value, ok := envelope[key]; ok && string(value) != "true" {
+					return nil, errors.New("API mutation was not acknowledged")
+				}
+			}
+		}
+	}
+	if err := validateMutationAcknowledgement(req, body); err != nil {
+		return nil, err
+	}
+	if strings.HasSuffix(req.URL.Path, "/create") {
+		var identity struct {
+			ID string `json:"id"`
+		}
+		if json.Unmarshal(body, &identity) != nil || !validCreateID(identity.ID) {
+			return nil, errors.New("create response has no usable object ID; creation may have succeeded, reconcile before retrying")
+		}
 	}
 	return res, nil
 }
@@ -164,7 +218,7 @@ func readTyped[T any](c *Client, ctx context.Context, url, what, id string) (*T,
 	}
 
 	out := new(T)
-	if err := json.NewDecoder(resp.Body).Decode(out); err != nil {
+	if err := decodeResponse(resp.Body, out); err != nil {
 		return nil, fmt.Errorf("failed to decode %s read response. err %w", what, err)
 	}
 	// Fail loudly if the server hands back a different record than the one asked
@@ -173,9 +227,9 @@ func readTyped[T any](c *Client, ctx context.Context, url, what, id string) (*T,
 	if v, ok := any(out).(identifiedRead); ok {
 		if got := v.readID(); got != "" && got != id {
 			tflog.Error(ctx, "read returned a different record than requested", map[string]interface{}{
-				"type": what, "requested": id, "returned": got,
+				"type": what, "requested": id,
 			})
-			return nil, fmt.Errorf("read of %s %s returned %s instead", what, id, got)
+			return nil, fmt.Errorf("read of %s %s returned a different object identity", what, id)
 		}
 		// Reject null, empty objects, and unexpected envelopes atomically. This
 		// also fails malformed imports instead of adopting an empty object;
@@ -226,7 +280,7 @@ func (c *Client) CreateTeam(ctx context.Context, name string, members, endpoints
 	}
 
 	var resp CreateResourceResponse
-	if err := json.NewDecoder(response.Body).Decode(&resp); err != nil {
+	if err := decodeResponse(response.Body, &resp); err != nil {
 		return nil, fmt.Errorf("failed to decode response body. err %w", err)
 	}
 	tflog.Debug(ctx, "Team successfully created", map[string]interface{}{"name": name, "id": resp.ID})
@@ -309,26 +363,12 @@ func encode(v any) (*bytes.Buffer, error) {
 	return buf, nil
 }
 
-// readBody drains a response body and returns it as a trimmed string. Draining
-// also lets the connection be reused.
+// readBody is a legacy diagnostic adapter. do already consumed and closed the
+// bounded wire body; do not expose it from downstream fallback paths.
 func readBody(resp *http.Response) string {
-	b, _ := io.ReadAll(resp.Body)
-	return strings.TrimSpace(string(b))
+	return (&HTTPError{StatusCode: resp.StatusCode}).Error()
 }
 
-func decodeError(ctx context.Context, response *http.Response) (reason string, decodeErr error) {
-	var errReason ErrorResponse
-	if err := json.NewDecoder(response.Body).Decode(&errReason); err != nil {
-		tflog.Error(ctx, "Failed to decode error response", map[string]interface{}{
-			"status_code": response.StatusCode,
-			"error":       err.Error(),
-		})
-		return "", fmt.Errorf("failed to decode response body. err %w", err)
-	} else {
-		reason = errReason.Error
-		tflog.Debug(ctx, "Decoded error response", map[string]interface{}{
-			"reason": reason,
-		})
-		return
-	}
+func decodeError(ctx context.Context, response *http.Response) (string, error) {
+	return readBody(response), nil
 }

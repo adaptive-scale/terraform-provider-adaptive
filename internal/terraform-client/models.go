@@ -20,7 +20,9 @@ type CreateResourceResponse struct {
 }
 
 type UpdateResourceResponse struct {
-	ID string `json:"id"`
+	// ID is retained for source compatibility with older callers/servers.
+	ID      string `json:"id,omitempty"`
+	Success bool   `json:"success"`
 }
 
 const (
@@ -86,7 +88,9 @@ type UpdateAuthorizationRequest struct {
 }
 
 type UpdateAuthorizationResponse struct {
-	ID string `json:"id"`
+	// The backend acknowledges this update; it does not assign a new ID.
+	ID string `json:"id,omitempty"`
+	OK bool   `json:"ok"`
 }
 
 // ScriptRequest is the payload consumed by the script create/update routes. The
@@ -96,7 +100,7 @@ type ScriptRequest struct {
 	Command               string            `json:"Command"`
 	Endpoint              string            `json:"Endpoint"`
 	Description           string            `json:"Description,omitempty"`
-	ParameterDescriptions map[string]string `json:"ParameterDescriptions,omitempty"`
+	ParameterDescriptions map[string]string `json:"ParameterDescriptions"`
 }
 
 // DataProtectionRequest mirrors the server's TerraformDataProtectionRequest.
@@ -191,13 +195,14 @@ type SessionReadResponse struct {
 }
 
 type AuthorizationReadResponse struct {
-	ID           string `json:"id"`
-	Name         string `json:"name"`
-	Description  string `json:"description"`
-	ResourceType string `json:"resourceType"`
-	Permissions  string `json:"permissions"`
-	Status       string `json:"status"`
-	Type         string `json:"type"`
+	ResourceTypePresent bool   `json:"-"`
+	ID                  string `json:"id"`
+	Name                string `json:"name"`
+	Description         string `json:"description"`
+	ResourceType        string `json:"resourceType"`
+	Permissions         string `json:"permissions"`
+	Status              string `json:"status"`
+	Type                string `json:"type"`
 }
 
 type TeamReadResponse struct {

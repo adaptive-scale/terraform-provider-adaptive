@@ -11,6 +11,7 @@ import (
 
 func ResourceAdaptiveSchedule() *schema.Resource {
 	return &schema.Resource{
+		CustomizeDiff: familyPlan(familyInputPlan([]string{"name", "schedule_type"}, []string{"users", "teams", "endpoints", "weekdays", "specific_dates"}), rejectExistingChange("timezone", scheduleTimezoneUpdateBlocked), rejectExistingClear("max_access_time", 0, scheduleDurationClearBlocked)),
 		CreateContext: ResourceAdaptiveScheduleCreate,
 		ReadContext:   ResourceAdaptiveScheduleRead,
 		UpdateContext: ResourceAdaptiveScheduleUpdate,
@@ -120,12 +121,12 @@ func ResourceAdaptiveSchedule() *schema.Resource {
 			"max_access_time": {
 				Type:        schema.TypeInt,
 				Optional:    true,
-				Description: "Maximum access time in minutes for sessions approved under this schedule.",
+				Description: "Maximum access time in minutes for sessions approved under this schedule. Removing an existing override is rejected: the backend preserves an omitted value, and a numeric zero is a real 0m TTL rather than an unset override.",
 			},
 			"timezone": {
 				Type:        schema.TypeString,
 				Optional:    true,
-				Description: "IANA timezone the window is evaluated in. Empty inherits the workspace default.",
+				Description: "IANA timezone the window is evaluated in. Empty inherits the workspace default on create. Changes and clears are rejected for existing schedules because the current backend update route does not persist timezone.",
 			},
 			"operation_type": {
 				Type:        schema.TypeString,
@@ -190,7 +191,8 @@ func scheduleRequestFromSchema(d *schema.ResourceData) (*adaptive.ScheduleReques
 	return req, nil
 }
 
-// stringList reads a TypeList of strings, rejecting empty entries.
+// stringList reads a TypeList of strings. Plan and apply input guards reject
+// blank entries before this builder is called.
 func stringList(d *schema.ResourceData, key string) []string {
 	raw := d.Get(key).([]interface{})
 	out := make([]string, 0, len(raw))
@@ -203,6 +205,9 @@ func stringList(d *schema.ResourceData, key string) []string {
 }
 
 func ResourceAdaptiveScheduleCreate(ctx context.Context, d *schema.ResourceData, m interface{}) diag.Diagnostics {
+	if err := validateFamilyInputs(d.Get, nil, []string{"name", "schedule_type"}, []string{"users", "teams", "endpoints", "weekdays", "specific_dates"}); err != nil {
+		return diag.FromErr(err)
+	}
 	client := m.(*adaptive.Client)
 
 	req, err := scheduleRequestFromSchema(d)
@@ -213,6 +218,9 @@ func ResourceAdaptiveScheduleCreate(ctx context.Context, d *schema.ResourceData,
 	resp, err := client.CreateSchedule(ctx, req)
 	if err != nil {
 		return diag.FromErr(err)
+	}
+	if resp == nil || resp.ID == "" {
+		return diag.Errorf("schedule create returned no trackable identity; inspect the remote object before retrying")
 	}
 	d.SetId(resp.ID)
 	return nil
@@ -232,24 +240,26 @@ func ResourceAdaptiveScheduleRead(ctx context.Context, d *schema.ResourceData, m
 	if missingOnImport(d, isImportRead(d, "name"), resp.Name) {
 		return nil
 	}
-	// Older backends answer this route with a lossy view that omits the pattern
-	// and membership fields, and an omitted field is indistinguishable from a
-	// zero one after decoding. So every optional attribute below is refreshed
-	// only when the server actually reported a value: clobbering a configured
-	// window with zeros would produce a diff on every plan.
+	// The current DTO always emits its window and canonical membership fields.
+	// This presence signature makes omitted optional fields authoritative clears.
+	// Legacy/partial DTOs instead refresh only fields actually present and warn.
 	if err := d.Set("name", resp.Name); err != nil {
 		return diag.FromErr(err)
 	}
 	if err := d.Set("schedule_type", resp.ScheduleType); err != nil {
 		return diag.FromErr(err)
 	}
-	if err := d.Set("is_active", resp.IsActive); err != nil {
-		return diag.FromErr(err)
+	if resp.HasField("isActive") {
+		if err := d.Set("is_active", resp.IsActive); err != nil {
+			return diag.FromErr(err)
+		}
 	}
-	if err := d.Set("all_day", resp.AllDay); err != nil {
-		return diag.FromErr(err)
+	if resp.HasField("allDay") {
+		if err := d.Set("all_day", resp.AllDay); err != nil {
+			return diag.FromErr(err)
+		}
 	}
-	if resp.Timezone != "" {
+	if resp.FullRead() || resp.HasField("timezone") {
 		if err := d.Set("timezone", resp.Timezone); err != nil {
 			return diag.FromErr(err)
 		}
@@ -259,23 +269,22 @@ func ResourceAdaptiveScheduleRead(ctx context.Context, d *schema.ResourceData, m
 			return diag.FromErr(err)
 		}
 	}
-	// expires_at is returned by the backend normalized to RFC3339 UTC. Refresh
-	// only when present so the lossy read view doesn't clobber a value the
-	// backend chose not to report (matches the timezone/operation_type pattern).
-	if resp.ExpiresAt != "" {
+	// Preserve equivalent RFC3339 spellings, but honor a modern empty expiry.
+	// Missing legacy expiry remains unknown rather than evidence of removal.
+	if (resp.FullRead() || resp.HasField("expiresAt")) && !sameInstantSet([]string{d.Get("expires_at").(string)}, []string{resp.ExpiresAt}) {
 		if err := d.Set("expires_at", resp.ExpiresAt); err != nil {
 			return diag.FromErr(err)
 		}
 	}
-	if resp.Description != "" {
+	if resp.FullRead() || resp.HasField("description") {
 		if err := d.Set("description", resp.Description); err != nil {
 			return diag.FromErr(err)
 		}
 	}
 
 	// The time-of-day window travels as four independent ints, so it is only
-	// refreshed when the server reported a window at all.
-	if resp.StartHour != 0 || resp.StartMinute != 0 || resp.EndHour != 0 || resp.EndMinute != 0 {
+	// refreshed only when all four values are present, including known zeroes.
+	if resp.HasField("startHour") && resp.HasField("startMinute") && resp.HasField("endHour") && resp.HasField("endMinute") {
 		for key, v := range map[string]int{
 			"start_hour":   resp.StartHour,
 			"start_minute": resp.StartMinute,
@@ -287,32 +296,36 @@ func ResourceAdaptiveScheduleRead(ctx context.Context, d *schema.ResourceData, m
 			}
 		}
 	}
-	if resp.StartDay != 0 {
+	if resp.FullRead() || resp.HasField("startDay") {
 		if err := d.Set("start_day", resp.StartDay); err != nil {
 			return diag.FromErr(err)
 		}
 	}
-	if resp.EndDay != 0 {
+	if resp.FullRead() || resp.HasField("endDay") {
 		if err := d.Set("end_day", resp.EndDay); err != nil {
 			return diag.FromErr(err)
 		}
 	}
-	if resp.MaxAccessTime != nil {
-		if err := d.Set("max_access_time", *resp.MaxAccessTime); err != nil {
+	if resp.FullRead() || resp.HasField("maxAccessTime") {
+		value := 0
+		if resp.MaxAccessTime != nil {
+			value = *resp.MaxAccessTime
+		}
+		if err := d.Set("max_access_time", value); err != nil {
 			return diag.FromErr(err)
 		}
 	}
 
 	// The backend lowercases weekday names, so only a genuine membership
 	// change — not a spelling difference — is written back.
-	if len(resp.Weekdays) > 0 && !sameStringSetFold(stringList(d, "weekdays"), resp.Weekdays) {
+	if (resp.FullRead() || resp.HasField("weekdays")) && !sameStringSetFold(stringList(d, "weekdays"), resp.Weekdays) {
 		if err := d.Set("weekdays", resp.Weekdays); err != nil {
 			return diag.FromErr(err)
 		}
 	}
 	// specific_dates come back normalized to UTC; the configuration's spelling
 	// of the same instants is kept.
-	if len(resp.SpecificDates) > 0 && !sameInstantSet(stringList(d, "specific_dates"), resp.SpecificDates) {
+	if (resp.FullRead() || resp.HasField("specificDates")) && !sameInstantSet(stringList(d, "specific_dates"), resp.SpecificDates) {
 		if err := d.Set("specific_dates", resp.SpecificDates); err != nil {
 			return diag.FromErr(err)
 		}
@@ -322,16 +335,28 @@ func ResourceAdaptiveScheduleRead(ctx context.Context, d *schema.ResourceData, m
 		"teams":     resp.Teams,
 		"endpoints": resp.EndpointNames(),
 	} {
-		if len(server) > 0 && !sameStringSet(stringList(d, key), server) {
+		if (resp.FullRead() || resp.HasField(key)) && !sameStringSet(stringList(d, key), server) {
 			if err := d.Set(key, server); err != nil {
 				return diag.FromErr(err)
 			}
 		}
 	}
+	if !resp.FullRead() {
+		return diag.Diagnostics{{Severity: diag.Warning, Summary: "schedule read capabilities are incomplete", Detail: "This backend returned a legacy or partial schedule view. Absent fields retain prior state; removals and drift on those fields cannot be verified. mappedEndpoints IDs are not adopted as endpoint names. Upgrade to the full schedule read DTO before relying on complete refresh/import coverage."}}
+	}
 	return nil
 }
 
 func ResourceAdaptiveScheduleUpdate(ctx context.Context, d *schema.ResourceData, m interface{}) diag.Diagnostics {
+	if err := validateFamilyInputs(d.Get, nil, []string{"name", "schedule_type"}, []string{"users", "teams", "endpoints", "weekdays", "specific_dates"}); err != nil {
+		return diag.FromErr(err)
+	}
+	if d.HasChange("max_access_time") && d.Get("max_access_time") == 0 {
+		return diag.Errorf("max_access_time cannot be cleared: %s", scheduleDurationClearBlocked)
+	}
+	if d.HasChange("timezone") {
+		return diag.Errorf("timezone cannot be updated: %s", scheduleTimezoneUpdateBlocked)
+	}
 	client := m.(*adaptive.Client)
 
 	req, err := scheduleRequestFromSchema(d)

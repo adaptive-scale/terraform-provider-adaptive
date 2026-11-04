@@ -3,6 +3,7 @@ package components
 import (
 	"context"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/adaptive-scale/terraform-provider-adaptive/internal/provider/integrations"
@@ -645,17 +646,28 @@ func ResourceAdaptiveSessionCreate(ctx context.Context, d *schema.ResourceData, 
 	}
 
 	resp, err := client.CreateSession(ctx, req)
+	if resp != nil && resp.ID != "" {
+		d.SetId(resp.ID)
+	}
 	if err != nil {
 		return diag.FromErr(err)
 	}
 	d.SetId(resp.ID)
 
-	// Best-effort: surface the server-computed outputs right away. A failure
-	// here is not fatal — the next refresh picks them up.
-	if r, rerr := client.ReadSession(ctx, resp.ID); rerr == nil && r != nil {
-		if err := setEndpointOutputs(d, r); err != nil {
-			return diag.FromErr(err)
-		}
+	// The object is already tracked. Failure to verify outputs must be
+	// reported without discarding that recoverable identity.
+	r, rerr := client.ReadSession(ctx, resp.ID)
+	if rerr != nil {
+		return diag.FromErr(fmt.Errorf("endpoint recorded but output read failed: %w", rerr))
+	}
+	if r == nil {
+		return diag.Errorf("endpoint recorded but absent during output verification; reconcile before retrying")
+	}
+	if status := strings.ToLower(r.Status); status != "created" && status != "paused" {
+		return diag.Errorf("endpoint recorded but no longer ready during output verification; reconcile the tracked endpoint")
+	}
+	if err := setEndpointOutputs(d, r); err != nil {
+		return diag.FromErr(err)
 	}
 	return nil
 }

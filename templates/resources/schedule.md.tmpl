@@ -11,6 +11,14 @@ The `adaptive_schedule` resource defines a recurring window in which access requ
 
 Schedules apply to the users, teams and endpoints they name. A request only matches when it falls inside the window in the schedule's timezone and the schedule is active.
 
+## Read, reset, and compatibility behavior
+
+Modern complete schedule responses refresh removals, including empty audiences and zero-valued windows. Legacy missing fields retain previous observations and produce compatibility warnings. `endpoints` contains canonical endpoint names; legacy `mappedEndpoints` IDs are never substituted for those names. Reported incomplete or unresolved sections fail before state is changed. Presence-based legacy recognition is not a guarantee against backend errors that are silently returned as complete data.
+
+Users, teams, endpoints, description, pattern and expiry retain full-replacement ownership: removing them resets the corresponding supported configuration. Removing `is_active` resets to the existing Terraform default `true`; removing `operation_type` resets to `autoapprove`.
+
+The current backend does not persist timezone updates or support removal of a previously set maximum access duration. Terraform rejects these changes instead of claiming success or attempting destructive name-keyed upsert replacement. Backend numeric zero is a real `0m` duration, not an unset value. Setting these fields when creating a schedule is distinct from later changing or clearing them. Backend persistence/mapping failures without a returned ID require remote reconciliation before retrying creation; do not assume a failed create was rolled back.
+
 ## Example Usage
 
 ### Business Hours Auto-Approval

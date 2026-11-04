@@ -23,7 +23,7 @@ var validAuthorizedResourceTypes = map[string]bool{
 	"mongodb":                       true,
 	"mongodb_atlas":                 true,
 	"mongodb_aws_secrets_manager":   true,
-	"mongo36":                       true,
+	"mongodb36":                     true, // backend model.Mongo36; "mongo36" was never canonical
 	"elasticsearch":                 true,
 	"ssh":                           true,
 	"postgres":                      true,
@@ -65,6 +65,7 @@ type AuthorizationConfiguration struct {
 
 func ResourceAdaptiveAuthorization() *schema.Resource {
 	return &schema.Resource{
+		CustomizeDiff: familyPlan(familyInputPlan([]string{"name", "resource_type", "permissions"}, nil), rejectAuthorizationResourceTypeChange, rejectExistingClear("description", "", descriptionClearBlocked)),
 		CreateContext: ResourceAdaptiveAuthorizationCreate,
 		ReadContext:   ResourceAdaptiveAuthorizationRead,
 		UpdateContext: ResourceAdaptiveAuthorizationUpdate,
@@ -84,7 +85,7 @@ func ResourceAdaptiveAuthorization() *schema.Resource {
 				Type:        schema.TypeString,
 				Optional:    true,
 				Default:     "",
-				Description: "An optional description of the authorization object.",
+				Description: "An optional description of the authorization object. The current backend preserves empty descriptions on update, so clearing an existing description is rejected at plan until backend support is available.",
 			},
 			"resource_type": {
 				Type:             schema.TypeString,
@@ -111,6 +112,9 @@ func SchemaToAuthorizationConfiguration(d *schema.ResourceData) AuthorizationCon
 }
 
 func ResourceAdaptiveAuthorizationCreate(ctx context.Context, d *schema.ResourceData, m interface{}) diag.Diagnostics {
+	if err := validateFamilyInputs(d.Get, nil, []string{"name", "resource_type", "permissions"}, nil); err != nil {
+		return diag.FromErr(err)
+	}
 	client := m.(*adaptive.Client)
 
 	obj := SchemaToAuthorizationConfiguration(d)
@@ -120,6 +124,9 @@ func ResourceAdaptiveAuthorizationCreate(ctx context.Context, d *schema.Resource
 	// }
 
 	resp, err := client.CreateAuthorization(ctx, obj.Name, obj.Description, obj.Permission, obj.ResourceType)
+	if resp != nil && resp.ID != "" {
+		d.SetId(resp.ID)
+	}
 	if err != nil {
 		return diag.FromErr(err)
 	}
@@ -145,14 +152,20 @@ func ResourceAdaptiveAuthorizationRead(ctx context.Context, d *schema.ResourceDa
 		return nil
 	}
 
+	if isImportRead(d, "name") && (!resp.ResourceTypePresent || resp.ResourceType == "") {
+		return diag.Errorf("authorization import cannot determine resource_type: the backend omitted or returned an empty type; upgrade the read DTO or supply the known resource_type in configuration before refreshing")
+	}
+
 	if err := d.Set("name", resp.Name); err != nil {
 		return diag.FromErr(err)
 	}
 	if err := d.Set("description", resp.Description); err != nil {
 		return diag.FromErr(err)
 	}
-	if err := d.Set("resource_type", resp.ResourceType); err != nil {
-		return diag.FromErr(err)
+	if resp.ResourceTypePresent {
+		if err := d.Set("resource_type", resp.ResourceType); err != nil {
+			return diag.FromErr(err)
+		}
 	}
 	if err := d.Set("permissions", resp.Permissions); err != nil {
 		return diag.FromErr(err)
@@ -162,6 +175,15 @@ func ResourceAdaptiveAuthorizationRead(ctx context.Context, d *schema.ResourceDa
 }
 
 func ResourceAdaptiveAuthorizationUpdate(ctx context.Context, d *schema.ResourceData, m interface{}) diag.Diagnostics {
+	if d.Id() != "" && d.HasChange("resource_type") {
+		return diag.Errorf("resource_type cannot be updated: %s", authorizationResourceTypeUpdateBlocked)
+	}
+	if err := validateFamilyInputs(d.Get, nil, []string{"name", "resource_type", "permissions"}, nil); err != nil {
+		return diag.FromErr(err)
+	}
+	if d.HasChange("description") && d.Get("description") == "" {
+		return diag.Errorf("description cannot be cleared: %s", descriptionClearBlocked)
+	}
 	client := m.(*adaptive.Client)
 	authID := d.Id()
 

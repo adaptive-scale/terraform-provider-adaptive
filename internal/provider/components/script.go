@@ -11,6 +11,7 @@ import (
 
 func ResourceAdaptiveScript() *schema.Resource {
 	return &schema.Resource{
+		CustomizeDiff: familyPlan(familyInputPlan([]string{"name", "command", "endpoint"}, nil), rejectExistingChange("endpoint", "script endpoint bindings are immutable"), rejectExistingClear("description", "", descriptionClearBlocked)),
 		CreateContext: ResourceAdaptiveScriptCreate,
 		ReadContext:   ResourceAdaptiveScriptRead,
 		UpdateContext: ResourceAdaptiveScriptUpdate,
@@ -41,7 +42,7 @@ func ResourceAdaptiveScript() *schema.Resource {
 			"description": {
 				Type:        schema.TypeString,
 				Optional:    true,
-				Description: "An optional description of the script.",
+				Description: "An optional description of the script. The current backend preserves empty descriptions on update, so clearing an existing description is rejected at plan until backend support is available.",
 			},
 			"parameter_descriptions": {
 				Type:        schema.TypeMap,
@@ -60,27 +61,37 @@ func ResourceAdaptiveScript() *schema.Resource {
 
 // scriptRequestFromSchema builds the API request from resource state.
 func scriptRequestFromSchema(d *schema.ResourceData) adaptive.ScriptRequest {
+	metadata := stateStringMap(d, "parameter_descriptions")
+	if metadata == nil {
+		metadata = map[string]string{}
+	}
 	return adaptive.ScriptRequest{
 		Name:                  d.Get("name").(string),
 		Command:               d.Get("command").(string),
 		Endpoint:              d.Get("endpoint").(string),
 		Description:           d.Get("description").(string),
-		ParameterDescriptions: stateStringMap(d, "parameter_descriptions"),
+		ParameterDescriptions: metadata,
 	}
 }
 
 // refreshCommandDigest records the server's fingerprint of the script body
-// after a write. Best-effort: servers that predate the field simply leave the
-// digest empty, which disables drift detection rather than failing the apply.
-func refreshCommandDigest(ctx context.Context, client *adaptive.Client, d *schema.ResourceData) {
+// after a write. Older servers or failed reads preserve prior evidence and
+// warn that this write has no new acknowledged baseline, without tainting the ID.
+func refreshCommandDigest(ctx context.Context, client *adaptive.Client, d *schema.ResourceData) diag.Diagnostics {
 	r, err := client.ReadScript(ctx, d.Id())
-	if err != nil || r == nil {
-		return
+	if err != nil || r == nil || r.CommandDigest == "" {
+		return diag.Diagnostics{{Severity: diag.Warning, Summary: "script written; command fingerprint unavailable", Detail: "The script ID is retained. The backend read did not provide a command fingerprint; prior fingerprint evidence is preserved, but this write cannot establish a new drift baseline. Refresh after backend recovery. No command body is included in this diagnostic."}}
 	}
-	_ = d.Set("command_digest", r.CommandDigest)
+	if err := d.Set("command_digest", r.CommandDigest); err != nil {
+		return diag.FromErr(err)
+	}
+	return nil
 }
 
 func ResourceAdaptiveScriptCreate(ctx context.Context, d *schema.ResourceData, m interface{}) diag.Diagnostics {
+	if err := validateFamilyInputs(d.Get, nil, []string{"name", "command", "endpoint"}, nil); err != nil {
+		return diag.FromErr(err)
+	}
 	client := m.(*adaptive.Client)
 
 	for _, attr := range []string{"name", "command", "endpoint"} {
@@ -93,10 +104,12 @@ func ResourceAdaptiveScriptCreate(ctx context.Context, d *schema.ResourceData, m
 	if err != nil {
 		return diag.FromErr(err)
 	}
+	if resp == nil || resp.ID == "" {
+		return diag.Errorf("script create returned no trackable identity; inspect the remote object before retrying")
+	}
 	d.SetId(resp.ID)
 
-	refreshCommandDigest(ctx, client, d)
-	return nil
+	return refreshCommandDigest(ctx, client, d)
 }
 
 func ResourceAdaptiveScriptRead(ctx context.Context, d *schema.ResourceData, m interface{}) diag.Diagnostics {
@@ -145,8 +158,11 @@ func ResourceAdaptiveScriptRead(ctx context.Context, d *schema.ResourceData, m i
 			return diag.FromErr(err)
 		}
 	}
-	if err := d.Set("command_digest", r.CommandDigest); err != nil {
-		return diag.FromErr(err)
+	// Refresh never acknowledges an external write or erases missing evidence.
+	if priorDigest == "" && r.CommandDigest != "" {
+		if err := d.Set("command_digest", r.CommandDigest); err != nil {
+			return diag.FromErr(err)
+		}
 	}
 
 	if isImport {
@@ -161,6 +177,12 @@ func ResourceAdaptiveScriptRead(ctx context.Context, d *schema.ResourceData, m i
 }
 
 func ResourceAdaptiveScriptUpdate(ctx context.Context, d *schema.ResourceData, m interface{}) diag.Diagnostics {
+	if err := validateFamilyInputs(d.Get, nil, []string{"name", "command", "endpoint"}, nil); err != nil {
+		return diag.FromErr(err)
+	}
+	if d.HasChange("description") && d.Get("description") == "" {
+		return diag.Errorf("description cannot be cleared: %s", descriptionClearBlocked)
+	}
 	client := m.(*adaptive.Client)
 	scriptID := d.Id()
 
@@ -178,8 +200,7 @@ func ResourceAdaptiveScriptUpdate(ctx context.Context, d *schema.ResourceData, m
 		return diag.FromErr(err)
 	}
 
-	refreshCommandDigest(ctx, client, d)
-	return nil
+	return refreshCommandDigest(ctx, client, d)
 }
 
 func ResourceAdaptiveScriptDelete(ctx context.Context, d *schema.ResourceData, m interface{}) diag.Diagnostics {

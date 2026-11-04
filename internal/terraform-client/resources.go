@@ -2,7 +2,6 @@ package client
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"net/http"
 
@@ -71,7 +70,7 @@ func (c *Client) CreateResource(
 	}
 
 	var resp CreateResourceResponse
-	if err := json.NewDecoder(response.Body).Decode(&resp); err != nil {
+	if err := decodeResponse(response.Body, &resp); err != nil {
 		return nil, fmt.Errorf("failed to decode response body. err %w", err)
 	}
 	tflog.Debug(ctx, "Resource successfully created", map[string]interface{}{
@@ -131,12 +130,13 @@ func (c *Client) UpdateResource(
 	}
 
 	var updateResourceResponse UpdateResourceResponse
-	if err := json.NewDecoder(response.Body).Decode(&updateResourceResponse); err != nil {
+	if err := decodeResponse(response.Body, &updateResourceResponse); err != nil {
 		return nil, fmt.Errorf("failed to decode response body. err %w", err)
 	}
 	tflog.Debug(ctx, "Resource successfully updated", map[string]interface{}{
 		"resource_id": resourceID,
 	})
+	updateResourceResponse.ID = resourceID
 	return &updateResourceResponse, nil
 }
 

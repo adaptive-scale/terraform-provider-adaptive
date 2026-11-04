@@ -7,15 +7,23 @@ description: |-
 
 # adaptive_script (Resource)
 
-The `adaptive_script` resource allows you to define and execute commands on Adaptive endpoints. Scripts are useful for:
+The `adaptive_script` resource stores reusable command definitions for later execution on Adaptive endpoints. Scripts are useful for:
 
 - **Automation** - Run setup scripts, migrations, or maintenance tasks
 - **Provisioning** - Initialize databases, create users, or set up schemas
-- **Operations** - Execute operational commands during Terraform apply
+- **Operations** - Prepare operational commands for later invocation
+
+## Lifecycle and secret handling
+
+Terraform stores the script definition; creating or updating this resource does not execute the command. Invocation, endpoint readiness and the command's runtime result are separate operations. The endpoint binding cannot be changed in place and is rejected during planning and apply rather than replaced automatically.
+
+The server may withhold the command body. Import cannot recover it; configure the intended command before an update. Sensitive command values can still persist in Terraform state and saved plans. The last acknowledged command fingerprint is retained across refreshes and missing metadata, so unresolved drift remains observable. A separate post-write fingerprint read is best-effort, not an atomic acknowledgment.
+
+An explicitly empty parameter-description map is sent as `{}` so existing map entries can be removed. The current backend preserves an empty description rather than clearing it; Terraform rejects description removal until backend support exists. Provider sensitivity and sanitized diagnostics cannot prevent logging performed by the backend itself.
 
 ## Example Usage
 
-### Basic Script Execution
+### Basic Script Definition
 
 ```terraform
 resource "adaptive_script" "init_db" {
