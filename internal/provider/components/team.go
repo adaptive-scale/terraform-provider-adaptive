@@ -87,21 +87,13 @@ func ResourceAdaptiveTeamCreate(ctx context.Context, d *schema.ResourceData, m i
 }
 
 func ResourceAdaptiveTeamRead(ctx context.Context, d *schema.ResourceData, m interface{}) diag.Diagnostics {
-	// client := m.(*adaptive.Client)
-
-	// team, err := client.GetTeam(ctx, d.Id())
-	// if err != nil {
-	// 	return diag.FromErr(err)
-	// }
-
-	// if err := d.Set("name", team.Name); err != nil {
-	// 	return diag.FromErr(err)
-	// }
-	// if err := d.Set("members", team.Members); err != nil {
-	// 	return diag.FromErr(err)
-	// }
-	var diags diag.Diagnostics
-	return diags
+	data, err := m.(*adaptive.Client).ReadTeam(ctx, d.Id())
+	if err != nil {
+		return readDiagnostics(d, err)
+	}
+	return setResponseFields(d, data, map[string][]string{
+		"name": {"name", "Name"}, "members": {"members", "Members"}, "endpoints": {"endpoints", "Endpoints"},
+	})
 }
 
 func ResourceAdaptiveTeamUpdate(ctx context.Context, d *schema.ResourceData, m interface{}) diag.Diagnostics {

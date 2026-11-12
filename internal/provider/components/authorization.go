@@ -126,33 +126,15 @@ func ResourceAdaptiveAuthorizationCreate(ctx context.Context, d *schema.Resource
 }
 
 func ResourceAdaptiveAuthorizationRead(ctx context.Context, d *schema.ResourceData, m interface{}) diag.Diagnostics {
-	client := m.(*adaptive.Client)
-	authID := d.Id()
-
-	resp, err := client.ReadAuthorization(ctx, authID, false)
+	resp, err := m.(*adaptive.Client).ReadAuthorization(ctx, d.Id(), false)
 	if err != nil {
-		return diag.FromErr(err)
+		return readDiagnostics(d, err)
 	}
-
-	data, ok := resp.(map[string]interface{})
-	if !ok {
-		return diag.Errorf("invalid response format")
-	}
-
-	if name, ok := data["name"].(string); ok {
-		d.Set("name", name)
-	}
-	if description, ok := data["description"].(string); ok {
-		d.Set("description", description)
-	}
-	if resourceType, ok := data["resource_type"].(string); ok {
-		d.Set("resource_type", resourceType)
-	}
-	if permissions, ok := data["permissions"].(string); ok {
-		d.Set("permissions", permissions)
-	}
-
-	return nil
+	return setResponseFields(d, resp.(map[string]interface{}), map[string][]string{
+		"name": {"name", "Name"}, "description": {"description", "Description"},
+		"resource_type": {"resourceType", "resource_type", "ResourceType"},
+		"permissions":   {"permissions", "Permission", "Permissions", "permission"},
+	})
 }
 
 func ResourceAdaptiveAuthorizationUpdate(ctx context.Context, d *schema.ResourceData, m interface{}) diag.Diagnostics {

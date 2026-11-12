@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"net/http"
 	"strings"
 
@@ -107,9 +108,14 @@ func (c *Client) writeSchedule(ctx context.Context, method, url string, req *Sch
 	}
 
 	// Non-200: try to surface the most specific reason we can.
+	body, err := io.ReadAll(response.Body)
+	if err != nil {
+		return nil, err
+	}
+	response.Body = io.NopCloser(bytes.NewReader(body))
 	if response.StatusCode == http.StatusBadRequest {
 		var resp ScheduleResponse
-		if err := json.NewDecoder(response.Body).Decode(&resp); err == nil {
+		if err := json.Unmarshal(body, &resp); err == nil {
 			if unresolved := resp.unresolvedErr(); unresolved != nil {
 				return nil, unresolved
 			}
@@ -138,30 +144,22 @@ func (c *Client) UpdateSchedule(ctx context.Context, id string, req *ScheduleReq
 // GetSchedule reads a schedule. It returns (nil, nil) when the schedule no
 // longer exists so callers can drop it from Terraform state.
 func (c *Client) GetSchedule(ctx context.Context, id string) (*ScheduleResponse, error) {
-	tflog.Debug(ctx, "GetSchedule called", map[string]interface{}{"id": id})
-	request, err := http.NewRequest("GET", fmt.Sprintf("%s/read/%s", c.scheduleAPI(), id), nil)
-	if err != nil {
-		return nil, err
-	}
-
-	response, err := c.do(ctx, request)
-	if err != nil {
-		return nil, err
-	}
-	defer response.Body.Close()
-
-	if response.StatusCode == http.StatusNotFound {
+	data, err := c.ReadSchedule(ctx, id)
+	if errors.Is(err, ErrNotFound) {
 		return nil, nil
 	}
-	if response.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("error reading schedule %s (status %d)", id, response.StatusCode)
+	if err != nil {
+		return nil, err
 	}
-
-	var resp ScheduleResponse
-	if err := json.NewDecoder(response.Body).Decode(&resp); err != nil {
-		return nil, fmt.Errorf("failed to decode response body. err %w", err)
+	body, err := json.Marshal(data)
+	if err != nil {
+		return nil, err
 	}
-	return &resp, nil
+	var response ScheduleResponse
+	if err := json.Unmarshal(body, &response); err != nil {
+		return nil, err
+	}
+	return &response, nil
 }
 
 // DeleteSchedule removes a schedule. The backend delete is idempotent, so a

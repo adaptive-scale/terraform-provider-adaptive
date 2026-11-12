@@ -159,6 +159,28 @@ resource "adaptive_group" "developers" {
 }
 ```
 
+## Endpoint policies
+
+```terraform
+resource "adaptive_endpoint" "reviewed" {
+  name                     = "reviewed-access"
+  resource                 = adaptive_resource.postgres.name
+  is_jit_enabled           = true
+  jit_mode                 = "both"
+  jit_approvers            = ["reviewer@example.com", "owner@example.com"]
+  jit_multi_approver        = true
+  jit_total_approvers       = 2
+  max_jit_request_duration = "2h"
+  auto_approval            = false
+  disable_output_capture   = true
+  disable_data_studio       = true
+  disable_web_cli           = false
+}
+```
+
+These optional policy fields require server support. Omit them to retain the
+server values. Set `max_jit_request_duration = ""` to restore workspace inheritance.
+
 {{ .SchemaMarkdown | trimspace }}
 
 ## TTL Format

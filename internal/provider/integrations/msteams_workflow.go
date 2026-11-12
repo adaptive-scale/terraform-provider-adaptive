@@ -11,6 +11,7 @@ resource "adaptive_msteams_workflow" "example" {
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
@@ -27,6 +28,7 @@ type MSTeamsWorkflowIntegrationConfiguration struct {
 
 func ResourceAdaptiveMSTeamsWorkflow() *schema.Resource {
 	return &schema.Resource{
+		Description:   "Manages a Microsoft Teams workflow integration. Webhook credentials remain in Terraform state when the server redacts them during refresh.",
 		CreateContext: resourceAdaptiveMSTeamsWorkflowCreate,
 		ReadContext:   resourceAdaptiveMSTeamsWorkflowRead,
 		UpdateContext: resourceAdaptiveMSTeamsWorkflowUpdate,
@@ -78,11 +80,29 @@ func resourceAdaptiveMSTeamsWorkflowCreate(ctx context.Context, d *schema.Resour
 	}
 
 	d.SetId(resp.ID)
-	resourceAdaptiveMSTeamsWorkflowRead(ctx, d, m)
 	return nil
 }
 
 func resourceAdaptiveMSTeamsWorkflowRead(ctx context.Context, d *schema.ResourceData, m interface{}) diag.Diagnostics {
+	resp, err := m.(*adaptive.Client).ReadResource(ctx, d.Id(), false)
+	if errors.Is(err, adaptive.ErrNotFound) {
+		d.SetId("")
+		return nil
+	}
+	if errors.Is(err, adaptive.ErrReadUnsupported) {
+		return diag.Diagnostics{{Severity: diag.Warning, Summary: "Server does not support workflow refresh", Detail: "Existing Terraform state has been preserved."}}
+	}
+	if err != nil {
+		return diag.FromErr(err)
+	}
+	data := resp.(map[string]interface{})
+	if name, ok := adaptive.ResponseValue(data, "name", "Name"); ok {
+		if err := d.Set("name", name); err != nil {
+			return diag.FromErr(err)
+		}
+	}
+	// Webhook URLs carry credentials and are withheld by the v0.9 read API.
+	// Preserve the configured URL in state, as with other resource secrets.
 	return nil
 }
 
@@ -102,7 +122,7 @@ func resourceAdaptiveMSTeamsWorkflowUpdate(ctx context.Context, d *schema.Resour
 	}
 
 	d.Set("last_updated", time.Now())
-	return resourceAdaptiveMSTeamsWorkflowRead(ctx, d, m)
+	return nil
 }
 
 func resourceAdaptiveMSTeamsWorkflowDelete(ctx context.Context, d *schema.ResourceData, m interface{}) diag.Diagnostics {

@@ -188,6 +188,14 @@ resource "adaptive_script" "init" {
 }
 ```
 
+## Script metadata
+
+`description`, `help_text`, and `parameter_descriptions` manage the metadata
+supported by the v0.9 Terraform API. Omitted fields retain the server values;
+`help_text = ""` clears help text. The read API withholds command bodies, so
+refresh preserves `command` in state. `command_digest` tracks the opaque server
+fingerprint and warns if it changes after the first refresh.
+
 {{ .SchemaMarkdown | trimspace }}
 
 ## Import

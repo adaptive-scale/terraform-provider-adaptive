@@ -7,74 +7,12 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"strings"
-	"time"
 
 	"github.com/hashicorp/terraform-plugin-log/tflog"
 )
 
 func (c *Client) ReadAuthorization(ctx context.Context, authID string, waitForStatus bool) (any, error) {
-	tflog.Debug(ctx, "ReadAuthorization called", map[string]interface{}{
-		"auth_id":         authID,
-		"wait_for_status": waitForStatus,
-	})
-	timeout := time.Second * 10
-	retryForStatus := 20
-	if waitForStatus {
-		retryForStatus = 20
-	}
-
-	resp, err := Do(
-		func() (map[string]interface{}, error) {
-			return _readAuthorization(ctx, c, authID)
-		}, RetryLimit(retryForStatus), Sleep(timeout), RetryResultChecker(func(intermedResult any) bool {
-			if res, ok := intermedResult.(map[string]interface{}); !ok {
-				tflog.Warn(ctx, "Authorization result has bad data format", map[string]interface{}{
-					"auth_id": authID,
-				})
-				return true
-			} else {
-				if res != nil {
-					if status, okk := res["Status"].(string); !okk {
-						tflog.Warn(ctx, "Authorization status field missing or not a string", map[string]interface{}{
-							"auth_id": authID,
-						})
-						return true
-					} else {
-						statusLower := strings.ToLower(status)
-						tflog.Debug(ctx, "Authorization status check", map[string]interface{}{
-							"auth_id":     authID,
-							"status":      status,
-							"is_creating": statusLower == "creating",
-						})
-						// Will return false, when state is among final states like "created" or "failed"
-						return statusLower == "creating"
-					}
-				}
-				tflog.Warn(ctx, "Authorization result is nil", map[string]interface{}{
-					"auth_id": authID,
-				})
-				return true
-			}
-		}))
-	if err != nil {
-		tflog.Error(ctx, "Failed to read authorization after retries", map[string]interface{}{
-			"auth_id": authID,
-			"error":   err.Error(),
-		})
-		return nil, fmt.Errorf("could to read session %s %w", authID, err)
-	}
-
-	tflog.Error(ctx, "Authorization not in created status", map[string]interface{}{
-		"auth_id": authID,
-		"status":  resp["Status"],
-	})
-
-	tflog.Debug(ctx, "Authorization successfully created", map[string]interface{}{
-		"auth_id": authID,
-	})
-	return resp, nil
-
+	return c.readWithStatus(ctx, c.authorizationAPI(), authID, waitForStatus)
 }
 
 // Authorizations
@@ -129,6 +67,7 @@ func (c *Client) CreateAuthorization(ctx context.Context, aName, description, pe
 		})
 		return nil, err
 	}
+	defer _response.Body.Close()
 	if _response.StatusCode == 409 {
 		tflog.Error(ctx, "Duplicate authorization detected", map[string]interface{}{
 			"name": req.AuthorizationName,
@@ -217,6 +156,7 @@ func (c *Client) UpdateAuthorization(ctx context.Context, authID, newName, newDe
 		})
 		return nil, err
 	}
+	defer _response.Body.Close()
 	if _response.StatusCode == 409 {
 		tflog.Error(ctx, "Duplicate authorization name during update", map[string]interface{}{
 			"auth_id": authID,
@@ -278,6 +218,7 @@ func (c *Client) DeleteAuthorization(ctx context.Context, authID string) (bool, 
 		})
 		return false, fmt.Errorf("failed to request adaptive api. err %w", err)
 	}
+	defer response.Body.Close()
 	if response.StatusCode != 200 {
 
 		d, _ := io.ReadAll(response.Body) // read body to completion to allow connection reuse
