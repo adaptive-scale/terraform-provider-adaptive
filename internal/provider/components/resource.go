@@ -113,6 +113,7 @@ func ResourceAdaptiveResource() *schema.Resource {
 			Delete: schema.DefaultTimeout(10 * time.Minute),
 		},
 		Schema: map[string]*schema.Schema{
+			"webhook_url": {Type: schema.TypeString, Optional: true, Description: "Webhook URL for an MS Teams workflow integration."},
 			"type": {
 				Type:             schema.TypeString,
 				Required:         true,
@@ -124,6 +125,7 @@ func ResourceAdaptiveResource() *schema.Resource {
 				Required:    true,
 				Description: "Name of the Adaptive resource",
 			},
+			"redacted_digests": {Type: schema.TypeMap, Computed: true, Elem: &schema.Schema{Type: schema.TypeString}, Description: "Opaque server fingerprints for withheld credentials, when supported."},
 			"tags": {
 				Type:     schema.TypeList,
 				Optional: true,
@@ -790,12 +792,73 @@ func ResourceAdaptiveResourceCreate(ctx context.Context, d *schema.ResourceData,
 	}
 
 	d.SetId(resp.ID)
-	ResourceAdaptiveResourceRead(ctx, d, m)
 	return nil
 }
 
 func ResourceAdaptiveResourceRead(ctx context.Context, d *schema.ResourceData, m interface{}) diag.Diagnostics {
-	return nil
+	resp, err := m.(*adaptive.Client).ReadResource(ctx, d.Id(), false)
+	if err != nil {
+		if errors.Is(err, adaptive.ErrReadUnsupported) {
+			if setErr := collectionBaseline(d, "redacted_digests", map[string]interface{}{}); setErr != nil {
+				return diag.FromErr(setErr)
+			}
+		}
+		return readDiagnostics(d, err)
+	}
+	data := resp.(map[string]interface{})
+	fields := map[string][]string{
+		"name": {"name", "Name"}, "type": {"integrationType", "IntegrationType"},
+		"tags": {"userTags", "UserTags"}, "default_cluster": {"defaultCluster", "DefaultCluster"},
+	}
+	if d.Get("default_cluster") == "" {
+		delete(fields, "default_cluster")
+	}
+	if _, modern := data["integrationType"]; modern {
+		if _, exists := data["defaultCluster"]; !exists {
+			data["defaultCluster"] = ""
+		}
+	}
+	if typ, _ := adaptive.ResponseValue(data, "integrationType", "IntegrationType"); typ == "servicelist" {
+		data["integrationType"] = "services"
+	}
+	if diags := setResponseFields(d, data, fields); diags.HasError() {
+		return diags
+	}
+	if raw, ok := adaptive.ResponseValue(data, "configuration", "Configuration"); ok {
+		if config, ok := raw.(map[string]interface{}); ok {
+			for key, attribute := range resourceConfigurationFields[d.Get("type").(string)] {
+				value, exists := config[key]
+				if !exists || redactedAttribute(data, key) {
+					continue
+				}
+				// Older redaction formats used a literal placeholder. Never persist it.
+				if text, ok := value.(string); ok && strings.Contains(text, "<REDACTED>") {
+					continue
+				}
+				if text, ok := d.Get(attribute).(string); ok && text == "" {
+					continue
+				}
+				if attribute == "hosts" {
+					if text, ok := value.(string); ok {
+						hosts := []interface{}{}
+						if text != "" {
+							for _, host := range strings.Split(text, "\n") {
+								hosts = append(hosts, host)
+							}
+						}
+						value = stableList(d.Get(attribute), hosts)
+					}
+				}
+				if err := d.Set(attribute, value); err != nil {
+					return diag.FromErr(fmt.Errorf("refreshing %s: %w", attribute, err))
+				}
+			}
+		}
+	}
+	if digests, ok := data["redactedDigests"]; ok {
+		return refreshDigests(d, "redacted_digests", digests)
+	}
+	return diag.FromErr(collectionBaseline(d, "redacted_digests", map[string]interface{}{}))
 }
 
 func ResourceAdaptiveResourceUpdate(ctx context.Context, d *schema.ResourceData, m interface{}) diag.Diagnostics {
@@ -837,7 +900,8 @@ func ResourceAdaptiveResourceUpdate(ctx context.Context, d *schema.ResourceData,
 	}
 
 	d.Set("last_updated", time.Now())
-	return ResourceAdaptiveResourceRead(ctx, d, m)
+	// A provider write may rotate credentials; the next read is the new baseline.
+	return diag.FromErr(d.Set("redacted_digests", map[string]interface{}{}))
 }
 
 func ResourceAdaptiveResourceDelete(ctx context.Context, d *schema.ResourceData, m interface{}) diag.Diagnostics {

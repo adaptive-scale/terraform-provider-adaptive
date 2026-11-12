@@ -9,6 +9,7 @@ import (
 	adaptive "github.com/adaptive-scale/terraform-provider-adaptive/internal/terraform-client"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/diag"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
+	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/validation"
 	"golang.org/x/exp/slices"
 )
 
@@ -299,6 +300,14 @@ func ResourceAdaptiveSession() *schema.Resource {
 				Optional:    true,
 				Description: "CPU of endpoint pod",
 			},
+			"disable_output_capture":   {Type: schema.TypeBool, Optional: true, Computed: true, Description: "Disable retained terminal output for this endpoint. Omit to retain the server value."},
+			"disable_data_studio":      {Type: schema.TypeBool, Optional: true, Computed: true, Description: "Disable Data Studio for this endpoint. Omit to retain the server value."},
+			"disable_web_cli":          {Type: schema.TypeBool, Optional: true, Computed: true, Description: "Disable the web CLI for this endpoint. Omit to retain the server value."},
+			"auto_approval":            {Type: schema.TypeBool, Optional: true, Computed: true, Description: "Allow automatic approval of JIT requests. Omit to retain the server value."},
+			"jit_multi_approver":       {Type: schema.TypeBool, Optional: true, Computed: true, Description: "Require multiple JIT approvers. Omit to retain the server value."},
+			"jit_mode":                 {Type: schema.TypeString, Optional: true, Computed: true, ValidateFunc: validation.StringInSlice([]string{"", "session", "script", "both"}, false), Description: "What JIT gates: session, script or both. Omit to retain the server value."},
+			"jit_total_approvers":      {Type: schema.TypeInt, Optional: true, Computed: true, ValidateFunc: validation.IntAtLeast(0), Description: "Number of approvals required. Omit to retain the server value."},
+			"max_jit_request_duration": {Type: schema.TypeString, Optional: true, Computed: true, Description: "Maximum JIT request duration. An explicit empty string restores workspace inheritance; omission retains the server value."},
 			"script_only_access": {
 				Type:        schema.TypeBool,
 				Optional:    true,
@@ -464,6 +473,7 @@ func ResourceAdaptiveSessionCreate(ctx context.Context, d *schema.ResourceData, 
 		groupsVal,
 		idleTimeout.(string),
 		scriptOnlyAccess,
+		sessionPolicyFromSchema(d),
 	)
 	if err != nil {
 		return diag.FromErr(err)
@@ -485,13 +495,62 @@ func ResourceAdaptiveSessionCreate(ctx context.Context, d *schema.ResourceData, 
 	// 	return fmt.Errorf("[WARN] Error waiting for RDS Cluster state to be \"available\": %s", err)
 	// }
 
-	ResourceAdaptiveSessionRead(ctx, d, m)
 	return nil
 }
 
 func ResourceAdaptiveSessionRead(ctx context.Context, d *schema.ResourceData, m interface{}) diag.Diagnostics {
-	var diags diag.Diagnostics
-	return diags
+	data, err := m.(*adaptive.Client).ReadSession(ctx, d.Id(), false)
+	if err != nil {
+		return readDiagnostics(d, err)
+	}
+	if status, _ := adaptive.ResponseValue(data, "status", "Status"); status == "does-not-exist" {
+		d.SetId("")
+		return nil
+	}
+	fields := map[string][]string{
+		"name": {"name", "Name"}, "resource": {"resource", "Resource"},
+		"type": {"sessionType", "SessionType"}, "authorization": {"authorization", "Authorization"},
+		"cluster": {"cluster", "Cluster"}, "ttl": {"ttl", "TTL"},
+		"idle_timeout": {"idleTimeout", "IdleTimeout"}, "pause_timeout": {"pauseTimeout", "Timeout"},
+		"memory": {"memory", "Memory"}, "cpu": {"cpu", "CPU"},
+		"users": {"sessionUsers", "SessionUsers"}, "groups": {"groups", "Groups"},
+		"tags": {"userTags", "UserTags"}, "is_jit_enabled": {"isJitEnabled", "IsJITEnabled"},
+		"jit_approvers":          {"accessApprovers", "AccessApprovers"},
+		"script_only_access":     {"scriptOnlyAccess"},
+		"disable_output_capture": {"disableOutputCapture"}, "disable_data_studio": {"disableDataStudio"},
+		"disable_web_cli": {"disableWebCli"}, "jit_mode": {"jitMode"}, "auto_approval": {"autoApproval"},
+		"jit_multi_approver": {"jitMultiApprover"}, "jit_total_approvers": {"jitTotalApprovers"},
+		"max_jit_request_duration": {"maxJitRequestDuration"},
+	}
+	// Empty values select server defaults in existing configurations. Keep the
+	// selector, rather than pinning the currently resolved default in state.
+	for _, key := range []string{"cluster", "ttl", "idle_timeout", "pause_timeout", "memory", "cpu"} {
+		if d.Get(key) == "" {
+			delete(fields, key)
+		}
+	}
+	if remote, ok := adaptive.ResponseValue(data, "sessionType", "SessionType"); ok {
+		if normalized, valid := getSessionType(d.Get("type").(string)); valid && normalized == remote {
+			delete(fields, "type")
+		}
+	}
+	// These fields use omitempty even on the full response.
+	if _, full := data["disableWebCli"]; full {
+		for _, key := range []string{"authorization", "maxJitRequestDuration", "cluster", "ttl", "idleTimeout", "pauseTimeout", "memory", "cpu", "jitMode"} {
+			if _, ok := data[key]; !ok {
+				data[key] = ""
+			}
+		}
+	}
+	if diags := setResponseFields(d, data, fields); diags.HasError() {
+		return diags
+	}
+	for _, key := range []string{"users", "groups"} {
+		if err := collectionBaseline(d, key, []interface{}{}); err != nil {
+			return diag.FromErr(err)
+		}
+	}
+	return nil
 }
 
 func ResourceAdaptiveSessionUpdate(ctx context.Context, d *schema.ResourceData, m interface{}) diag.Diagnostics {
@@ -641,13 +700,13 @@ func ResourceAdaptiveSessionUpdate(ctx context.Context, d *schema.ResourceData, 
 		groupsVal,
 		idleTimeout.(string),
 		scriptOnlyAccess,
+		sessionPolicyFromSchema(d),
 	)
 	if err != nil {
 		return diag.FromErr(err)
 	}
 
 	d.SetId(resp.ID)
-	ResourceAdaptiveSessionRead(ctx, d, m)
 	return nil
 }
 
@@ -662,4 +721,26 @@ func ResourceAdaptiveSessionDelete(ctx context.Context, d *schema.ResourceData, 
 
 	d.SetId("")
 	return nil
+}
+
+func sessionPolicyFromSchema(d *schema.ResourceData) adaptive.SessionPolicy {
+	p := adaptive.SessionPolicy{JITMode: d.Get("jit_mode").(string)}
+	for key, target := range map[string]**bool{
+		"disable_output_capture": &p.DisableOutputCapture, "disable_data_studio": &p.DisableDataStudio,
+		"disable_web_cli": &p.DisableWebCLI, "auto_approval": &p.AutoApproval, "jit_multi_approver": &p.JITMultiApprover,
+	} {
+		if v, ok := optionalValue(d, key); ok {
+			value := v.(bool)
+			*target = &value
+		}
+	}
+	if v, ok := optionalValue(d, "jit_total_approvers"); ok {
+		value := v.(int)
+		p.JITTotalApprovers = &value
+	}
+	if v, ok := optionalValue(d, "max_jit_request_duration"); ok {
+		value := v.(string)
+		p.MaxJITRequestDuration = &value
+	}
+	return p
 }

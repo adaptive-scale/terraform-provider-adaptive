@@ -3,6 +3,7 @@ package components
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	adaptive "github.com/adaptive-scale/terraform-provider-adaptive/internal/terraform-client"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/diag"
@@ -11,6 +12,7 @@ import (
 
 func ResourceAdaptiveSchedule() *schema.Resource {
 	return &schema.Resource{
+		Description:   "Manages scheduled access approval or rejection, including time windows, users, groups and endpoints.",
 		CreateContext: ResourceAdaptiveScheduleCreate,
 		ReadContext:   ResourceAdaptiveScheduleRead,
 		UpdateContext: ResourceAdaptiveScheduleUpdate,
@@ -215,50 +217,66 @@ func ResourceAdaptiveScheduleCreate(ctx context.Context, d *schema.ResourceData,
 }
 
 func ResourceAdaptiveScheduleRead(ctx context.Context, d *schema.ResourceData, m interface{}) diag.Diagnostics {
-	client := m.(*adaptive.Client)
-
-	resp, err := client.GetSchedule(ctx, d.Id())
+	data, err := m.(*adaptive.Client).ReadSchedule(ctx, d.Id())
 	if err != nil {
-		return diag.FromErr(err)
+		return readDiagnostics(d, err)
 	}
-	// Schedule was deleted out-of-band — drop it from state so Terraform recreates it.
-	if resp == nil {
-		d.SetId("")
-		return nil
+	fields := map[string][]string{
+		"name": {"name"}, "description": {"description"}, "schedule_type": {"scheduleType"},
+		"is_active": {"isActive"}, "all_day": {"allDay"}, "start_hour": {"startHour"},
+		"start_minute": {"startMinute"}, "end_hour": {"endHour"}, "end_minute": {"endMinute"},
+		"weekdays": {"weekdays"}, "start_day": {"startDay"}, "end_day": {"endDay"},
+		"specific_dates": {"specificDates"}, "users": {"users"}, "teams": {"teams"},
+		"endpoints": {"endpoints"}, "expires_at": {"expiresAt"}, "max_access_time": {"maxAccessTime"},
+		"timezone": {"timezone"}, "operation_type": {"operationType"},
 	}
-	// The read endpoint returns a lossy view (no pattern fields), so we only
-	// refresh attributes it authoritatively reports to avoid spurious diffs.
-	if err := d.Set("name", resp.Name); err != nil {
-		return diag.FromErr(err)
-	}
-	if err := d.Set("schedule_type", resp.ScheduleType); err != nil {
-		return diag.FromErr(err)
-	}
-	if err := d.Set("is_active", resp.IsActive); err != nil {
-		return diag.FromErr(err)
-	}
-	if err := d.Set("all_day", resp.AllDay); err != nil {
-		return diag.FromErr(err)
-	}
-	if resp.Timezone != "" {
-		if err := d.Set("timezone", resp.Timezone); err != nil {
-			return diag.FromErr(err)
+	// Pattern fields distinguish the full v0.9 view from the old envelope-only
+	// view. Only the full view authoritatively omits cleared optional values.
+	if _, full := data["startHour"]; full {
+		for _, key := range []string{"description", "expiresAt", "timezone"} {
+			if _, ok := data[key]; !ok {
+				data[key] = ""
+			}
+		}
+		for _, key := range []string{"startDay", "endDay", "maxAccessTime"} {
+			if _, ok := data[key]; !ok {
+				data[key] = 0
+			}
+		}
+		for _, key := range []string{"weekdays", "specificDates"} {
+			if _, ok := data[key]; !ok {
+				data[key] = []interface{}{}
+			}
 		}
 	}
-	if resp.OperationType != "" {
-		if err := d.Set("operation_type", resp.OperationType); err != nil {
-			return diag.FromErr(err)
+	// All-day patterns are normalized to 00:00-23:59 by the server; the
+	// ignored time fields must retain the user's previous representation.
+	if allDay, _ := data["allDay"].(bool); allDay && d.Get("all_day").(bool) {
+		for _, key := range []string{"start_hour", "start_minute", "end_hour", "end_minute"} {
+			delete(fields, key)
 		}
 	}
-	// expires_at is returned by the backend normalized to RFC3339 UTC. Refresh
-	// only when present so the lossy read view doesn't clobber a value the
-	// backend chose not to report (matches the timezone/operation_type pattern).
-	if resp.ExpiresAt != "" {
-		if err := d.Set("expires_at", resp.ExpiresAt); err != nil {
-			return diag.FromErr(err)
+	if incoming, ok := data["weekdays"].([]interface{}); ok {
+		for i, day := range incoming {
+			for _, old := range d.Get("weekdays").([]interface{}) {
+				if strings.EqualFold(fmt.Sprint(day), fmt.Sprint(old)) {
+					incoming[i] = old
+					break
+				}
+			}
 		}
 	}
-	return nil
+	if incoming, ok := data["specificDates"].([]interface{}); ok {
+		for i, date := range incoming {
+			for _, old := range d.Get("specific_dates").([]interface{}) {
+				if equivalentString("expires_at", fmt.Sprint(old), fmt.Sprint(date)) {
+					incoming[i] = old
+					break
+				}
+			}
+		}
+	}
+	return setResponseFields(d, data, fields)
 }
 
 func ResourceAdaptiveScheduleUpdate(ctx context.Context, d *schema.ResourceData, m interface{}) diag.Diagnostics {

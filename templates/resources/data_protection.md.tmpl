@@ -1,0 +1,52 @@
+---
+page_title: "adaptive_data_protection Resource - terraform-provider-adaptive"
+subcategory: ""
+description: |-
+  Manages a database masking policy on an Adaptive resource.
+---
+
+# adaptive_data_protection (Resource)
+
+Manages the masking policy for one existing resource. This requires an Adaptive
+server with the Terraform data protection API. Manage only one policy per resource.
+The server validates masking types for the selected integration.
+
+```terraform
+resource "adaptive_data_protection" "database" {
+  resource = adaptive_resource.postgres.name
+  scoped   = true
+
+  masks {
+    database_name = "app"
+    tables {
+      schema     = "public"
+      table_name = "users"
+      masked     = true
+
+      masked_columns {
+        column_name  = "email"
+        masking_type = "email"
+      }
+    }
+  }
+}
+
+resource "adaptive_endpoint" "masked" {
+  name          = "masked-database"
+  resource      = adaptive_resource.postgres.name
+  authorization = adaptive_data_protection.database.authorization_name
+}
+```
+
+Destroy disables masking. The server retains its policy record, generated
+`masked_<resource>` authorization, and previously provisioned views.
+
+{{ .SchemaMarkdown | trimspace }}
+
+## Import
+
+Import using the underlying Adaptive resource ID:
+
+```shell
+terraform import adaptive_data_protection.database resource-id
+```

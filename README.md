@@ -94,7 +94,7 @@ See the [examples directory](examples/) for configuration examples of each integ
 
 ## Resources
 
-The provider includes 5 resource types:
+The provider includes 8 resource types:
 
 | Resource | Description |
 |----------|-------------|
@@ -103,6 +103,38 @@ The provider includes 5 resource types:
 | `adaptive_authorization` | Permission policy for fine-grained access control |
 | `adaptive_group` | User and endpoint organization for access management |
 | `adaptive_script` | Command execution on endpoints |
+| `adaptive_schedule` | Scheduled access approval or rejection |
+| `adaptive_data_protection` | Database masking policies |
+| `adaptive_msteams_workflow` | Microsoft Teams workflow integration |
+
+## Server compatibility
+
+The provider supports the Terraform API on Adaptive `release/v0.9.x`, including
+endpoint JIT policies, script metadata, full schedule refresh, and data protection.
+Existing resource names, attributes, defaults, list types, and state versions are
+preserved; existing configurations do not require a state migration.
+
+Refresh accepts both legacy PascalCase and current camelCase responses, including
+HTTP 200 and 202. Older responses leave unreported fields unchanged. A server
+without a read route produces a warning and retains state; an object reported as
+missing by the API is removed from state so Terraform can recreate it. Permission
+and server errors stop refresh without dropping the object.
+
+Credentials, composite settings containing redacted credentials, and omitted
+script bodies retain their configured values. Where available, `redacted_digests`
+and `command_digest` record opaque server fingerprints and warn about subsequent
+external changes. They do not recover plaintext or automatically restore secrets.
+Resource refresh updates mapped public configuration fields already represented
+in state; omitted and unmapped settings remain unchanged. Server-selected endpoint
+defaults remain inherited when the corresponding configuration is empty.
+
+New endpoint policy and script metadata fields are optional. Omission retains the
+server value after refresh; explicit `false`, `0`, and supported empty strings are
+sent as configured. New features require server support. Older servers may ignore
+fields they do not recognize; the provider does not emulate those features.
+
+Destroying `adaptive_data_protection` disables masking through the server API. It
+retains the server's policy record, generated authorization, and existing views.
 
 ## Documentation
 

@@ -7,76 +7,12 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
-	"strings"
-	"time"
 
 	"github.com/hashicorp/terraform-plugin-log/tflog"
 )
 
 func (c *Client) ReadResource(ctx context.Context, resourceID string, waitForStatus bool) (any, error) {
-	tflog.Debug(ctx, "ReadResource called", map[string]interface{}{
-		"resource_id":     resourceID,
-		"wait_for_status": waitForStatus,
-	})
-	timeout := time.Second * 10
-	retryForStatus := 20
-	if waitForStatus {
-		retryForStatus = 20
-	}
-
-	resp, err := Do(
-		func() (map[string]interface{}, error) {
-			return _readResource(ctx, c, resourceID)
-		}, RetryLimit(retryForStatus), Sleep(timeout), RetryResultChecker(func(intermedResult any) bool {
-			if res, ok := intermedResult.(map[string]interface{}); !ok {
-				tflog.Warn(ctx, "Resource result has bad data format", map[string]interface{}{
-					"resource_id": resourceID,
-				})
-				return true
-			} else {
-				if res != nil {
-					if status, okk := res["Status"].(string); !okk {
-						tflog.Warn(ctx, "Resource status field missing or not a string", map[string]interface{}{
-							"resource_id": resourceID,
-						})
-						return true
-					} else {
-						statusLower := strings.ToLower(status)
-						tflog.Debug(ctx, "Resource status check", map[string]interface{}{
-							"resource_id": resourceID,
-							"status":      status,
-							"is_creating": statusLower == "creating",
-						})
-						// Will return false, when state is among final states like "created" or "failed"
-						return statusLower == "creating"
-					}
-				}
-				tflog.Warn(ctx, "Resource result is nil", map[string]interface{}{
-					"resource_id": resourceID,
-				})
-				return true
-			}
-		}))
-	if err != nil {
-		tflog.Error(ctx, "Failed to read resource after retries", map[string]interface{}{
-			"resource_id": resourceID,
-			"error":       err.Error(),
-		})
-		return nil, fmt.Errorf("could not read resource %s %w", resourceID, err)
-	}
-	finalStatus := strings.ToLower(resp["Status"].(string))
-	if finalStatus != "created" {
-		tflog.Error(ctx, "Resource not in created status", map[string]interface{}{
-			"resource_id": resourceID,
-			"status":      resp["Status"],
-		})
-		return nil, fmt.Errorf("error read resource %s", resourceID)
-	}
-	tflog.Debug(ctx, "Resource successfully created", map[string]interface{}{
-		"resource_id": resourceID,
-	})
-	return resp, nil
-
+	return c.readWithStatus(ctx, c.resourceAPI(), resourceID, waitForStatus)
 }
 
 // Resources / Integrations
@@ -126,6 +62,7 @@ func (c *Client) CreateResource(
 		})
 		return nil, err
 	}
+	defer response.Body.Close()
 	if response.StatusCode == 409 {
 		tflog.Error(ctx, "Duplicate resource detected", map[string]interface{}{
 			"name": name,
@@ -200,6 +137,7 @@ func (c *Client) UpdateResource(
 		})
 		return nil, err
 	}
+	defer response.Body.Close()
 	if response.StatusCode != 200 {
 		tflog.Error(ctx, "Failed to update resource", map[string]interface{}{
 			"resource_id": resourceID,
@@ -244,6 +182,7 @@ func (c *Client) DeleteResource(ctx context.Context, resourceID, resourceName st
 		})
 		return false, err
 	}
+	defer _response.Body.Close()
 	if _response.StatusCode != 200 {
 		var errReason string
 		decodeErr := json.NewDecoder(_response.Body).Decode(&errReason)
@@ -270,17 +209,22 @@ func (c *Client) DeleteResource(ctx context.Context, resourceID, resourceName st
 	return true, nil
 }
 
-func (c *Client) CreateScript(ctx context.Context, name, command, endpoint string) (*CreateResourceResponse, error) {
+func (c *Client) CreateScript(ctx context.Context, name, command, endpoint string, options ...ScriptOptions) (*CreateResourceResponse, error) {
 	tflog.Debug(ctx, "CreateScript called", map[string]interface{}{
 		"name":     name,
 		"endpoint": endpoint,
 	})
 	payloadBuf := bytes.NewBuffer([]byte{})
-	if err := json.NewEncoder(payloadBuf).Encode(map[string]interface{}{
-		"Name":     name,
-		"Command":  command,
-		"Endpoint": endpoint,
-	}); err != nil {
+	payload := struct {
+		Name     interface{} `json:"Name"`
+		Command  interface{} `json:"Command"`
+		Endpoint interface{} `json:"Endpoint"`
+		ScriptOptions
+	}{Name: name, Command: command, Endpoint: endpoint}
+	if len(options) > 0 {
+		payload.ScriptOptions = options[0]
+	}
+	if err := json.NewEncoder(payloadBuf).Encode(payload); err != nil {
 		tflog.Error(ctx, "Failed to encode request body for creating script", map[string]interface{}{
 			"name":  name,
 			"error": err.Error(),
@@ -306,6 +250,7 @@ func (c *Client) CreateScript(ctx context.Context, name, command, endpoint strin
 		})
 		return nil, err
 	}
+	defer response.Body.Close()
 	if response.StatusCode == 409 {
 		tflog.Error(ctx, "Duplicate script detected", map[string]interface{}{
 			"name": name,

@@ -29,6 +29,7 @@ const (
 
 // sessions
 type CreateSessionRequest struct {
+	SessionPolicy
 	SessionName       string `json:"sessionName"`
 	ResourceName      string `json:"resourceName"`
 	ClusterName       string `json:"clusterName,omitempty"`
@@ -52,6 +53,25 @@ type CreateSessionRequest struct {
 
 	// script only access
 	ScriptOnlyAccess bool `json:"script_only_access"`
+}
+
+// Pointer fields preserve the backend's omitted-versus-explicit-false contract.
+// An empty policy emits no new fields, keeping legacy requests unchanged.
+type SessionPolicy struct {
+	DisableOutputCapture  *bool   `json:"disable_output_capture,omitempty"`
+	DisableDataStudio     *bool   `json:"disable_data_studio,omitempty"`
+	DisableWebCLI         *bool   `json:"disable_web_cli,omitempty"`
+	JITMode               string  `json:"jit_mode,omitempty"`
+	AutoApproval          *bool   `json:"auto_approval,omitempty"`
+	JITMultiApprover      *bool   `json:"jit_multi_approver,omitempty"`
+	JITTotalApprovers     *int    `json:"jit_total_approvers,omitempty"`
+	MaxJITRequestDuration *string `json:"max_jit_request_duration,omitempty"`
+}
+
+type ScriptOptions struct {
+	Description           *string            `json:"Description,omitempty"`
+	HelpText              *string            `json:"helpText,omitempty"`
+	ParameterDescriptions *map[string]string `json:"ParameterDescriptions,omitempty"`
 }
 
 type CreateSessionResponse struct {

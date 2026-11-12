@@ -6,8 +6,9 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
+	"strings"
 
 	"github.com/hashicorp/terraform-plugin-log/tflog"
 )
@@ -27,7 +28,10 @@ func NewClient(serviceToken, workspaceURL string) *Client {
 	if workspaceURL == "" {
 		workspaceURL = defaultAdaptiveURL
 	} else {
-		workspaceURL = fmt.Sprintf("%s/api/v1", workspaceURL)
+		workspaceURL = strings.TrimRight(workspaceURL, "/")
+		if !strings.HasSuffix(workspaceURL, "/api/v1") {
+			workspaceURL += "/api/v1"
+		}
 	}
 
 	return &Client{
@@ -63,6 +67,10 @@ func (c *Client) do(ctx context.Context, req *http.Request) (*http.Response, err
 		"url":    req.URL.String(),
 	})
 	req.Header.Set("Authorization", c.serviceToken)
+	req = req.WithContext(ctx)
+	if req.Body != nil {
+		req.Header.Set("Content-Type", "application/json")
+	}
 	res, err := c.httpClient.Do(req)
 	if err != nil {
 		tflog.Error(ctx, "Failed to make HTTP request", map[string]interface{}{
@@ -78,6 +86,7 @@ func (c *Client) do(ctx context.Context, req *http.Request) (*http.Response, err
 		"url":         req.URL.String(),
 	})
 	if res.StatusCode == 401 {
+		res.Body.Close()
 		tflog.Error(ctx, "Authentication failed: bad token", map[string]interface{}{
 			"url": req.URL.String(),
 		})
@@ -86,114 +95,22 @@ func (c *Client) do(ctx context.Context, req *http.Request) (*http.Response, err
 	return res, err
 }
 
-func _readAuthorization(ctx context.Context, c *Client, authID string) (map[string]interface{}, error) {
-	tflog.Debug(ctx, "Reading authorization", map[string]interface{}{
-		"auth_id": authID,
-	})
-	request, err := http.NewRequest("GET", fmt.Sprintf("%s/read/%s", c.authorizationAPI(), authID), nil)
-	if err != nil {
-		tflog.Error(ctx, "Failed to create HTTP request for reading authorization", map[string]interface{}{
-			"auth_id": authID,
-			"error":   err.Error(),
-		})
-		return nil, err
-	}
-
-	response, err := c.do(ctx, request)
-	if err != nil {
-		tflog.Error(ctx, "Failed to request adaptive api for authorization", map[string]interface{}{
-			"auth_id": authID,
-			"error":   err.Error(),
-		})
-		return nil, fmt.Errorf("failed to request adaptive api. err %w", err)
-	}
-	if response.StatusCode != http.StatusAccepted && response.StatusCode != http.StatusOK {
-
-		d, _ := ioutil.ReadAll(response.Body) // drain body to allow connection reuse
-
-		tflog.Error(ctx, "Unexpected status code reading authorization", map[string]interface{}{
-			"auth_id":     authID,
-			"status_code": response.StatusCode,
-			"expected":    http.StatusAccepted,
-			"error_body":  string(d),
-		})
-
-		return nil, fmt.Errorf("error read authorization %s", authID)
-	}
-	var resp map[string]interface{}
-	if err := json.NewDecoder(response.Body).Decode(&resp); err != nil {
-		tflog.Error(ctx, "Failed to decode response body for authorization", map[string]interface{}{
-			"auth_id": authID,
-			"error":   err.Error(),
-		})
-		return nil, fmt.Errorf("failed to decode response body. err %w", err)
-	}
-	tflog.Debug(ctx, "Successfully read authorization", map[string]interface{}{
-		"auth_id":  authID,
-		"response": fmt.Sprintf("%+v", resp),
-	})
-	return resp, nil
-}
-
-func _readResource(ctx context.Context, c *Client, resourceID string) (map[string]interface{}, error) {
-	tflog.Debug(ctx, "Reading resource", map[string]interface{}{
-		"resource_id": resourceID,
-	})
-	request, err := http.NewRequest("GET", fmt.Sprintf("%s/read/%s", c.resourceAPI(), resourceID), nil)
-	if err != nil {
-		tflog.Error(ctx, "Failed to create HTTP request for reading resource", map[string]interface{}{
-			"resource_id": resourceID,
-			"error":       err.Error(),
-		})
-		return nil, err
-	}
-
-	response, err := c.do(ctx, request)
-	if err != nil {
-		tflog.Error(ctx, "Failed to request adaptive api for resource", map[string]interface{}{
-			"resource_id": resourceID,
-			"error":       err.Error(),
-		})
-		return nil, fmt.Errorf("failed to request adaptive api. err %w", err)
-	}
-	if response.StatusCode != http.StatusAccepted {
-
-		d, _ := ioutil.ReadAll(response.Body) // drain body to allow connection reuse
-
-		tflog.Error(ctx, "Unexpected status code reading resource", map[string]interface{}{
-			"resource_id": resourceID,
-			"status_code": response.StatusCode,
-			"expected":    http.StatusAccepted,
-			"error_body":  string(d),
-		})
-		return nil, fmt.Errorf("error read resource %s", resourceID)
-	}
-	var resp map[string]interface{}
-	if err := json.NewDecoder(response.Body).Decode(&resp); err != nil {
-		tflog.Error(ctx, "Failed to decode response body for resource", map[string]interface{}{
-			"resource_id": resourceID,
-			"error":       err.Error(),
-		})
-		return nil, fmt.Errorf("failed to decode response body. err %w", err)
-	}
-	tflog.Debug(ctx, "Successfully read resource", map[string]interface{}{
-		"resource_id": resourceID,
-		"response":    fmt.Sprintf("%+v", resp),
-	})
-	return resp, nil
-}
-
-func (c *Client) UpdateScript(ctx context.Context, id, name, command, endpoint *string) (any, error) {
+func (c *Client) UpdateScript(ctx context.Context, id, name, command, endpoint *string, options ...ScriptOptions) (any, error) {
 	tflog.Debug(ctx, "UpdateScript called", map[string]interface{}{
 		"script_id": *id,
 		"name":      *name,
 	})
 	payloadBuf := bytes.NewBuffer([]byte{})
-	if err := json.NewEncoder(payloadBuf).Encode(map[string]interface{}{
-		"Name":     name,
-		"Command":  command,
-		"Endpoint": endpoint,
-	}); err != nil {
+	payload := struct {
+		Name     interface{} `json:"Name"`
+		Command  interface{} `json:"Command"`
+		Endpoint interface{} `json:"Endpoint"`
+		ScriptOptions
+	}{Name: name, Command: command, Endpoint: endpoint}
+	if len(options) > 0 {
+		payload.ScriptOptions = options[0]
+	}
+	if err := json.NewEncoder(payloadBuf).Encode(payload); err != nil {
 		tflog.Error(ctx, "Failed to encode request body for updating script", map[string]interface{}{
 			"script_id": *id,
 			"error":     err.Error(),
@@ -223,6 +140,7 @@ func (c *Client) UpdateScript(ctx context.Context, id, name, command, endpoint *
 		})
 		return nil, err
 	}
+	defer response.Body.Close()
 	if response.StatusCode == 409 {
 		tflog.Error(ctx, "Duplicate script name during update", map[string]interface{}{
 			"script_id": *id,
@@ -265,6 +183,7 @@ func (c *Client) DeleteScript(ctx context.Context, id, name string) (bool, error
 		})
 		return false, err
 	}
+	defer _response.Body.Close()
 	if _response.StatusCode != 200 {
 		var errReason string
 		decodeErr := json.NewDecoder(_response.Body).Decode(&errReason)
@@ -326,6 +245,7 @@ func (c *Client) CreateTeam(ctx context.Context, name *string, members, endpoint
 		})
 		return nil, err
 	}
+	defer response.Body.Close()
 	if response.StatusCode == 409 {
 		tflog.Error(ctx, "Duplicate group/team detected", map[string]interface{}{
 			"name": *name,
@@ -363,46 +283,16 @@ func (c *Client) CreateTeam(ctx context.Context, name *string, members, endpoint
 }
 
 func (c *Client) GetTeam(ctx context.Context, id string) (*CreateResourceResponse, error) {
-	tflog.Debug(ctx, "GetTeam called", map[string]interface{}{
-		"team_id": id,
-	})
-	request, err := http.NewRequest("GET", fmt.Sprintf("%s/%s", c.teamAPI(), id), nil)
+	data, err := c.ReadTeam(ctx, id)
 	if err != nil {
-		tflog.Error(ctx, "Failed to create HTTP request for getting team", map[string]interface{}{
-			"team_id": id,
-			"error":   err.Error(),
-		})
 		return nil, err
 	}
-
-	response, err := c.do(ctx, request)
-	if err != nil {
-		tflog.Error(ctx, "Failed to make request to adaptive API for getting team", map[string]interface{}{
-			"team_id": id,
-			"error":   err.Error(),
-		})
-		return nil, err
+	value, _ := ResponseValue(data, "id", "ID")
+	teamID, ok := value.(string)
+	if !ok || teamID == "" {
+		return nil, errors.New("team read response has no ID")
 	}
-	if response.StatusCode != 200 {
-		tflog.Error(ctx, "Failed to get team", map[string]interface{}{
-			"team_id":     id,
-			"status_code": response.StatusCode,
-		})
-		return nil, fmt.Errorf("error getting group %s", id)
-	}
-
-	var resp CreateResourceResponse
-	if err := json.NewDecoder(response.Body).Decode(&resp); err != nil {
-		tflog.Error(ctx, "Failed to decode response body for team", map[string]interface{}{
-			"team_id": id,
-			"error":   err.Error(),
-		})
-		return nil, fmt.Errorf("failed to decode response body. err %w", err)
-	}
-	tflog.Debug(ctx, "Team successfully retrieved", map[string]interface{}{
-		"team_id": id,
-	})
-	return &resp, nil
+	return &CreateResourceResponse{ID: teamID}, nil
 }
 
 func (c *Client) UpdateTeam(ctx context.Context, id, name *string, members, endpoints *[]string) (any, error) {
@@ -441,6 +331,7 @@ func (c *Client) UpdateTeam(ctx context.Context, id, name *string, members, endp
 		})
 		return nil, err
 	}
+	defer response.Body.Close()
 	if response.StatusCode != 200 {
 		decodedMsg, err := decodeError(ctx, response)
 		if err != nil {
@@ -484,6 +375,7 @@ func (c *Client) DeleteTeam(ctx context.Context, id, name string) (bool, error) 
 		})
 		return false, err
 	}
+	defer response.Body.Close()
 	if response.StatusCode != 200 {
 		decodedMsg, err := decodeError(ctx, response)
 		if err != nil {
@@ -505,19 +397,27 @@ func (c *Client) DeleteTeam(ctx context.Context, id, name string) (bool, error) 
 	return true, nil
 }
 
-func decodeError(ctx context.Context, response *http.Response) (reason string, decodeErr error) {
-	var errReason ErrorResponse
-	if err := json.NewDecoder(response.Body).Decode(&errReason); err != nil {
-		tflog.Error(ctx, "Failed to decode error response", map[string]interface{}{
-			"status_code": response.StatusCode,
-			"error":       err.Error(),
-		})
-		return "", fmt.Errorf("failed to decode response body. err %w", err)
-	} else {
-		reason = errReason.Error
-		tflog.Debug(ctx, "Decoded error response", map[string]interface{}{
-			"reason": reason,
-		})
-		return
+func decodeError(ctx context.Context, response *http.Response) (string, error) {
+	body, err := io.ReadAll(response.Body)
+	if err != nil {
+		return "", err
 	}
+	var message string
+	if json.Unmarshal(body, &message) == nil {
+		return message, nil
+	}
+	var envelope struct {
+		Error   string
+		Msg     string
+		Message string
+	}
+	if err := json.Unmarshal(body, &envelope); err != nil {
+		return "", fmt.Errorf("failed to decode error response: %w", err)
+	}
+	for _, text := range []string{envelope.Error, envelope.Msg, envelope.Message} {
+		if text != "" {
+			return text, nil
+		}
+	}
+	return "", nil
 }

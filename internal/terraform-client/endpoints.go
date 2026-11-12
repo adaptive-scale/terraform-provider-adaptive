@@ -32,6 +32,7 @@ func (c *Client) CreateSession(
 	groups []string,
 	idleTimeout string,
 	scriptOnlyAccess bool,
+	policies ...SessionPolicy,
 ) (*CreateSessionResponse, error) {
 	tflog.Debug(ctx, "CreateSession called", map[string]interface{}{
 		"name":          sessionName,
@@ -59,6 +60,9 @@ func (c *Client) CreateSession(
 		ScriptOnlyAccess:  scriptOnlyAccess,
 	}
 
+	if len(policies) > 0 {
+		req.SessionPolicy = policies[0]
+	}
 	payloadBuf := bytes.NewBuffer([]byte{})
 	if err := json.NewEncoder(payloadBuf).Encode(req); err != nil {
 		tflog.Error(ctx, "Failed to encode request body for creating session", map[string]interface{}{
@@ -86,6 +90,7 @@ func (c *Client) CreateSession(
 		})
 		return nil, err
 	}
+	defer _response.Body.Close()
 	if _response.StatusCode == 409 {
 		tflog.Error(ctx, "Duplicate session detected", map[string]interface{}{
 			"name": sessionName,
@@ -136,119 +141,11 @@ func (c *Client) CreateSession(
 	return &response, nil
 }
 
-func _readSession(ctx context.Context, c *Client, sessionID string) (map[string]interface{}, error) {
-	tflog.Debug(ctx, "Reading session", map[string]interface{}{
-		"session_id": sessionID,
-	})
-	request, err := http.NewRequest("GET", fmt.Sprintf("%s/read/%s", c.sessionAPI(), sessionID), nil)
-	if err != nil {
-		tflog.Error(ctx, "Failed to create HTTP request for reading session", map[string]interface{}{
-			"session_id": sessionID,
-			"error":      err.Error(),
-		})
-		return nil, err
-	}
-
-	response, err := c.do(ctx, request)
-	if err != nil {
-		tflog.Error(ctx, "Failed to request adaptive api for session", map[string]interface{}{
-			"session_id": sessionID,
-			"error":      err.Error(),
-		})
-		return nil, fmt.Errorf("failed to request adaptive api. err %w", err)
-	}
-	if response.StatusCode != http.StatusAccepted {
-		tflog.Error(ctx, "Unexpected status code reading session", map[string]interface{}{
-			"session_id":  sessionID,
-			"status_code": response.StatusCode,
-			"expected":    http.StatusAccepted,
-		})
-		return nil, fmt.Errorf("error read session %s", sessionID)
-	}
-	var resp map[string]interface{}
-	if err := json.NewDecoder(response.Body).Decode(&resp); err != nil {
-		tflog.Error(ctx, "Failed to decode response body for session", map[string]interface{}{
-			"session_id": sessionID,
-			"error":      err.Error(),
-		})
-		return nil, fmt.Errorf("failed to decode response body. err %w", err)
-	}
-	tflog.Debug(ctx, "Successfully read session", map[string]interface{}{
-		"session_id": sessionID,
-		"response":   fmt.Sprintf("%+v", resp),
-	})
-	return resp, nil
-}
-
 /*
 waitForStatus: if true, will wait for session to be active/fail before returning
 */
 func (c *Client) ReadSession(ctx context.Context, sessionID string, waitForStatus bool) (map[string]interface{}, error) {
-	tflog.Debug(ctx, "ReadSession called", map[string]interface{}{
-		"session_id":      sessionID,
-		"wait_for_status": waitForStatus,
-	})
-	timeout := time.Second * 10
-	retryForStatus := 20
-	if waitForStatus {
-		retryForStatus = 30
-	}
-
-	resp, err := Do(
-		func() (map[string]interface{}, error) {
-			return _readSession(ctx, c, sessionID)
-		}, RetryLimit(retryForStatus), Sleep(timeout), RetryResultChecker(func(intermedResult any) bool {
-			tflog.Debug(ctx, "Session status check", map[string]interface{}{
-				"result": fmt.Sprintf("%v", intermedResult),
-			})
-			if res, ok := intermedResult.(map[string]interface{}); !ok {
-				tflog.Warn(ctx, "Session result has bad data format", map[string]interface{}{
-					"session_id": sessionID,
-				})
-				return true
-			} else {
-				if res != nil {
-					if status, okk := res["Status"].(string); !okk {
-						tflog.Warn(ctx, "Session status field missing or not a string", map[string]interface{}{
-							"session_id": sessionID,
-						})
-						return true
-					} else {
-						statusLower := strings.ToLower(status)
-						tflog.Debug(ctx, "Session status check", map[string]interface{}{
-							"session_id":  sessionID,
-							"status":      status,
-							"is_creating": statusLower == "creating",
-						})
-						// Will return false, when state is among final states like "created" or "failed"
-						return statusLower == "creating"
-					}
-				}
-				tflog.Warn(ctx, "Session result is nil", map[string]interface{}{
-					"session_id": sessionID,
-				})
-				return true
-			}
-		}))
-	if err != nil {
-		tflog.Error(ctx, "Failed to read session after retries", map[string]interface{}{
-			"session_id": sessionID,
-			"error":      err.Error(),
-		})
-		return nil, fmt.Errorf("could to create session %s", sessionID)
-	}
-	finalStatus := strings.ToLower(resp["Status"].(string))
-	if finalStatus != "created" {
-		tflog.Error(ctx, "Session not in created status", map[string]interface{}{
-			"session_id": sessionID,
-			"status":     resp["Status"],
-		})
-		return nil, fmt.Errorf("error create session %s", sessionID)
-	}
-	tflog.Debug(ctx, "Session successfully created", map[string]interface{}{
-		"session_id": sessionID,
-	})
-	return resp, nil
+	return c.readWithStatus(ctx, c.sessionAPI(), sessionID, waitForStatus)
 }
 
 func (c *Client) UpdateSession(
@@ -269,6 +166,7 @@ func (c *Client) UpdateSession(
 	groups []string,
 	idleTimeout string,
 	scriptOnlyAccess bool,
+	policies ...SessionPolicy,
 ) (*UpdateSessionResponse, error) {
 	tflog.Debug(ctx, "UpdateSession called", map[string]interface{}{
 		"session_id": sessionID,
@@ -294,6 +192,9 @@ func (c *Client) UpdateSession(
 		ScriptOnlyAccess:  scriptOnlyAccess,
 	}
 
+	if len(policies) > 0 {
+		req.SessionPolicy = policies[0]
+	}
 	payloadBuf := bytes.NewBuffer([]byte{})
 	if err := json.NewEncoder(payloadBuf).Encode(req); err != nil {
 		tflog.Error(ctx, "Failed to encode request body for updating session", map[string]interface{}{
@@ -321,6 +222,7 @@ func (c *Client) UpdateSession(
 		})
 		return nil, err
 	}
+	defer _response.Body.Close()
 	if _response.StatusCode == 409 {
 		tflog.Error(ctx, "Duplicate session name during update", map[string]interface{}{
 			"session_id": sessionID,
@@ -359,116 +261,46 @@ func (c *Client) UpdateSession(
 }
 
 func (c *Client) DeleteSession(ctx context.Context, sessionID string) (bool, error) {
-	tflog.Debug(ctx, "DeleteSession called", map[string]interface{}{
-		"session_id": sessionID,
-	})
 	request, err := http.NewRequest("POST", fmt.Sprintf("%s/delete/%s", c.sessionAPI(), sessionID), nil)
 	if err != nil {
-		tflog.Error(ctx, "Failed to create HTTP request for deleting session", map[string]interface{}{
-			"session_id": sessionID,
-			"error":      err.Error(),
-		})
 		return false, err
 	}
-
 	response, err := c.do(ctx, request)
 	if err != nil {
-		tflog.Error(ctx, "Failed to make request to adaptive API for deleting session", map[string]interface{}{
-			"session_id": sessionID,
-			"error":      err.Error(),
-		})
-		return false, fmt.Errorf("failed to request adaptive api. err %w", err)
+		return false, err
 	}
-	if response.StatusCode != 200 {
-		tflog.Error(ctx, "Failed to initiate session deletion", map[string]interface{}{
-			"session_id":  sessionID,
-			"status_code": response.StatusCode,
-		})
-		return false, fmt.Errorf("error deleting session %s", sessionID)
+	response.Body.Close()
+	if response.StatusCode != http.StatusOK {
+		return false, fmt.Errorf("error deleting session %s: HTTP %d", sessionID, response.StatusCode)
 	}
-	tflog.Debug(ctx, "Delete request successful, monitoring session termination", map[string]interface{}{
-		"session_id": sessionID,
-	})
-	// Once delete request is succesful, we check for status of session
-	timeout := time.Second * 10
-	retryForStatus := 20
-
-	resp, err := Do(
-		func() (map[string]interface{}, error) {
-			return _readSession(ctx, c, sessionID)
-		}, RetryLimit(retryForStatus), Sleep(timeout), RetryResultChecker(func(intermedResult any) bool {
-			if res, ok := intermedResult.(map[string]interface{}); !ok {
-				tflog.Warn(ctx, "Session deletion check has bad data format", map[string]interface{}{
-					"session_id": sessionID,
-				})
-				return true
-			} else {
-				if res != nil {
-					if status, okk := res["Status"].(string); !okk {
-						tflog.Warn(ctx, "Session status field missing during deletion", map[string]interface{}{
-							"session_id": sessionID,
-						})
-						return false
-					} else {
-						statusLower := strings.ToLower(status)
-						tflog.Debug(ctx, "Session deletion status check", map[string]interface{}{
-							"session_id": sessionID,
-							"status":     status,
-						})
-
-						// Return true to keep retrying if NOT in a terminal state
-						terminatedOrFailed := (statusLower == "terminated" || statusLower == "marked-for-deletion" || statusLower == "failed" || statusLower == "failed-to-restart")
-						if terminatedOrFailed {
-							tflog.Debug(ctx, "Session in terminal state, forcing deletion", map[string]interface{}{
-								"session_id": sessionID,
-								"status":     status,
-							})
-							_, err2 := c.deleteSession(ctx, sessionID)
-							if err2 != nil {
-								tflog.Error(ctx, "Failed to force delete session", map[string]interface{}{
-									"session_id": sessionID,
-									"error":      err2.Error(),
-								})
-								return false
-							}
-							return false
-						}
-					}
-				}
-				return true
-			}
-		}))
-	if err != nil {
-		tflog.Error(ctx, "Failed to read session during deletion", map[string]interface{}{
-			"session_id": sessionID,
-			"error":      err.Error(),
-		})
-		return false, fmt.Errorf("could to read session %s %w", sessionID, err)
-	}
-
-	if status, ok := resp["Status"].(string); ok {
-		statusLower := strings.ToLower(status)
-		tflog.Debug(ctx, "Final session deletion status", map[string]interface{}{
-			"session_id": sessionID,
-			"status":     status,
-		})
-		if statusLower == "terminated" || statusLower == "marked-for-deletion" || statusLower == "does-not-exist" {
-			tflog.Debug(ctx, "Session successfully deleted", map[string]interface{}{
-				"session_id": sessionID,
-			})
+	for attempt := 0; attempt < 20; attempt++ {
+		data, err := c.ReadSession(ctx, sessionID, false)
+		if errors.Is(err, ErrNotFound) {
 			return true, nil
 		}
-		tflog.Error(ctx, "Unexpected session status after deletion", map[string]interface{}{
-			"session_id": sessionID,
-			"status":     statusLower,
-		})
-		return false, fmt.Errorf("error read session %s", sessionID)
-	} else {
-		tflog.Error(ctx, "Could not determine status for session", map[string]interface{}{
-			"session_id": sessionID,
-		})
-		return false, errors.New("could not delete session")
+		if err != nil {
+			return false, err
+		}
+		value, _ := ResponseValue(data, "status", "Status")
+		status, ok := value.(string)
+		if !ok {
+			return false, fmt.Errorf("missing session deletion status for %s", sessionID)
+		}
+		switch strings.ToLower(status) {
+		case "does-not-exist":
+			return true, nil
+		case "terminated", "marked-for-deletion", "failed", "failed-to-restart":
+			return c.deleteSession(ctx, sessionID)
+		}
+		timer := time.NewTimer(10 * time.Second)
+		select {
+		case <-ctx.Done():
+			timer.Stop()
+			return false, ctx.Err()
+		case <-timer.C:
+		}
 	}
+	return false, fmt.Errorf("timed out deleting session %s", sessionID)
 }
 
 func (c *Client) deleteSession(ctx context.Context, sessionID string) (bool, error) {
@@ -493,6 +325,7 @@ func (c *Client) deleteSession(ctx context.Context, sessionID string) (bool, err
 		})
 		return false, fmt.Errorf("failed to request adaptive api. err %w", err)
 	}
+	defer _response.Body.Close()
 
 	if _response.StatusCode != 200 {
 		tflog.Error(ctx, "Force delete failed", map[string]interface{}{

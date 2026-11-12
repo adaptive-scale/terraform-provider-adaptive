@@ -620,11 +620,13 @@ resource "adaptive_resource" "postgres_with_secrets" {
 - `username` (String) Username for the adaptive resource authentication. Used by CockroachDB, Postgres, Mysql, SSH resources
 - `version` (String) The version
 - `warehouse` (String) The Snowflake warehouse name. Used by Snowflake resource
+- `webhook_url` (String) Webhook URL for an MS Teams workflow integration.
 - `webui_port` (String) The web UI port
 
 ### Read-Only
 
 - `id` (String) The ID of this resource.
+- `redacted_digests` (Map of String) Opaque server fingerprints for withheld credentials, when supported.
 
 <a id="nestedblock--targets"></a>
 ### Nested Schema for `targets`
