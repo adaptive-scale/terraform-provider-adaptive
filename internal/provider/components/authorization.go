@@ -25,6 +25,7 @@ var validAuthorizedResourceTypes = map[string]bool{
 	"mongodb_aws_secrets_manager":   true,
 	"mongo36":                       true,
 	"elasticsearch":                 true,
+	"servicelist":                   true,
 	"ssh":                           true,
 	"postgres":                      true,
 	"mysql":                         true,

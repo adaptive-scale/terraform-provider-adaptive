@@ -19,8 +19,33 @@ The `adaptive_authorization` resource defines permission policies that control w
 | `mongodb` | MongoDB database | JSON with role, privileges, actions |
 | `kubernetes` | Kubernetes cluster | Kubernetes RBAC Role manifest |
 | `ssh` | SSH server | YAML with allow/deny for data_transfer, operations, directories |
+| `servicelist` | HTTP services | YAML with allow/deny lists of operation_type and route |
 
 ## Example Usage
+
+### Services HTTP Access
+
+```terraform
+resource "adaptive_authorization" "services_read" {
+  name          = "services-read"
+  resource_type = "servicelist"
+  permissions   = <<-EOT
+    allow:
+      - operation_type: GET
+        route: /api/*
+    deny:
+      - operation_type: "*"
+        route: /api/admin/*
+  EOT
+  description   = "Read API routes except administrative routes"
+}
+```
+
+Services permissions use `allow` and/or `deny` lists of HTTP methods and paths.
+`operation_type` accepts an HTTP method or `"*"`; `route` accepts an exact path
+or a prefix ending in `*`. Deny rules take precedence. At least one rule is
+required; unknown fields and `payload_regex` are rejected. Apply this
+authorization to a Services endpoint using its `authorization` name.
 
 ### PostgreSQL Read-Only Access
 
