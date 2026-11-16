@@ -1,0 +1,414 @@
+{
+  "cases": [
+    {
+      "type": "aws",
+      "attributes": {"region_name": "us-east-1", "access_key_id": "TF_LIVE_DUMMY_ACCESS_KEY", "secret_access_key": "tf-live-dummy-secret-access-key", "use_role_arn": false, "use_service_account": false, "create_if_not_exists": false},
+      "notes": "Static AWS key mode; not role assumption or service-account provisioning. Dummy credentials only. Persistence fixture, never Test Config, sync, or endpoint creation; AWS SDK use would contact real AWS APIs. All create operations may emit configured backend metrics/activity notifications."
+    },
+    {
+      "type": "azure",
+      "attributes": {"tenant_id": "00000000-0000-0000-0000-000000000001", "application_id": "00000000-0000-0000-0000-000000000002", "client_secret": "tf-live-dummy-client-secret"},
+      "notes": "Azure application/client-secret mode. Dummy tenant and application IDs; persistence only. Authentication or validation would contact Microsoft cloud endpoints."
+    },
+    {
+      "type": "azureactivedirectory",
+      "attributes": {"domain": "tf-live.invalid", "client_id": "tf-live-dummy-client-id", "client_secret": "tf-live-dummy-client-secret", "tenant_id": "00000000-0000-0000-0000-000000000001", "use_tenant": true},
+      "notes": "Tenant-scoped OAuth client-secret mode. Backend create also stores a disabled workspace login method with auto-sync and role-sync disabled; do not enable login or sync. Persistence only, not authentication."
+    },
+    {
+      "type": "cockroachdb",
+      "attributes": {"host": "tf-live.invalid", "port": "26257", "username": "tf_live", "password": "tf-live-dummy-password", "database_name": "tf_live", "ssl_mode": "require"},
+      "notes": "Password authentication with TLS required. Plain CockroachDB maps CA material via tls_root_cert, not root_cert; certificate fields intentionally omitted. Persistence only."
+    },
+    {
+      "type": "gcp",
+      "attributes": {"project_id": "tf-live-dummy-project", "key_file": "{\"type\":\"service_account\",\"project_id\":\"tf-live-dummy-project\",\"client_email\":\"tf-live@tf-live.invalid\",\"private_key_id\":\"tf-live-dummy-key-id\",\"private_key\":\"TF_LIVE_DUMMY_NOT_A_PRIVATE_KEY\",\"token_uri\":\"https://tf-live.invalid/token\"}"},
+      "notes": "Service-account JSON key mode; key_file is credential content, not a filename. Deliberately nonfunctional synthetic private key. Persistence only, not SDK credential validation."
+    },
+    {
+      "type": "google",
+      "attributes": {"domain": "tf-live.invalid", "client_id": "tf-live-dummy-client-id", "client_secret": "tf-live-dummy-client-secret"},
+      "notes": "OAuth client-secret mode, not delegated directory service-account mode. Backend create stores a disabled login method; do not enable login, directory sync, or role sync. Persistence only."
+    },
+    {
+      "type": "mongodb",
+      "attributes": {"uri": "mongodb://tf_live:tf-live-dummy-password@tf-live.invalid:27017/tf_live", "use_tls": true, "version": "7.0"},
+      "notes": "Password authentication embedded in sensitive uri, TLS enabled. No X.509 client certificate. Persistence only; do not connect."
+    },
+    {
+      "type": "mongodb_aws_secrets_manager",
+      "attributes": {"arn": "arn:aws:iam::000000000000:role/tf-live-dummy", "region": "us-east-1", "secret_id": "tf-live-dummy-mongodb-secret"},
+      "notes": "AWS Secrets Manager reference mode. ARN is the dummy IAM role reference; do not invent host/password inputs for this builder. Optional key omitted. No plaintext secret is resolved by this fixture; runtime secret resolution would call AWS."
+    },
+    {
+      "type": "mysql",
+      "attributes": {"host": "tf-live.invalid", "port": "3306", "username": "tf_live", "password": "tf-live-dummy-password", "database_name": "tf_live", "ssl_mode": "required", "use_rds_iam": false, "auth_mode": "password"},
+      "notes": "Password mode explicitly excludes RDS IAM. MySQL uses required, not the PostgreSQL require spelling, for this fixture. No client certificates. Persistence only."
+    },
+    {
+      "type": "mysql_aws_secrets_manager",
+      "attributes": {"arn": "arn:aws:iam::000000000000:role/tf-live-dummy", "region": "us-east-1", "secret_id": "tf-live-dummy-mysql-secret"},
+      "notes": "Secrets Manager reference mode, dummy role and secret ID. This builder maps no direct database password or host. Persistence only; secret retrieval would call AWS."
+    },
+    {
+      "type": "okta",
+      "attributes": {"domain": "tf-live.invalid", "client_id": "tf-live-dummy-client-id", "client_secret": "tf-live-dummy-client-secret"},
+      "notes": "OAuth client-secret mode. Backend create stores a disabled workspace login method; leave login, auto-sync, and role-sync disabled. Persistence only."
+    },
+    {
+      "type": "postgres",
+      "attributes": {"host": "tf-live.invalid", "port": "5432", "username": "tf_live", "password": "tf-live-dummy-password", "database_name": "tf_live", "ssl_mode": "require", "use_rds_iam": false, "auth_mode": "password"},
+      "notes": "Password mode explicitly excludes RDS IAM and credential discovery. TLS required, no client certificates. Persistence only; existing backend connection validators are not safe save-time probes."
+    },
+    {
+      "type": "postgres_aws_secrets_manager",
+      "attributes": {"arn": "arn:aws:iam::000000000000:role/tf-live-dummy", "region": "us-east-1", "secret_id": "tf-live-dummy-postgres-secret"},
+      "notes": "Secrets Manager reference mode with no direct password input in this builder. Persistence only; resolving the dummy reference would call AWS, so never run Test Config."
+    },
+    {
+      "type": "services",
+      "attributes": {"urls": "https://tf-live.invalid:8443", "tls_enabled": true},
+      "notes": "TLS service-list mode; provider type services maps to backend servicelist. This builder exposes no authentication secret. URLs are stored configuration, not Adaptive endpoint resources. Persistence only."
+    },
+    {
+      "type": "serverlist",
+      "attributes": {"hosts": ["tf-live.invalid"], "default_user": "tf_live", "password": "tf-live-dummy-password"},
+      "notes": "Password-based server-list access, no SSH key. hosts is a provider list serialized to newline-separated backend hosts. Persistence only; no SSH sessions."
+    },
+    {
+      "type": "ssh",
+      "attributes": {"host": "tf-live.invalid", "port": "22", "username": "tf_live", "password": "tf-live-dummy-password"},
+      "notes": "Password SSH mode is derived from absent key; use_password is not a provider input. Persistence only, no SSH sessions."
+    },
+    {
+      "type": "kubernetes",
+      "attributes": {"api_server": "https://tf-live.invalid:6443", "cluster_token": "tf-live-dummy-cluster-token", "namespace": "tf-live"},
+      "notes": "Bearer-token Kubernetes mode; cluster CA omitted rather than supplying a malformed certificate. Persistence only: do not Test Config, select as a default/access cluster, or launch pods/endpoints."
+    },
+    {
+      "type": "awsdocumentdb",
+      "attributes": {"uri": "mongodb://tf_live:tf-live-dummy-password@tf-live.invalid:27017/tf_live", "tls_enabled": true},
+      "notes": "Password in sensitive Mongo-compatible URI, TLS enabled via tls_enabled (not use_tls). Persistence only, no DocumentDB connections."
+    },
+    {
+      "type": "awsredshift",
+      "attributes": {"host": "tf-live.invalid", "port": "5439", "username": "tf_live", "password": "tf-live-dummy-password", "database_name": "tf_live", "ssl_mode": "require"},
+      "notes": "Database password mode, not IAM. Builder uses host, not hostname. TLS required. Persistence only."
+    },
+    {
+      "type": "zerotier",
+      "attributes": {"network_id": "0000000000000000", "api_token": "tf-live-dummy-api-token"},
+      "notes": "API-token mode; provider zerotier maps to backend zero_tier. No configurable API host, so .invalid cannot fence runtime API calls. Persistence only; never join networks or validate the token."
+    },
+    {
+      "type": "rdp_windows",
+      "attributes": {"hostname": "tf-live.invalid", "port": "3389", "username": "tf_live", "password": "tf-live-dummy-password", "allow_file_transfer": false},
+      "notes": "Windows username/password mode, file transfer explicitly disabled. Persistence only, no remote-desktop endpoint or session."
+    },
+    {
+      "type": "adaptive_rdp",
+      "attributes": {"targets": [{"id": "tf-live-target", "name": "Synthetic target", "host": "tf-live.invalid", "port": 3389, "username": "tf_live", "password": "tf-live-dummy-password", "domain": "tf-live.invalid", "record": false}]},
+      "notes": "Per-target Windows username/password mode. targets is a nested provider block list, serialized as YAML; nested port is integer unlike top-level port. Persistence only, no fleet session or endpoint."
+    },
+    {
+      "type": "mongodb_atlas",
+      "attributes": {"uri": "mongodb://tf_live:tf-live-dummy-password@tf-live.invalid:27017/tf_live", "organization_id": "000000000000000000000001", "project_id": "000000000000000000000002", "public_key": "tf-live-dummy-public-key", "private_key": "tf-live-dummy-private-key"},
+      "notes": "Atlas API public/private key pair plus database URI credentials. Dummy organization/project identifiers. Atlas API uses its own cloud host; persistence only, never discover databases or test credentials."
+    },
+    {
+      "type": "awssecretsmanager",
+      "attributes": {"aws_region_name": "us-east-1", "aws_arn": "arn:aws:iam::000000000000:role/tf-live-dummy"},
+      "notes": "AWS role-based Secrets Manager integration; this builder maps aws_arn and aws_region_name, not arn/region/secret_id. No inline secret field. Persistence only, no AWS calls."
+    },
+    {
+      "type": "sql_server",
+      "attributes": {"host": "tf-live.invalid", "port": "1433", "username": "tf_live", "password": "tf-live-dummy-password", "database_name": "tf_live", "ssl_mode": "require"},
+      "notes": "SQL username/password mode. Builder uses host, not hostname. Persistence only."
+    },
+    {
+      "type": "azuresqlserver",
+      "attributes": {"hostname": "tf-live.invalid", "port": "1433", "username": "tf_live", "password": "tf-live-dummy-password", "database_name": "tf_live", "ssl_mode": "require"},
+      "notes": "SQL password mode, not Azure managed identity. This builder requires nonempty hostname, port, username, password, database_name, and caller-supplied resource name. Persistence only."
+    },
+    {
+      "type": "splunk",
+      "attributes": {"url": "https://tf-live.invalid:8088", "token_id": "tf-live-dummy-token-id"},
+      "notes": "HEC token mode using url (not uri). Configuring this resource does not itself prove it is a notification destination; global backend activity sinks may independently emit on any create. Persistence only, never send test events."
+    },
+    {
+      "type": "datadog",
+      "attributes": {"dd_site": "tf-live.invalid", "dd_api_key": "tf-live-dummy-api-key", "app_key": "tf-live-dummy-app-key"},
+      "notes": "API/application key pair; app_key maps dd_app_key. dd_site is synthetic, not a supported real Datadog site. Persistence only, not API validation."
+    },
+    {
+      "type": "sqlserver_aws_secrets_manager",
+      "attributes": {"arn": "arn:aws:iam::000000000000:role/tf-live-dummy", "region": "us-east-1", "secret_id": "tf-live-dummy-sqlserver-secret"},
+      "notes": "Secrets Manager reference mode; no direct SQL credentials in this builder. Persistence only; secret retrieval would call AWS."
+    },
+    {
+      "type": "coralogix",
+      "attributes": {"uri": "https://tf-live.invalid", "private_key": "tf-live-dummy-private-key", "application_name": "tf-live", "sub_system_name": "persistence"},
+      "notes": "Coralogix private API key mode; URI maps backend url. Persistence only, no log delivery or test event. Existing global event sinks remain independent of this dummy resource."
+    },
+    {
+      "type": "jumpcloud",
+      "attributes": {"domain": "tf-live.invalid", "client_id": "tf-live-dummy-client-id", "client_secret": "tf-live-dummy-client-secret", "api_token": "tf-live-dummy-api-token"},
+      "notes": "OAuth client secret plus directory API key. Backend create stores a disabled login method; do not enable login or directory/role sync. Runtime API calls may use fixed vendor hosts. Persistence only."
+    },
+    {
+      "type": "msteams",
+      "attributes": {"client_id": "00000000-0000-0000-0000-000000000002", "client_secret": "tf-live-dummy-client-secret", "tenant_id": "00000000-0000-0000-0000-000000000001"},
+      "notes": "Teams application secret mode; client_id/client_secret map appId/appKey. Persistence only, not message delivery or Microsoft token acquisition."
+    },
+    {
+      "type": "yugabytedb",
+      "attributes": {"host": "tf-live.invalid", "port": "5433", "username": "tf_live", "password": "tf-live-dummy-password", "ssl_mode": "require"},
+      "notes": "Password mode; this builder maps host but no database_name. Root certificate intentionally omitted. Persistence only."
+    },
+    {
+      "type": "onelogin",
+      "attributes": {"domain": "tf-live.invalid", "client_id": "tf-live-dummy-client-id", "client_secret": "tf-live-dummy-client-secret", "api_client_id": "tf-live-dummy-api-client-id", "api_client_secret": "tf-live-dummy-api-client-secret"},
+      "notes": "OAuth and API client-secret pairs. Backend create stores a disabled login method; leave login, auto-sync, and role-sync disabled. Persistence only."
+    },
+    {
+      "type": "elasticsearch",
+      "attributes": {"uri": "https://tf-live.invalid:9200", "username": "tf_live", "password": "tf-live-dummy-password", "index": "tf-live"},
+      "notes": "HTTP username/password mode. uri maps backend url. Persistence only, no indexing or connectivity test."
+    },
+    {
+      "type": "paloalto_ngfw",
+      "attributes": {"hostname": "tf-live.invalid", "port": "22", "username": "tf_live", "password": "tf-live-dummy-password", "webui_port": "443", "login_url": "https://tf-live.invalid"},
+      "notes": "SSH password mode derives from absent key, with separately stored web UI URL. No browser automation or scripts configured. Persistence only, no device sessions."
+    },
+    {
+      "type": "fortinet_ngfw",
+      "attributes": {"hostname": "tf-live.invalid", "port": "22", "username": "tf_live", "password": "tf-live-dummy-password", "webui_port": "443", "uri": "https://tf-live.invalid", "use_proxy": false},
+      "notes": "SSH password mode, no key or automation. uri is the public input mapping backend login_url; login_url is explicitly rejected for this type. Persistence only."
+    },
+    {
+      "type": "cisco_ngfw",
+      "attributes": {"hostname": "tf-live.invalid", "port": "22", "username": "tf_live", "password": "tf-live-dummy-password", "webui_port": "443", "uri": "https://tf-live.invalid", "use_proxy": false},
+      "notes": "SSH password mode. uri maps backend login_url; do not substitute the rejected login_url provider input. No browser automation or proxy. Persistence only."
+    },
+    {
+      "type": "snowflake",
+      "attributes": {"hostname": "tf-live.invalid", "username": "tf_live", "password": "tf-live-dummy-password", "database_name": "TF_LIVE", "warehouse": "TF_LIVE", "schema": "PUBLIC", "role": "TF_LIVE"},
+      "notes": "Password mode; hostname maps databaseAccount, not a generic TCP host. Key-pair clientcert omitted. Snowflake may derive a real vendor hostname from account input if used; persistence only."
+    },
+    {
+      "type": "snowflake_aws_secrets_manager",
+      "attributes": {"arn": "arn:aws:iam::000000000000:role/tf-live-dummy", "region": "us-east-1", "secret_id": "tf-live-dummy-snowflake-secret"},
+      "notes": "Secrets Manager reference mode. No direct Snowflake password mapped by this builder; persistence only, no AWS secret resolution."
+    },
+    {
+      "type": "custom_siem_webhook",
+      "attributes": {"uri": "https://tf-live.invalid/events", "shared_secret": "tf-live-dummy-shared-secret"},
+      "notes": "Shared-secret webhook mode; uri maps url. Persistence only, no webhook delivery. Backend creation events can independently use existing global notification sinks."
+    },
+    {
+      "type": "aruba_sw",
+      "attributes": {"hostname": "tf-live.invalid", "port": "22", "username": "tf_live", "password": "tf-live-dummy-password", "webui_port": "443", "login_url": "https://tf-live.invalid"},
+      "notes": "SSH password mode derived from absent key, with web UI configuration. No browser automation or script. Persistence only."
+    },
+    {
+      "type": "aruba_instant_on",
+      "attributes": {"host": "tf-live.invalid", "port": "22", "username": "tf_live", "password": "tf-live-dummy-password", "webui_port": "443", "login_url": "https://tf-live.invalid"},
+      "notes": "SSH password mode. host is the canonical provider alias for backend hostname; do not configure both aliases. No browser automation. Persistence only."
+    },
+    {
+      "type": "hpe_switch",
+      "attributes": {"hostname": "tf-live.invalid", "port": "22", "username": "tf_live", "password": "tf-live-dummy-password", "webui_port": "443", "uri": "https://tf-live.invalid", "use_proxy": false},
+      "notes": "SSH password mode. uri maps backend login_url and public login_url is rejected for this type. No automation or proxy. Persistence only."
+    },
+    {
+      "type": "syslog",
+      "attributes": {"hostname": "tf-live.invalid", "port": "514", "protocol": "tcp", "tls_enabled": false},
+      "notes": "Plain TCP syslog, no authentication secret in this mode. TLS CA/client certificate/key fields deliberately omitted. Persistence only, no log delivery."
+    },
+    {
+      "type": "customintegration",
+      "attributes": {"image": "tf-live.invalid/synthetic/persistence:never-run", "service_account_name": "tf-live-dummy"},
+      "notes": "Workload service-account reference; builder exposes no inline secret. Image registry is .invalid. Persistence only: never create a pod, pull image, or create endpoint."
+    },
+    {
+      "type": "clickhouse",
+      "attributes": {"host": "tf-live.invalid", "port": "9440", "username": "tf_live", "password": "tf-live-dummy-password", "database_name": "tf_live", "use_tls": true},
+      "notes": "Password mode with use_tls; ssl_mode is not this builder's TLS control. Persistence only."
+    },
+    {
+      "type": "keyspaces",
+      "attributes": {"keyspace": "tf_live", "keyspaces_endpoint": "tf-live.invalid", "version": "1.0", "aws_region_name": "us-east-1", "aws_access_key_id": "TF_LIVE_DUMMY_ACCESS_KEY", "aws_secret_access_key": "tf-live-dummy-secret-access-key", "use_role_arn": false, "use_service_account": false, "create_if_not_exists": false},
+      "notes": "Static AWS key mode, no role assumption or service-account provisioning. Correct builder names are keyspaces_endpoint and aws_region_name. Persistence only, no keyspace discovery or AWS calls."
+    },
+    {
+      "type": "rabbitmq",
+      "attributes": {"uri": "https://tf-live.invalid:15671", "username": "tf_live", "password": "tf-live-dummy-password"},
+      "notes": "Management UI username/password mode; uri maps backend url. Persistence only, no broker or management API connection."
+    },
+    {
+      "type": "azurecosmosnosql",
+      "attributes": {"uri": "https://tf-live.invalid:443", "api_token": "dGYtbGl2ZS1kdW1teS1jb3Ntb3Mta2V5"},
+      "notes": "Cosmos account-key mode: api_token maps key, uri maps endpoint. Base64 dummy account key, not a real credential. Persistence only."
+    },
+    {
+      "type": "msteams_workflow",
+      "attributes": {"webhook_url": "https://tf-live.invalid/workflows/tf-live-dummy"},
+      "notes": "Webhook URL is the credential-bearing field; no separate secret is exposed by this builder. Persistence only, no message or workflow invocation."
+    },
+    {
+      "type": "1password",
+      "attributes": {"service_account": "tf-live-dummy-service-account-token", "use_connect_server": false},
+      "notes": "Service-account token mode, not Connect Server mode; connect_server_url omitted. API host is not configurable in this mode. Persistence only, no 1Password SDK calls."
+    },
+    {
+      "type": "adaptiveencrypt",
+      "attributes": {"value": "tf-live-dummy-encrypted-value"},
+      "notes": "Opaque sensitive value persistence; no network authentication mode or connection host exists in this builder. Synthetic plaintext only."
+    },
+    {
+      "type": "adaptiveremotedesktop",
+      "attributes": {"cpu": "1", "memory": "1Gi", "storage": "1Gi"},
+      "notes": "Managed desktop sizing only; builder exposes no authentication secret. Persistence only: never create a desktop workload, endpoint, or session."
+    },
+    {
+      "type": "avastbusinessedr",
+      "attributes": {"client_id": "tf-live-dummy-client-id", "client_secret": "tf-live-dummy-client-secret"},
+      "notes": "OAuth client-secret mode. No configurable API host; runtime authentication would reach vendor endpoints. Persistence only, no EDR API tests."
+    },
+    {
+      "type": "awscloudwatchlogs",
+      "attributes": {"aws_region_name": "us-east-1", "arn": "arn:aws:iam::000000000000:role/tf-live-dummy", "log_group_name": "tf-live-dummy", "log_stream_name": "persistence"},
+      "notes": "AWS role-reference mode; builder has no inline AWS key. aws_region_name maps aws_region. Persistence only, no CloudWatch delivery or stream creation."
+    },
+    {
+      "type": "awselasticcache",
+      "attributes": {"host": "tf-live.invalid", "port": "6379", "username": "tf_live", "password": "tf-live-dummy-password", "tls_enabled": true, "tls_skip_verify": false, "use_iam_auth": false},
+      "notes": "Redis username/password mode, IAM disabled. Preserve the provider's accepted awselasticcache spelling. No AWS credentials, access-control provisioning, or IAM token generation configured. Persistence only."
+    },
+    {
+      "type": "awsdocumentdb_aws_secret_manager",
+      "attributes": {"arn": "arn:aws:iam::000000000000:role/tf-live-dummy", "region": "us-east-1", "secret_id": "tf-live-dummy-documentdb-secret", "tls_enabled": true},
+      "notes": "Secrets Manager reference mode with TLS enabled. Preserve accepted singular secret spelling in this type token. Persistence only, no secret retrieval or database connection."
+    },
+    {
+      "type": "azure_documentdb",
+      "attributes": {"uri": "mongodb://tf_live:tf-live-dummy-password@tf-live.invalid:10255/tf_live?tls=true"},
+      "notes": "Cosmos Mongo-compatible URI password mode; builder exposes only uri beyond name/version. Persistence only, no connection."
+    },
+    {
+      "type": "big_query",
+      "attributes": {"credential_json": "{\"type\":\"service_account\",\"project_id\":\"tf-live-dummy-project\",\"client_email\":\"tf-live@tf-live.invalid\",\"private_key_id\":\"tf-live-dummy-key-id\",\"private_key\":\"TF_LIVE_DUMMY_NOT_A_PRIVATE_KEY\",\"token_uri\":\"https://tf-live.invalid/token\"}"},
+      "notes": "Service-account JSON credential mode. Project and fake key are inside credential_json; no separate project_id mapping exists in this builder. Deliberately nonfunctional key; persistence only, no SDK validation."
+    },
+    {
+      "type": "chrome",
+      "attributes": {"url": "https://tf-live.invalid", "fields": "[]"},
+      "notes": "Unconfigured browser authentication; synthetic empty form-fields document exercises a sensitive mapped input without executable script or prestart command. Persistence only, no browser launch or endpoint."
+    },
+    {
+      "type": "cockroachdb_aws_secrets_manager",
+      "attributes": {"arn": "arn:aws:iam::000000000000:role/tf-live-dummy", "region": "us-east-1", "secret_id": "tf-live-dummy-cockroach-secret", "host": "tf-live.invalid", "port": "26257", "username": "tf_live", "password": "tf-live-dummy-password", "database_name": "tf_live", "ssl_mode": "require"},
+      "notes": "Secrets Manager reference plus direct database fields: this builder really maps both (unlike most other secret-manager variants). Dummy password exercises secret persistence. Persistence only, no AWS calls or connections."
+    },
+    {
+      "type": "confluent",
+      "attributes": {"organization_id": "tf-live-dummy-org", "resource": "tf-live-dummy-resource", "username": "tf_live", "password": "tf-live-dummy-password", "api_key": "tf-live-dummy-api-key", "api_secret": "tf-live-dummy-api-secret"},
+      "notes": "Confluent username/password and API key/secret fields are independently mapped. No configurable API host. Persistence only, no discovery or vendor API validation."
+    },
+    {
+      "type": "digitalocean",
+      "attributes": {"api_token": "tf-live-dummy-api-token"},
+      "notes": "DigitalOcean API-token mode. No configurable API host or other nonsecret setting beyond caller resource name. Persistence only, no cloud discovery."
+    },
+    {
+      "type": "fortinet_analyzer",
+      "attributes": {"hostname": "tf-live.invalid", "port": "22", "username": "tf_live", "password": "tf-live-dummy-password", "webui_port": "443", "login_url": "https://tf-live.invalid"},
+      "notes": "Shared Fortinet appliance builder, SSH password mode derived from absent key. No browser automation. Persistence only."
+    },
+    {
+      "type": "fortinet_manager",
+      "attributes": {"hostname": "tf-live.invalid", "port": "22", "username": "tf_live", "password": "tf-live-dummy-password", "webui_port": "443", "login_url": "https://tf-live.invalid"},
+      "notes": "Shared Fortinet appliance builder, SSH password mode derived from absent key. No browser automation. Persistence only."
+    },
+    {
+      "type": "heroku",
+      "attributes": {"machine": "tf-live.invalid", "username": "tf-live@tf-live.invalid", "token": "tf-live-dummy-token"},
+      "notes": "Heroku machine/username/token mode. machine is a configuration value, not a guarantee that cloud SDK traffic is fenced. Persistence only, no API discovery."
+    },
+    {
+      "type": "ivanti",
+      "attributes": {"hostname": "tf-live.invalid", "port": "22", "username": "tf_live", "password": "tf-live-dummy-password", "webui_port": "443", "login_url": "https://tf-live.invalid", "use_proxy": false},
+      "notes": "SSH password mode, absent key; no browser automation or proxy. Persistence only, no device session."
+    },
+    {
+      "type": "juniper_sw",
+      "attributes": {"hostname": "tf-live.invalid", "port": "22", "username": "tf_live", "password": "tf-live-dummy-password"},
+      "notes": "Shared SSH appliance builder, password mode. Browser policy fields omitted rather than creating automated login behavior. Persistence only."
+    },
+    {
+      "type": "kafka",
+      "attributes": {"use_msk_iam": false, "client_configuration": "bootstrap.servers=tf-live.invalid:9093\nsecurity.protocol=SASL_SSL\nsasl.mechanism=PLAIN\nsasl.jaas.config=org.apache.kafka.common.security.plain.PlainLoginModule required username=\"tf_live\" password=\"tf-live-dummy-password\";\n"},
+      "notes": "SASL/PLAIN password in sensitive properties-format client_configuration. MSK IAM explicitly disabled; do not invent top-level username/password mappings for this builder. Persistence only, no broker connection."
+    },
+    {
+      "type": "ldap",
+      "attributes": {"hostname": "tf-live.invalid", "port": "636", "ldap_encryption_method": "ssl", "ldap_search_bind_dn": "cn=tf-live,dc=tf-live,dc=invalid", "ldap_search_bind_password": "tf-live-dummy-bind-password", "ldap_user_name_attribute": "uid", "ldap_user_base_dn": "ou=people,dc=tf-live,dc=invalid"},
+      "notes": "LDAPS search-bind password mode. Backend create stores a disabled login method; do not enable authentication, auto-sync, or role-sync. Persistence only, no directory queries."
+    },
+    {
+      "type": "mongodb-do",
+      "attributes": {"database_name": "tf-live-dummy-database", "api_token": "tf-live-dummy-api-token"},
+      "notes": "DigitalOcean managed MongoDB API-token mode; database_name maps dbName. No host/uri mapping exists in this builder, so cloud discovery would use real vendor API hosts. Persistence only."
+    },
+    {
+      "type": "mongodb36",
+      "attributes": {"uri": "mongodb://tf_live:tf-live-dummy-password@tf-live.invalid:27017/tf_live", "use_tls": true},
+      "notes": "MongoDB 3.6 URI password mode with TLS, no client certificate. version is a builder constant here, not an accepted configurable version control. Persistence only."
+    },
+    {
+      "type": "oracle",
+      "attributes": {"host": "tf-live.invalid", "port": "1521", "username": "tf_live", "password": "tf-live-dummy-password", "service_name": "TF_LIVE"},
+      "notes": "Oracle service-name/password mode. service_name is the actual mapped input, not database_name. Persistence only."
+    },
+    {
+      "type": "proxysql",
+      "attributes": {"host": "tf-live.invalid", "port": "6033", "username": "tf_live", "password": "tf-live-dummy-password", "database_name": "tf_live", "ssl_mode": "required", "proxysql_admin_port": "6032", "proxysql_admin_username": "tf_live_admin", "proxysql_admin_password": "tf-live-dummy-admin-password", "proxysql_hostgroup_id": "10"},
+      "notes": "Separate data-plane and admin username/password pairs; no client certificates. Explicit native required SSL mode is accepted by both Terraform and CLI creation; legacy require remains literal for compatibility but cannot be cloned through the CLI form route. Persistence only, no ProxySQL admin mutations or database connections."
+    },
+    {
+      "type": "rdpldap",
+      "attributes": {"hostname": "tf-live.invalid", "port": "3389", "ldap_hostname": "tf-live-ldap.invalid", "ldap_port": "636", "ldap_encryption_method": "ssl", "ldap_search_bind_dn": "cn=tf-live,dc=tf-live,dc=invalid", "ldap_search_bind_password": "tf-live-dummy-bind-password", "ldap_user_base_dn": "ou=people,dc=tf-live,dc=invalid", "ldap_user_name_attribute": "uid"},
+      "notes": "LDAP search-bind password plus RDP target address. This builder maps no top-level RDP username/password. Persistence only, no LDAP authentication or RDP session."
+    },
+    {
+      "type": "redis",
+      "attributes": {"host": "tf-live.invalid", "port": "6379", "username": "tf_live", "password": "tf-live-dummy-password", "tls_enabled": true, "tls_skip_verify": false, "is_redis_labs": false},
+      "notes": "Redis ACL username/password mode, TLS enabled, no mutual TLS material. Persistence only, no Redis commands or connection tests."
+    },
+    {
+      "type": "securetunnels",
+      "attributes": {},
+      "notes": "Name-only builder: caller must supply resource name. There are no mapped host, authentication, or secret inputs; do not invent them. Persistence only, never establish a tunnel or create an endpoint."
+    },
+    {
+      "type": "slack_webhook",
+      "attributes": {"webhook_url": "https://tf-live.invalid/services/tf-live-dummy", "api_token": "tf-live-dummy-api-token"},
+      "notes": "Webhook URL and API token are both mapped credential inputs. Persistence only, no messages or webhook tests. Existing global backend event notifications are a separate possible outbound path."
+    },
+    {
+      "type": "sophos_fw",
+      "attributes": {"hostname": "tf-live.invalid", "port": "22", "username": "tf_live", "password": "tf-live-dummy-password"},
+      "notes": "Shared SSH appliance builder, password mode derived from absent key. Browser automation omitted. Persistence only."
+    },
+    {
+      "type": "vnc",
+      "attributes": {"hosts": ["tf-live.invalid"], "port": "5900", "password": "tf-live-dummy-password"},
+      "notes": "VNC password mode; hosts is a provider list, serialized as newline-separated hosts. No username mapping in this builder. Persistence only, no desktop session."
+    },
+    {
+      "type": "windows-server-groups",
+      "attributes": {"hosts": ["tf-live.invalid"], "port": "3389", "username": "tf_live", "password": "tf-live-dummy-password"},
+      "notes": "Windows fleet username/password mode; hosts is a list serialized to newline-separated backend hosts. Preserve the accepted hyphenated type token. Persistence only, no endpoint or RDP session."
+    }
+  ]
+}
