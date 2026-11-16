@@ -756,7 +756,7 @@ resource "adaptive_resource" "postgres_with_secrets" {
 - `service_account_name` (String) The service account name to use for the YugabyteDB resource
 - `service_name` (String) Oracle service name. Used by the oracle resource.
 - `shared_secret` (String, Sensitive) The shared secret for the integration
-- `ssl_mode` (String) SSL mode for MySQL, Postgres, CockroachDB, Redshift, ProxySQL, SQL Server, and Azure SQL Server. SQL Server/Azure SQL additionally support false and skip-verify; MySQL accepts only verify_identity, verify_ca, required, preferred, disabled, the legacy CLI prefix require (preserved literally), or empty (omit the CLI SSL-mode flag). PostgreSQL spellings such as verify-full are not MySQL modes. Absent MySQL mode defaults to require for compatibility. ClickHouse uses use_tls.
+- `ssl_mode` (String) SSL mode for MySQL, Postgres, CockroachDB, Redshift, ProxySQL, SQL Server, and Azure SQL Server. SQL Server/Azure SQL additionally support false and skip-verify; MySQL/ProxySQL accept only verify_identity, verify_ca, required, preferred, disabled, the legacy CLI prefix require (preserved literally), or empty (omit the CLI SSL-mode flag). PostgreSQL spellings such as verify-full are not MySQL/ProxySQL modes. Use required rather than legacy require for ProxySQL CLI export/apply compatibility. Absent MySQL mode defaults to require for compatibility; absent ProxySQL mode remains empty. ClickHouse uses use_tls.
 - `storage` (String) Persistent storage size for the remote desktop pod. Used by the adaptiveremotedesktop resource.
 - `sub_system_name` (String) The sub system name for the service
 - `tags` (List of String) Optional tags
@@ -796,6 +796,7 @@ resource "adaptive_resource" "postgres_with_secrets" {
 
 - `applied_digests` (Map of String) Opaque server fingerprints of the write-only secret arguments as of the last write by this provider, used to detect out-of-band secret changes on refresh. Not comparable across resources or workspaces.
 - `id` (String) The ID of this resource.
+- `known_empty_secret_keys` (List of String) Server configuration keys of scalar sensitive strings explicitly observed empty. Retained until a verified provider write reconciles a subsequent credential addition; absent keys remain unknown.
 
 <a id="nestedblock--targets"></a>
 ### Nested Schema for `targets`

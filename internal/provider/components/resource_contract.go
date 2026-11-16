@@ -42,18 +42,26 @@ func validateResourceContractInputs(typ string, get func(string) interface{}) er
 	if mode, _ := get("ssl_mode").(string); (mode == "false" || mode == "skip-verify") && typ != "sql_server" && typ != "azuresqlserver" {
 		return fmt.Errorf("ssl_mode false and skip-verify are supported only for SQL Server and Azure SQL Server resources")
 	}
-	if mode, _ := get("ssl_mode").(string); (mode == "verify_identity" || mode == "verify_ca" || mode == "required" || mode == "preferred" || mode == "disabled") && typ != "mysql" {
-		return fmt.Errorf("MySQL-specific ssl_mode is supported only for MySQL resources")
+	if mode, _ := get("ssl_mode").(string); (mode == "verify_identity" || mode == "verify_ca" || mode == "required" || mode == "preferred" || mode == "disabled") && typ != "mysql" && typ != "proxysql" {
+		return fmt.Errorf("MySQL-specific ssl_mode is supported only for MySQL and ProxySQL resources")
 	}
-	if typ == "mysql" {
+	if typ == "mysql" || typ == "proxysql" {
 		// The backend forwards this token literally to mysql --ssl-mode. Keep
 		// only canonical modes, empty (omit the flag), and the historical
 		// CLI-accepted require prefix; never rewrite PostgreSQL spellings.
+		// ProxySQL GenerateConfig copies SSLMode into the same MySQL runtime.
+		// Its CLI form route accepts only the five canonical modes (or empty):
+		// use required for cross-route compatibility; require is preserved only
+		// for existing Terraform/runtime callers, never silently normalized.
 		mode, _ := get("ssl_mode").(string)
 		switch mode {
 		case "", "verify_identity", "verify_ca", "required", "preferred", "disabled", "require":
 		default:
-			return fmt.Errorf("MySQL ssl_mode must be verify_identity, verify_ca, required, preferred, disabled, the legacy require prefix, or empty; got %q", mode)
+			family := "MySQL"
+			if typ == "proxysql" {
+				family = "ProxySQL"
+			}
+			return fmt.Errorf("%s ssl_mode must be verify_identity, verify_ca, required, preferred, disabled, the legacy require prefix, or empty; got %q", family, mode)
 		}
 	}
 	if typ == "clickhouse" {

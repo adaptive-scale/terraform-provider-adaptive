@@ -234,7 +234,7 @@ func ResourceAdaptiveResource() *schema.Resource {
 
 					return nil, nil
 				},
-				Description: "SSL mode for MySQL, Postgres, CockroachDB, Redshift, ProxySQL, SQL Server, and Azure SQL Server. SQL Server/Azure SQL additionally support false and skip-verify; MySQL accepts only verify_identity, verify_ca, required, preferred, disabled, the legacy CLI prefix require (preserved literally), or empty (omit the CLI SSL-mode flag). PostgreSQL spellings such as verify-full are not MySQL modes. Absent MySQL mode defaults to require for compatibility. ClickHouse uses use_tls.",
+				Description: "SSL mode for MySQL, Postgres, CockroachDB, Redshift, ProxySQL, SQL Server, and Azure SQL Server. SQL Server/Azure SQL additionally support false and skip-verify; MySQL/ProxySQL accept only verify_identity, verify_ca, required, preferred, disabled, the legacy CLI prefix require (preserved literally), or empty (omit the CLI SSL-mode flag). PostgreSQL spellings such as verify-full are not MySQL/ProxySQL modes. Use required rather than legacy require for ProxySQL CLI export/apply compatibility. Absent MySQL mode defaults to require for compatibility; absent ProxySQL mode remains empty. ClickHouse uses use_tls.",
 			},
 			"admin_email":         {Type: schema.TypeString, Optional: true, Description: "Google directory delegated administrator email."},
 			"allow_file_transfer": {Type: schema.TypeBool, Optional: true, Description: "Allow Windows RDP file transfer; explicit false disables it."},
@@ -899,6 +899,12 @@ func ResourceAdaptiveResource() *schema.Resource {
 			// redacted_digests field did) destroys the evidence the comparison
 			// just produced, which is why out-of-band secret changes never
 			// reached the plan.
+			"known_empty_secret_keys": {
+				Type:        schema.TypeList,
+				Computed:    true,
+				Elem:        &schema.Schema{Type: schema.TypeString},
+				Description: "Server configuration keys of scalar sensitive strings explicitly observed empty. Retained until a verified provider write reconciles a subsequent credential addition; absent keys remain unknown.",
+			},
 			"applied_digests": {
 				Type:     schema.TypeMap,
 				Computed: true,
@@ -1276,24 +1282,31 @@ func ResourceAdaptiveResourceRead(ctx context.Context, d *schema.ResourceData, m
 	// validates planned/configured values and the actual serialized payload
 	// before sending any mutation; it does not assume Get reads raw input.
 	//
-	// An empty recorded map (import, a resource predating this field, an older
-	// server) is seeded by the d.Set below rather than reported: with no
-	// baseline, every key would look drifted.
+	// An empty legacy baseline is unknown and may be seeded on refresh.
+	// Per-key known-empty provenance is different: the first server fingerprint
+	// for such a key is actionable drift, and refresh must not seed it away.
 	// Two different reasons a drifted key cannot be marked, kept apart because
 	// they mean different things to whoever reads the warning.
 	// An explicit empty value is authoritative evidence of a clear. Missing
 	// fields or digests are not: older servers and redacted reads omit them.
 	// Materialize an empty computed map too: an empty-credential import must
 	// not schedule a write just to change null into a known empty baseline.
-	if err := d.Set("applied_digests", pruneClearedSecretDigests(stateStringMap(d, "applied_digests"), r.Configuration)); err != nil {
-		return diag.FromErr(err)
+	drifted, evidenceErr := refreshResourceSecretEvidence(d, r)
+	if evidenceErr != nil {
+		return diag.FromErr(evidenceErr)
 	}
 	var unmapped []string  // names no single attribute at all
 	var notSecret []string // names one, but the schema does not call it sensitive
-	if recorded := stateStringMap(d, "applied_digests"); len(recorded) > 0 && len(r.RedactedDigests) > 0 {
-		for _, k := range driftedDigestKeys(recorded, r.RedactedDigests) {
+	if len(drifted) > 0 {
+		for _, k := range drifted {
 			attr, ok := integrations.AttrForConfigKey(r.IntegrationType, k)
 			switch {
+			case integrations.ProviderType(r.IntegrationType) == "adaptive_rdp" && k == "targets":
+				diags = append(diags, diag.Diagnostic{
+					Severity: diag.Warning,
+					Summary:  fmt.Sprintf("resource %q: RDP configuration changed outside this configuration", r.Name),
+					Detail:   "The aggregate RDP configuration no longer matches the last-applied fingerprint. This warning does not attribute the change to any target or credential and does not force a Terraform update. Explicitly resupply the intended targets configuration to reconcile it.",
+				})
 			case !ok:
 				unmapped = append(unmapped, k)
 			case !isSecretStringAttr(attr):
@@ -1307,14 +1320,6 @@ func ResourceAdaptiveResourceRead(ctx context.Context, d *schema.ResourceData, m
 					return diag.FromErr(err)
 				}
 			}
-		}
-	}
-
-	// Only seed an absent baseline. Refresh must not acknowledge an external
-	// change as our own write or discard evidence when a server omits digests.
-	if len(stateStringMap(d, "applied_digests")) == 0 && len(r.RedactedDigests) > 0 {
-		if err := captureResourceSecretDigests(d, r); err != nil {
-			return diag.FromErr(err)
 		}
 	}
 
@@ -1357,11 +1362,24 @@ func ResourceAdaptiveResourceRead(ctx context.Context, d *schema.ResourceData, m
 // explicitly confirmed clear. Capture remains best-effort until the backend
 // returns fingerprints atomically with the write response.
 func captureResourceSecretDigests(d *schema.ResourceData, r *adaptive.ResourceReadResponse) error {
-	applied := pruneClearedSecretDigests(stateStringMap(d, "applied_digests"), r.Configuration)
-	for key, digest := range r.RedactedDigests {
-		applied[key] = digest
+	// Validate the read before advancing either piece of credential evidence.
+	staged := ResourceAdaptiveResource().Data(d.State())
+	if err := integrations.ApplyIntegrationConfig(staged, r.IntegrationType, r.Configuration); err != nil {
+		return err
 	}
-	return d.Set("applied_digests", applied)
+	applied := pruneClearedSecretDigests(stateStringMap(d, "applied_digests"), r.Configuration)
+	known := knownEmptySecretKeys(d)
+	for key, digest := range r.RedactedDigests {
+		if digest != "" {
+			applied[key] = digest
+			delete(known, key)
+		}
+	}
+	observeEmptySecretKeys(known, r)
+	if err := d.Set("applied_digests", applied); err != nil {
+		return err
+	}
+	return setKnownEmptySecretKeys(d, known)
 }
 
 // pruneClearedSecretDigests keeps last-write evidence unless the server
@@ -1390,11 +1408,9 @@ func isSecretStringAttr(attr string) bool {
 // recorded at the last write — either because the value behind it changed, or
 // because the server now holds a secret where it recorded none.
 //
-// A key that only appeared since the last write used to be dismissed as "not
-// drift". It is drift: someone setting a password in the UI where there was none
-// is exactly the change an operator needs to see. The wholesale empty-map guard
-// at the call site is what keeps an import or a first refresh after upgrade from
-// reporting every key as new.
+// New keys are drift against a nonempty applied baseline. Read also checks
+// known-empty per-key provenance, distinguishing a first addition from an
+// unknown empty legacy baseline without inventing a server fingerprint.
 //
 // Keys that disappeared are not reported: the secret is gone, there is nothing
 // to reconcile, and the ordinary diff already covers a configuration removing

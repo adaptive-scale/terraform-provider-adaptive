@@ -438,7 +438,10 @@ func TestAWSKeyspacesPolicyClearAloneConverges(t *testing.T) {
 	if err := integrations.ApplyIntegrationConfig(planned, "aws", map[string]interface{}{"allowed_commands": "", "enable_allowed_commands": true}); err != nil {
 		t.Fatal(err)
 	}
-	// Read materializes the unrelated computed fingerprint map.
+	// Read materializes unrelated computed credential metadata.
+	if err := planned.Set("known_empty_secret_keys", []string{}); err != nil {
+		t.Fatal(err)
+	}
 	if err := planned.Set("applied_digests", map[string]interface{}{}); err != nil {
 		t.Fatal(err)
 	}

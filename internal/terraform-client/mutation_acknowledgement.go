@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"errors"
+	"io"
 	"net/http"
 	"strings"
 )
@@ -57,7 +58,7 @@ func validateMutationAcknowledgement(req *http.Request, body []byte) error {
 		if action == "delete" {
 			expected = "team deleted successfully"
 		}
-		acknowledged = (action == "update" || action == "delete") && stringField("status") == expected
+		acknowledged = (action == "update" || action == "delete") && teamMutationAcknowledged(body, expected)
 	case "session":
 		switch action {
 		case "update":
@@ -92,4 +93,30 @@ func validateMutationAcknowledgement(req *http.Request, body []byte) error {
 		return fail()
 	}
 	return nil
+}
+
+// Team handlers serialize model.DefaultResponse's untagged Status field. Keep
+// the existing lowercase contract too, but require exactly one status field:
+// maps and case-insensitive struct decoding would hide duplicate/conflicting
+// acknowledgements. Extra fields (including error envelopes) are not this DTO.
+func teamMutationAcknowledged(body []byte, expected string) bool {
+	decoder := json.NewDecoder(bytes.NewReader(body))
+	start, err := decoder.Token()
+	if err != nil || start != json.Delim('{') {
+		return false
+	}
+	key, err := decoder.Token()
+	if err != nil || (key != "Status" && key != "status") {
+		return false
+	}
+	var status string
+	if decoder.Decode(&status) != nil || status != expected {
+		return false
+	}
+	end, err := decoder.Token()
+	if err != nil || end != json.Delim('}') {
+		return false
+	}
+	_, err = decoder.Token()
+	return err == io.EOF
 }

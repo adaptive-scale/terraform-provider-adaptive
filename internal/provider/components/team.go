@@ -29,7 +29,8 @@ func ResourceAdaptiveTeam() *schema.Resource {
 				Description: "Name of the group. Must be unique.",
 			},
 			"members": {
-				Type: schema.TypeList,
+				DiffSuppressFunc: suppressTeamMembershipReorder("members"),
+				Type:             schema.TypeList,
 				Elem: &schema.Schema{
 					Type: schema.TypeString,
 				},
@@ -37,7 +38,8 @@ func ResourceAdaptiveTeam() *schema.Resource {
 				Description: "List of emails to add to the team. If empty, the group will be created without members. ",
 			},
 			"endpoints": {
-				Type: schema.TypeList,
+				DiffSuppressFunc: suppressTeamMembershipReorder("endpoints"),
+				Type:             schema.TypeList,
 				Elem: &schema.Schema{
 					Type: schema.TypeString,
 				},
@@ -50,6 +52,25 @@ func ResourceAdaptiveTeam() *schema.Resource {
 				Description: "Slack channel ID access requests for this group are routed to. A remote-only channel is not adopted on ordinary refresh; any group update sends the configured channel (empty when omitted), clearing an omitted remote channel. Import adopts the existing channel.",
 			},
 		},
+	}
+}
+
+// suppressTeamMembershipReorder keeps the historical TypeList state encoding
+// while comparing complete memberships, not individual positional elements.
+func suppressTeamMembershipReorder(field string) schema.SchemaDiffSuppressFunc {
+	return func(k, oldValue, newValue string, d *schema.ResourceData) bool {
+		if k == field+".#" && oldValue != newValue {
+			return false
+		}
+		old, next := d.GetChange(field)
+		stringsFromList := func(value interface{}) []string {
+			var out []string
+			for _, item := range list(value) {
+				out = append(out, str(item))
+			}
+			return out
+		}
+		return sameStringSet(stringsFromList(old), stringsFromList(next))
 	}
 }
 

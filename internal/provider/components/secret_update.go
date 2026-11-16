@@ -3,6 +3,7 @@ package components
 import (
 	"context"
 	"fmt"
+	"reflect"
 	"sort"
 	"strings"
 
@@ -41,13 +42,20 @@ func validateResourceSecretUpdate(ctx context.Context, d *schema.ResourceData, c
 	for _, key := range live.RedactedKeys {
 		held[key] = ""
 	}
-	// The backend's contextual serviceAccount classifier is not complete for
-	// Google directory documents. Treat an observed nonempty/null credential as
-	// held even without digest metadata. This is a provider-side write safeguard,
-	// not a claim that backend read redaction or fingerprint coverage is fixed.
-	if integrations.ProviderType(live.IntegrationType) == "google" {
-		if value, present := live.Configuration["serviceAccount"]; present && value != "" {
-			held["serviceAccount"] = ""
+	// A missing digest is not proof that a credential is absent: older or
+	// format-dependent backend classifiers can return sensitive values in clear.
+	// Require explicit intent for every observed mapped sensitive string, not
+	// only one integration's service-account field. Null is unknown, not an
+	// authoritative clear; only an explicit empty string proves it was cleared.
+	attributes := ResourceAdaptiveResource().Schema
+	for key, value := range live.Configuration {
+		attr, mapped := integrations.AttrForConfigKey(live.IntegrationType, key)
+		if !mapped {
+			continue
+		}
+		attribute := attributes[attr]
+		if attribute != nil && attribute.Sensitive && attribute.Type == schema.TypeString && value != "" {
+			held[key] = ""
 		}
 	}
 
@@ -66,8 +74,8 @@ func validateResourceSecretUpdate(ctx context.Context, d *schema.ResourceData, c
 	for key := range held {
 		attr, ok := integrations.AttrForConfigKey(live.IntegrationType, key)
 		if !ok {
-			// A nested path belongs to the enclosing configured collection. The
-			// builder still validates its required credential leaves.
+			// Nested held paths require explicit ownership of the enclosing
+			// collection; RDP's raw, planned, and embedded payload are checked below.
 			root := strings.FieldsFunc(key, func(r rune) bool { return r == '.' || r == '[' })
 			if len(root) > 0 && root[0] != key {
 				attr, ok = integrations.AttrForConfigKey(live.IntegrationType, root[0])
@@ -85,6 +93,14 @@ func validateResourceSecretUpdate(ctx context.Context, d *schema.ResourceData, c
 		if value.IsNull() || !value.IsWhollyKnown() {
 			missing[attr] = true
 			continue
+		}
+		if integrations.ProviderType(live.IntegrationType) == "adaptive_rdp" && attr == "targets" {
+			if !rdpConfiguredTargetsMatchPlan(value, d.Get(attr)) {
+				return fmt.Errorf("cannot safely update resource: planned targets differ from their configured values (possibly due to lifecycle.ignore_changes), or required credential leaves are missing; reconcile targets and lifecycle settings before applying")
+			}
+			if !rdpSerializedTargetsMatchPlan(value, d.Get(attr), outgoing["targets"]) {
+				return fmt.Errorf("cannot safely update resource: serialized targets do not retain the configured targets and credential arguments")
+			}
 		}
 		// Presence alone is not authorization to serialize a different planned
 		// value. In particular, ignore_changes can preserve a refresh marker.
@@ -113,6 +129,97 @@ func validateResourceSecretUpdate(ctx context.Context, d *schema.ResourceData, c
 		return fmt.Errorf("updating resource would clear server-held values for %s; provide the matching configuration arguments, or explicitly clear a supported optional string argument with \"\"", strings.Join(sortedSecretKeys(missing), ", "))
 	}
 	return nil
+}
+
+// rdpConfiguredTargetsMatchPlan compares the whole ordered collection, applying
+// only schema defaults and SDK zero values for omitted optional arguments. In
+// particular, an ignored password or a reordered target is not explicit intent.
+func rdpConfiguredTargetsMatchPlan(raw cty.Value, planned interface{}) bool {
+	if raw.IsNull() || !raw.IsWhollyKnown() || (!raw.Type().IsListType() && !raw.Type().IsTupleType()) {
+		return false
+	}
+	targets, ok := planned.([]interface{})
+	if !ok || len(targets) == 0 || raw.LengthInt() != len(targets) {
+		return false
+	}
+	leaves := ResourceAdaptiveResource().Schema["targets"].Elem.(*schema.Resource).Schema
+	for i, configured := range raw.AsValueSlice() {
+		target, ok := targets[i].(map[string]interface{})
+		if !ok || configured.IsNull() || !configured.Type().IsObjectType() {
+			return false
+		}
+		for name, leaf := range leaves {
+			value := cty.NilVal
+			if configured.Type().HasAttribute(name) {
+				value = configured.GetAttr(name)
+			}
+			expected := leaf.ZeroValue()
+			if leaf.Default != nil {
+				expected = leaf.Default
+			}
+			if value == cty.NilVal || value.IsNull() {
+				if leaf.Required {
+					return false
+				}
+			} else {
+				switch {
+				case value.Type() == cty.String && leaf.Type == schema.TypeString:
+					expected = value.AsString()
+				case value.Type() == cty.Bool && leaf.Type == schema.TypeBool:
+					expected = value.True()
+				case value.Type() == cty.Number && leaf.Type == schema.TypeInt:
+					n, accuracy := value.AsBigFloat().Int64()
+					if accuracy != 0 || int64(int(n)) != n {
+						return false
+					}
+					expected = int(n)
+				default:
+					return false
+				}
+			}
+			if name == "password" && expected == "" {
+				return false // RDP has no supported explicit password clear.
+			}
+			if !reflect.DeepEqual(expected, target[name]) {
+				return false
+			}
+		}
+	}
+	return true
+}
+
+// rdpSerializedTargetsMatchPlan runs only after the raw-to-plan check. Compare
+// the embedded YAML structurally, preserving list order, exact credential bytes,
+// omitted optional strings, and the record override's inherit/false/true states.
+func rdpSerializedTargetsMatchPlan(raw cty.Value, planned, sent interface{}) bool {
+	embedded, ok := sent.(string)
+	if !ok {
+		return false
+	}
+	var actual []map[string]interface{}
+	if err := yaml.UnmarshalStrict([]byte(embedded), &actual); err != nil {
+		return false
+	}
+	targets := planned.([]interface{})
+	expected := make([]map[string]interface{}, len(targets))
+	configured := raw.AsValueSlice()
+	for i, item := range targets {
+		target := item.(map[string]interface{})
+		expected[i] = make(map[string]interface{})
+		for key, value := range target {
+			if key == "record" || ((key == "name" || key == "domain") && value == "") {
+				continue
+			}
+			expected[i][key] = value
+		}
+		if configured[i].Type().HasAttribute("record") {
+			record := configured[i].GetAttr("record")
+			if !record.IsNull() {
+				expected[i]["record"] = record.True()
+			}
+		}
+	}
+	return reflect.DeepEqual(expected, actual)
 }
 
 // credentialPayloadRetained permits only the boundary-whitespace normalization
