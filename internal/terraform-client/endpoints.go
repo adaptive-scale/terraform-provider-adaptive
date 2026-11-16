@@ -187,8 +187,15 @@ func (c *Client) DeleteSession(ctx context.Context, sessionID string) (bool, err
 		// Only an independent read 404 establishes idempotent absence.
 		var statusErr *HTTPError
 		if errors.As(err, &statusErr) && statusErr.StatusCode == 200 && statusErr.Reason == "error while terminating session" {
-			if r, readErr := c.ReadSession(ctx, sessionID); readErr == nil && r == nil {
-				return true, nil
+			if r, readErr := c.ReadSession(ctx, sessionID); readErr == nil {
+				if r == nil {
+					return true, nil
+				}
+				// EndSessionSync can reject an already-terminated endpoint.
+				// Only a fresh authoritative terminal read permits row removal.
+				if isSessionReaped(r.Status) {
+					return c.deleteTerminalSession(ctx, sessionID)
+				}
 			}
 		}
 		return false, fmt.Errorf("failed to request adaptive api: %w", err)
@@ -248,6 +255,10 @@ func (c *Client) DeleteSession(ctx context.Context, sessionID string) (bool, err
 	}
 
 	// Hard-delete the row so the resource it points at can be deleted right away.
+	return c.deleteTerminalSession(ctx, sessionID)
+}
+
+func (c *Client) deleteTerminalSession(ctx context.Context, sessionID string) (bool, error) {
 	if _, err := c.forceDeleteSession(ctx, sessionID); err != nil {
 		// The backend reports a missing row as 500 here. Only an independent
 		// authoritative read 404 can make that disappearance race idempotent.
@@ -261,7 +272,6 @@ func (c *Client) DeleteSession(ctx context.Context, sessionID string) (bool, err
 	}
 	tflog.Debug(ctx, "Session successfully deleted", map[string]interface{}{
 		"session_id": sessionID,
-		"status":     resp.Status,
 	})
 	return true, nil
 }

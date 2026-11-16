@@ -64,7 +64,7 @@ func validateMutationAcknowledgement(req *http.Request, body []byte) error {
 		case "update":
 			acknowledged = sameID()
 		case "delete":
-			acknowledged = sameID() && strings.TrimSpace(stringField("status")) != ""
+			acknowledged = sessionTerminationAcknowledged(body, target)
 		case "forcedelete":
 			acknowledged = stringField("status") == "session deleted successfully"
 		}
@@ -93,6 +93,48 @@ func validateMutationAcknowledgement(req *http.Request, body []byte) error {
 		return fail()
 	}
 	return nil
+}
+
+// Termination returns model.Session (ID/Status), whereas Terraform reads use
+// id/status. Accept either spelling without allowing duplicate or conflicting
+// aliases to hide the identity or status of the acknowledged endpoint.
+func sessionTerminationAcknowledged(body []byte, target string) bool {
+	decoder := json.NewDecoder(bytes.NewReader(body))
+	start, err := decoder.Token()
+	if err != nil || start != json.Delim('{') {
+		return false
+	}
+	var id, status string
+	seenID, seenStatus := false, false
+	for decoder.More() {
+		key, err := decoder.Token()
+		if err != nil {
+			return false
+		}
+		switch key {
+		case "id", "ID":
+			if seenID || decoder.Decode(&id) != nil {
+				return false
+			}
+			seenID = true
+		case "status", "Status":
+			if seenStatus || decoder.Decode(&status) != nil {
+				return false
+			}
+			seenStatus = true
+		default:
+			var ignored json.RawMessage
+			if decoder.Decode(&ignored) != nil {
+				return false
+			}
+		}
+	}
+	end, err := decoder.Token()
+	if err != nil || end != json.Delim('}') {
+		return false
+	}
+	_, err = decoder.Token()
+	return err == io.EOF && seenID && seenStatus && validCreateID(id) && id == target && strings.TrimSpace(status) != ""
 }
 
 // Team handlers serialize model.DefaultResponse's untagged Status field. Keep
