@@ -14,6 +14,28 @@ The `adaptive_endpoint` resource creates a secure access point to an Adaptive re
 - **User management** - Assign specific users who can access the endpoint
 - **Auto-pause** - Automatically pause inactive endpoints to save resources
 
+## Policy ownership and refresh
+
+Endpoint-local policy is readable, nonsecret configuration. For `is_jit_enabled`, `script_only_access`, the three `disable_*` flags, `jit_approvers`, `auto_approval`, `jit_multi_approver`, `jit_total_approvers`, `max_jit_request_duration`, and `jit_mode`, omission observes the remote value instead of assigning a false/zero default. This preserves imported policy during unrelated updates. Removing an argument relinquishes management; it does not request a reset.
+
+- Set booleans explicitly to `false` to disable them, `jit_total_approvers = 0` for an explicit stored zero, and `jit_approvers = []` to remove all approvers. A zero quorum is representable, not a recommendation to enable multi-approver access with no approvals.
+- Set `max_jit_request_duration = ""` to clear the endpoint override and inherit the workspace cap. The real Terraform CLI tests cover a duration-only saved-plan clear and ensure `lifecycle.ignore_changes` is not overridden. SDKv2 may display this computed empty-string transition as known after apply; the request and acknowledged state still carry the explicit clear.
+- `jit_mode = ""` is different: the backend treats empty/omitted mode as preserve, so it stops managing that setting rather than clearing it. Use `session`, `script`, or `both` to own the mode.
+- Full-replacement flags and approver lists are sent from hydrated planned state. Pointer policy fields are omitted from requests when configuration does not own them; observed state alone does not grant write ownership.
+- Refresh records endpoint-local policy changes in either direction, including false-to-true and zero-to-nonzero. Explicitly configured values can then be reconciled by plan/apply; unconfigured values are observed instead.
+
+Endpoint-local settings are not effective workspace policy. A local `disable_output_capture = false` cannot override capture disabled by the workspace, and a stored duration override is not the effective workspace-limited cap. Workspace-derived cluster/CPU/memory handling remains separate.
+
+Reads and update preflights require a complete resource/type and the full-replacement policy fields. Missing/null booleans or a missing approver list cause an actionable error before state mutation or an update POST, rather than becoming invented false/empty values. A present null approver slice is an authoritative empty list. This requires a backend that reports the complete endpoint-local policy; incomplete older responses are not treated as safe defaults. Missing optional pointer fields retain prior observations. The supported backend deliberately omits empty mode/duration strings, which are interpreted according to that contract, not as a general capability-negotiation mechanism.
+
+Updates read back the exact tracked endpoint and verify requested policy before reporting success. A 200 response with an ignored setting, an unconfirmed read-back, or a changed response ID is an error; remote changes may already be partial, so refresh before retrying. This is not an atomic transaction or a concurrent-writer lock: full-replacement fields still need backend revision/patch support to eliminate races. Create/provisioning readiness and live enforcement are separate guarantees.
+
+## Endpoint types
+
+The supported backend accepts `cli` and `client`. Terraform's default `direct` and an empty string are aliases for `cli`; switching between those spellings is harmless. Unsupported types such as `services` or `kubernetes` are rejected during planning. A Kubernetes resource can use a supported endpoint type rather than inventing a Kubernetes endpoint type.
+
+Actual `cli`/`client` transitions are rejected during planning and again before update mutation because the backend does not apply them in place. Create another endpoint and migrate explicitly; the provider does not automatically destroy a running endpoint. When importing a client endpoint, declare `type = "client"` rather than relying on the `direct` default.
+
 ## Example Usage
 
 ### Basic Endpoint
@@ -33,7 +55,7 @@ resource "adaptive_endpoint" "basic" {
 resource "adaptive_endpoint" "time_limited" {
   name     = "postgres-temp-access"
   resource = adaptive_resource.postgres.name
-  ttl      = "4h"  # Access expires after 4 hours
+  ttl      = "3h"  # Access expires after 3 hours
   users    = ["contractor@example.com"]
   tags     = ["temporary"]
 }
@@ -88,8 +110,8 @@ resource "adaptive_endpoint" "auto_pause" {
 resource "adaptive_endpoint" "k8s_endpoint" {
   name     = "k8s-admin"
   resource = adaptive_resource.k8s_cluster.name
-  type     = "kubernetes"
-  cpu      = "500m"
+  type     = "client"
+  cpu      = "0.5"
   memory   = "512Mi"
   users    = ["platform-team@example.com"]
   tags     = ["kubernetes", "admin"]
@@ -103,7 +125,7 @@ resource "adaptive_endpoint" "k8s_endpoint" {
 resource "adaptive_endpoint" "dev_access" {
   name     = "dev-database"
   resource = adaptive_resource.dev_db.name
-  ttl      = "8h"
+  ttl      = "6h"
   users    = ["dev-team@example.com"]
   tags     = ["development"]
 }
@@ -112,7 +134,7 @@ resource "adaptive_endpoint" "dev_access" {
 resource "adaptive_endpoint" "prod_access" {
   name           = "prod-database"
   resource       = adaptive_resource.prod_db.name
-  ttl            = "2h"
+  ttl            = "3h"
   is_jit_enabled = true
   jit_approvers  = ["security@example.com"]
   users          = ["oncall@example.com"]
@@ -146,7 +168,7 @@ resource "adaptive_endpoint" "app_db" {
   name          = "app-database-access"
   resource      = adaptive_resource.postgres.name
   authorization = adaptive_authorization.readonly.name
-  ttl           = "8h"
+  ttl           = "6h"
   users         = ["developer@example.com"]
   tags          = ["app", "database"]
 }
@@ -205,16 +227,17 @@ resource "adaptive_endpoint" "regulated" {
 - `idle_timeout` (String) The time after which the session will be automatically terminated if no user is connected. Defaults to never timeout.
 - `is_jit_enabled` (Boolean) Whether Just-In-Time access is enabled for the session
 - `jit_approvers` (List of String) The list of user emails who can approve Just-In-Time access requests
-- `jit_mode` (String) Which access paths require Just-In-Time approval. One of: session, script, both.
+- `jit_mode` (String) Which access paths require Just-In-Time approval. One of: session, script, both. Omitted or empty means unmanaged and observes the server value; the API cannot clear this setting with an empty string.
 - `jit_multi_approver` (Boolean) Require more than one approver for Just-In-Time access requests.
 - `jit_total_approvers` (Number) Number of approvals required when `jit_multi_approver` is enabled.
+- `max_jit_request_duration` (String) Maximum duration of a Just-In-Time access request for this endpoint. Omit to preserve the existing setting; an empty string clears the endpoint override and inherits the workspace setting.
 - `memory` (String) Memory of endpoint pod
 - `pause_timeout` (String) The time after which the session will be paused if no user has connected to it. Defaults to never pause.
 - `script_only_access` (Boolean) Whether the endpoint should only be accessible via script
 - `tags` (List of String) Optional tags
 - `timeouts` (Block, Optional) (see [below for nested schema](#nestedblock--timeouts))
 - `ttl` (String) The time-to-live (TTL) for the session. The session will be automatically terminated after this time period. If not set, defaults to 90 days.
-- `type` (String) The type of session to create. One of: direct (the default), cli, client, services. `direct` and `cli` are the same session type.
+- `type` (String) The type of session to create. One of: direct (the default), cli, client. `direct`, `cli`, and an empty string are the same session type.
 - `users` (List of String) The list of users associated with the adaptive endpoint
 
 ### Read-Only
@@ -236,11 +259,7 @@ Optional:
 
 ## TTL Format
 
-The `ttl` field accepts duration strings in the following formats:
-- Hours: `1h`, `8h`, `24h`
-- Minutes: `30m`, `60m`
-- Combined: `1h30m`
-- Days: `1d`, `7d` (equivalent to `24h`, `168h`)
+The provider accepts the enumerated TTL values `""`, `3h`, `6h`, `1d`, `3d`, `7d`, `30d`, `60d`, `90d`, `180d`, and `365d`. It does not accept arbitrary duration strings such as `8h`, `30m`, or `1h30m`. Use a value supported by the installed provider schema.
 
 ## Import
 
@@ -250,4 +269,4 @@ Endpoints can be imported using the endpoint ID:
 terraform import adaptive_endpoint.example endpoint-id
 ```
 
-Import reads the full endpoint back from the platform, so the arguments above are populated from what the server holds. Refresh is more conservative: optional arguments your configuration never set (`cluster`, `memory`, `cpu`, `ttl`) keep their workspace defaults rather than being written into state, and a toggle that is off locally is never flipped on by a server-side value, since several of them are OR'd with workspace settings.
+Import reads the endpoint-local policy from the platform. The policy controls described above are observed in both directions; omitted controls preserve observed values, while explicit false/zero/empty values retain their documented meanings. Workspace-derived optional arguments (`cluster`, `memory`, `cpu`, `ttl`) retain their separate compatibility behavior and are not used to infer policy ownership. Only an authoritative 404 removes the tracked endpoint; malformed or incomplete policy reads fail without partially refreshing state.

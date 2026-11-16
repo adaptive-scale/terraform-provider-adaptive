@@ -9,6 +9,7 @@ import (
 
 type ServerListIntegrationConfiguration struct {
 	Version     string `yaml:"version"`
+	Name        string `yaml:"name"`
 	Hosts       string `yaml:"hosts"`
 	DefaultUser string `yaml:"user"`
 	SshKey      string `yaml:"sshKey"`
@@ -48,6 +49,7 @@ func SchemaToServerListIntegrationConfiguration(d *schema.ResourceData) (ServerL
 
 	return ServerListIntegrationConfiguration{
 		Version:     "1",
+		Name:        attrString(d, "name"),
 		Hosts:       hostsNSV,
 		SshKey:      sshKey,
 		Password:    password,

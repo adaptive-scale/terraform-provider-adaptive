@@ -3,6 +3,7 @@ package components
 import (
 	"context"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/adaptive-scale/terraform-provider-adaptive/internal/provider/integrations"
@@ -137,6 +138,7 @@ func ResourceAdaptiveSession() *schema.Resource {
 		ReadContext:   ResourceAdaptiveSessionRead,
 		UpdateContext: ResourceAdaptiveSessionUpdate,
 		DeleteContext: ResourceAdaptiveSessionDelete,
+		CustomizeDiff: endpointContractCustomizeDiff,
 		Timeouts: &schema.ResourceTimeout{
 			Create: schema.DefaultTimeout(10 * time.Minute),
 			Update: schema.DefaultTimeout(10 * time.Minute),
@@ -157,8 +159,20 @@ func ResourceAdaptiveSession() *schema.Resource {
 				Type:     schema.TypeString,
 				Default:  SessionTypeDefault,
 				Optional: true,
-				Description: "The type of session to create. One of: direct (the default), cli, client, services. " +
-					"`direct` and `cli` are the same session type.",
+				ValidateFunc: func(i interface{}, k string) ([]string, []error) {
+					typ, ok := i.(string)
+					if !ok || !isValidSessionType(typ) {
+						return nil, []error{fmt.Errorf("%s must be one of direct, cli, client", k)}
+					}
+					return nil, nil
+				},
+				DiffSuppressFunc: func(_ string, old, new string, _ *schema.ResourceData) bool {
+					a, aOK := getSessionType(old)
+					b, bOK := getSessionType(new)
+					return aOK && bOK && a == b
+				},
+				Description: "The type of session to create. One of: direct (the default), cli, client. " +
+					"`direct`, `cli`, and an empty string are the same session type.",
 			},
 			"ttl": {
 				Type:     schema.TypeString,
@@ -229,13 +243,14 @@ func ResourceAdaptiveSession() *schema.Resource {
 			},
 			"is_jit_enabled": {
 				Type:        schema.TypeBool,
+				Computed:    true,
 				Optional:    true,
-				Default:     false,
 				Elem:        &schema.Schema{Type: schema.TypeBool},
 				Description: "Whether Just-In-Time access is enabled for the session",
 			},
 			"jit_approvers": {
 				Type:     schema.TypeList,
+				Computed: true,
 				Optional: true,
 				Elem: &schema.Schema{
 					Type: schema.TypeString,
@@ -302,8 +317,8 @@ func ResourceAdaptiveSession() *schema.Resource {
 			},
 			"script_only_access": {
 				Type:        schema.TypeBool,
+				Computed:    true,
 				Optional:    true,
-				Default:     false,
 				Description: "Whether the endpoint should only be accessible via script",
 			},
 			"tags": {
@@ -316,27 +331,31 @@ func ResourceAdaptiveSession() *schema.Resource {
 			},
 			"disable_output_capture": {
 				Type:     schema.TypeBool,
+				Computed: true,
 				Optional: true,
-				Default:  false,
 				Description: "Do not retain terminal output for this endpoint. The effective value is OR'd with " +
 					"the workspace-level setting: an endpoint cannot re-enable capture that the workspace disabled.",
 			},
 			"disable_data_studio": {
 				Type:        schema.TypeBool,
+				Computed:    true,
 				Optional:    true,
-				Default:     false,
 				Description: "Hide Data Studio for this endpoint. Only meaningful for `cli` endpoints.",
 			},
 			"disable_web_cli": {
 				Type:        schema.TypeBool,
+				Computed:    true,
 				Optional:    true,
-				Default:     false,
 				Description: "Hide \"Connect via Web CLI\" for this endpoint. Only meaningful for `cli` endpoints.",
 			},
 			"jit_mode": {
 				Type:        schema.TypeString,
 				Optional:    true,
-				Description: "Which access paths require Just-In-Time approval. One of: session, script, both.",
+				Computed:    true,
+				Description: "Which access paths require Just-In-Time approval. One of: session, script, both. Omitted or empty means unmanaged and observes the server value; the API cannot clear this setting with an empty string.",
+				DiffSuppressFunc: func(_ string, _, new string, _ *schema.ResourceData) bool {
+					return new == ""
+				},
 				ValidateFunc: func(i interface{}, k string) (ws []string, es []error) {
 					v, ok := i.(string)
 					if !ok {
@@ -348,18 +367,27 @@ func ResourceAdaptiveSession() *schema.Resource {
 					return nil, nil
 				},
 			},
+			"max_jit_request_duration": {
+				Type:        schema.TypeString,
+				Computed:    true,
+				Optional:    true,
+				Description: "Maximum duration of a Just-In-Time access request for this endpoint. Omit to preserve the existing setting; an empty string clears the endpoint override and inherits the workspace setting.",
+			},
 			"auto_approval": {
 				Type:        schema.TypeBool,
+				Computed:    true,
 				Optional:    true,
 				Description: "Automatically approve Just-In-Time access requests.",
 			},
 			"jit_multi_approver": {
 				Type:        schema.TypeBool,
+				Computed:    true,
 				Optional:    true,
 				Description: "Require more than one approver for Just-In-Time access requests.",
 			},
 			"jit_total_approvers": {
 				Type:        schema.TypeInt,
+				Computed:    true,
 				Optional:    true,
 				Description: "Number of approvals required when `jit_multi_approver` is enabled.",
 			},
@@ -392,8 +420,61 @@ func ResourceAdaptiveSession() *schema.Resource {
 
 var validJITModes = []string{"", "session", "script", "both"}
 
+// The update handler does not apply SessionType. Reject transitions rather
+// than reporting success or automatically destroying a running endpoint.
+func validateEndpointTypeChange(old, next string) error {
+	newWire, valid := getSessionType(next)
+	if !valid {
+		return fmt.Errorf("invalid endpoint type: %s; use direct, cli, or client", next)
+	}
+	oldWire, oldValid := getSessionType(old)
+	if oldValid && oldWire != newWire {
+		return fmt.Errorf("endpoint type cannot be changed in place; create a separate endpoint with the desired type and migrate explicitly")
+	}
+	return nil
+}
+
+func endpointContractCustomizeDiff(_ context.Context, d *schema.ResourceDiff, _ interface{}) error {
+	// SDKv2 otherwise treats an empty Optional+Computed string as unset,
+	// losing the API's explicit-clear operation. Preserve raw configuration
+	// intent without inferring ownership from an observed state value.
+	raw := d.GetRawConfig()
+	if !raw.IsNull() && raw.IsKnown() && raw.Type().IsObjectType() && raw.Type().HasAttribute("max_jit_request_duration") {
+		v := raw.GetAttr("max_jit_request_duration")
+		if v.IsKnown() && !v.IsNull() && v.AsString() == "" {
+			// Core has already applied lifecycle.ignore_changes to the proposed
+			// plan. Do not replace a retained known override with clear intent.
+			plan := d.GetRawPlan()
+			if !plan.IsNull() && plan.IsKnown() && plan.Type().IsObjectType() && plan.Type().HasAttribute("max_jit_request_duration") {
+				p := plan.GetAttr("max_jit_request_duration")
+				if p.IsKnown() && !p.IsNull() && p.AsString() != "" {
+					return endpointTypeDiff(d)
+				}
+			}
+			if err := d.SetNew("max_jit_request_duration", ""); err != nil {
+				return err
+			}
+		}
+	}
+	return endpointTypeDiff(d)
+}
+
+func endpointTypeDiff(d *schema.ResourceDiff) error {
+	if !d.NewValueKnown("type") {
+		return nil
+	}
+	old, next := d.GetChange("type")
+	if d.Id() == "" {
+		if !isValidSessionType(next.(string)) {
+			return fmt.Errorf("invalid endpoint type: %s; use direct, cli, or client", next)
+		}
+		return nil
+	}
+	return validateEndpointTypeChange(old.(string), next.(string))
+}
+
 func isValidSessionType(t string) bool {
-	return t == SessionTypeDirect || t == SessionTypeClient || t == SessionTypeCLI || t == SessionTypeServices
+	return t == "" || t == SessionTypeDirect || t == SessionTypeClient || t == SessionTypeCLI
 }
 
 func getSessionType(t string) (string, bool) {
@@ -409,8 +490,6 @@ func getSessionType(t string) (string, bool) {
 			return "client", true
 		case SessionTypeCLI:
 			return "cli", true
-		case SessionTypeServices:
-			return "services", true
 		default:
 			return "", false
 		}
@@ -475,7 +554,14 @@ func sessionRequestFromSchema(d *schema.ResourceData) (adaptive.CreateSessionReq
 		DisableOutputCapture: d.Get("disable_output_capture").(bool),
 		DisableDataStudio:    d.Get("disable_data_studio").(bool),
 		DisableWebCLI:        d.Get("disable_web_cli").(bool),
-		JITMode:              d.Get("jit_mode").(string),
+	}
+	// Empty mode is a backend preserve operation, not an explicit clear. Never
+	// resend a mode merely because Read observed it in state.
+	if configHasAttr(d, "jit_mode") {
+		mode := d.GetRawConfig().GetAttr("jit_mode").AsString()
+		if mode != "" {
+			req.JITMode = d.Get("jit_mode").(string)
+		}
 	}
 
 	if configHasAttr(d, "auto_approval") {
@@ -489,6 +575,28 @@ func sessionRequestFromSchema(d *schema.ResourceData) (adaptive.CreateSessionReq
 	if configHasAttr(d, "jit_total_approvers") {
 		v := d.Get("jit_total_approvers").(int)
 		req.JITTotalApprovers = &v
+	}
+	if configHasAttr(d, "max_jit_request_duration") {
+		v := d.Get("max_jit_request_duration").(string)
+		write := true
+		if d.GetRawConfig().GetAttr("max_jit_request_duration").AsString() == "" {
+			plan := d.GetRawPlan()
+			if !plan.IsNull() && plan.IsKnown() && plan.Type().IsObjectType() && plan.Type().HasAttribute("max_jit_request_duration") {
+				p := plan.GetAttr("max_jit_request_duration")
+				if p.IsKnown() && (p.IsNull() || p.AsString() != "") {
+					write = false // A retained plan value is not permission to clear.
+				} else {
+					// SDKv2 marks a computed empty string unknown and Get can
+					// return prior state. Resolve the authorized apply-time clear.
+					v = ""
+				}
+			} else if v != "" {
+				return adaptive.CreateSessionRequest{}, fmt.Errorf("cannot safely resolve an endpoint duration clear without its Terraform plan")
+			}
+		}
+		if write {
+			req.MaxJITRequestDuration = &v
+		}
 	}
 
 	return req, nil
@@ -538,17 +646,28 @@ func ResourceAdaptiveSessionCreate(ctx context.Context, d *schema.ResourceData, 
 	}
 
 	resp, err := client.CreateSession(ctx, req)
+	if resp != nil && resp.ID != "" {
+		d.SetId(resp.ID)
+	}
 	if err != nil {
 		return diag.FromErr(err)
 	}
 	d.SetId(resp.ID)
 
-	// Best-effort: surface the server-computed outputs right away. A failure
-	// here is not fatal — the next refresh picks them up.
-	if r, rerr := client.ReadSession(ctx, resp.ID); rerr == nil && r != nil {
-		if err := setEndpointOutputs(d, r); err != nil {
-			return diag.FromErr(err)
-		}
+	// The object is already tracked. Failure to verify outputs must be
+	// reported without discarding that recoverable identity.
+	r, rerr := client.ReadSession(ctx, resp.ID)
+	if rerr != nil {
+		return diag.FromErr(fmt.Errorf("endpoint recorded but output read failed: %w", rerr))
+	}
+	if r == nil {
+		return diag.Errorf("endpoint recorded but absent during output verification; reconcile before retrying")
+	}
+	if status := strings.ToLower(r.Status); status != "created" && status != "paused" {
+		return diag.Errorf("endpoint recorded but no longer ready during output verification; reconcile the tracked endpoint")
+	}
+	if err := setEndpointOutputs(d, r); err != nil {
+		return diag.FromErr(err)
 	}
 	return nil
 }
@@ -565,10 +684,13 @@ func ResourceAdaptiveSessionRead(ctx context.Context, d *schema.ResourceData, m 
 		return notFoundGone(d)
 	}
 
-	// On import there is no prior state to reconcile against, so every attribute
-	// is taken from the server. On refresh we only overwrite attributes the
-	// configuration actually set: adopting a server-side default into an unset
-	// optional would create a perpetual diff.
+	if err := validateEndpointPolicyRead(r); err != nil {
+		return diag.FromErr(err)
+	}
+
+	// Optional+Computed policy always observes endpoint-local values. Raw
+	// configuration, never observed state, controls pointer-field write ownership.
+
 	isImport := isImportRead(d, "name")
 	if missingOnImport(d, isImport, r.Name) {
 		return nil
@@ -633,36 +755,34 @@ func ResourceAdaptiveSessionRead(ctx context.Context, d *schema.ResourceData, m 
 		}
 	}
 
-	// State cannot tell an unset toggle from one explicitly set to false, and
-	// several of these are OR'd with workspace-level settings server-side. So a
-	// toggle that is off locally never adopts a server-side true (that would be
-	// a perpetual diff); one that is on is refreshed, which catches it being
-	// turned off out-of-band.
+	// Observe endpoint-local policy in both directions, including false and zero.
 	for _, f := range []struct {
-		key    string
-		server bool
+		key, wire string
+		server    bool
 	}{
-		{"is_jit_enabled", r.IsJITEnabled},
-		{"script_only_access", r.ScriptOnlyAccess},
-		{"disable_output_capture", r.DisableOutputCapture},
-		{"disable_data_studio", r.DisableDataStudio},
-		{"disable_web_cli", r.DisableWebCLI},
-		{"auto_approval", r.AutoApproval},
-		{"jit_multi_approver", r.JITMultiApprover},
+		{"is_jit_enabled", "isJitEnabled", r.IsJITEnabled},
+		{"script_only_access", "scriptOnlyAccess", r.ScriptOnlyAccess},
+		{"disable_output_capture", "disableOutputCapture", r.DisableOutputCapture},
+		{"disable_data_studio", "disableDataStudio", r.DisableDataStudio},
+		{"disable_web_cli", "disableWebCli", r.DisableWebCLI},
+		{"auto_approval", "autoApproval", r.AutoApproval},
+		{"jit_multi_approver", "jitMultiApprover", r.JITMultiApprover},
 	} {
-		if isImport || (d.Get(f.key).(bool) && !f.server) {
-			if err := d.Set(f.key, f.server); err != nil {
-				return diag.FromErr(err)
-			}
+		if !r.HasField(f.wire) {
+			continue
 		}
-	}
-
-	if isImport || d.Get("jit_mode").(string) != "" {
-		if err := d.Set("jit_mode", r.JITMode); err != nil {
+		if err := d.Set(f.key, f.server); err != nil {
 			return diag.FromErr(err)
 		}
 	}
-	if isImport || d.Get("jit_total_approvers").(int) != 0 {
+
+	if err := d.Set("jit_mode", r.JITMode); err != nil {
+		return diag.FromErr(err)
+	}
+	if err := d.Set("max_jit_request_duration", r.MaxJITRequestDuration); err != nil {
+		return diag.FromErr(err)
+	}
+	if r.HasField("jitTotalApprovers") {
 		if err := d.Set("jit_total_approvers", r.JITTotalApprovers); err != nil {
 			return diag.FromErr(err)
 		}
@@ -675,6 +795,10 @@ func ResourceAdaptiveSessionRead(ctx context.Context, d *schema.ResourceData, m 
 }
 
 func ResourceAdaptiveSessionUpdate(ctx context.Context, d *schema.ResourceData, m interface{}) diag.Diagnostics {
+	oldType, newType := d.GetChange("type")
+	if err := validateEndpointTypeChange(oldType.(string), newType.(string)); err != nil {
+		return diag.FromErr(err)
+	}
 	client := m.(*adaptive.Client)
 
 	req, err := sessionRequestFromSchema(d)
@@ -682,26 +806,48 @@ func ResourceAdaptiveSessionUpdate(ctx context.Context, d *schema.ResourceData, 
 		return diag.FromErr(err)
 	}
 
+	live, err := client.ReadSession(ctx, d.Id())
+	if err != nil {
+		return diag.FromErr(fmt.Errorf("cannot verify endpoint policy before updating: %w", err))
+	}
+	if err := validateEndpointPolicyRead(live); err != nil {
+		return diag.FromErr(err)
+	}
+	if live.SessionType != req.SessionType {
+		return diag.Errorf("endpoint type cannot be changed in place; create a separate endpoint and migrate explicitly")
+	}
+
 	resp, err := client.UpdateSession(ctx, d.Id(), req)
 	if err != nil {
 		return diag.FromErr(err)
 	}
-	if resp != nil && resp.ID != "" {
-		d.SetId(resp.ID)
+	if resp != nil && resp.ID != "" && resp.ID != d.Id() {
+		return diag.Errorf("endpoint update response identifies a different object; original tracked ID retained")
 	}
 
-	// Best-effort refresh of the server-computed outputs.
-	if r, rerr := client.ReadSession(ctx, d.Id()); rerr == nil && r != nil {
-		if err := setEndpointOutputs(d, r); err != nil {
+	// Policy writes can partially fail despite a successful response. Read the
+	// exact original target and confirm the requested policy before state writes.
+	r, err := client.ReadSession(ctx, d.Id())
+	if err != nil {
+		return diag.FromErr(fmt.Errorf("endpoint may have updated but read-back failed; refresh before retrying: %w", err))
+	}
+	if err := verifyEndpointPolicyWrite(req, r); err != nil {
+		return diag.FromErr(err)
+	}
+	if req.MaxJITRequestDuration != nil {
+		if err := d.Set("max_jit_request_duration", r.MaxJITRequestDuration); err != nil {
 			return diag.FromErr(err)
 		}
+	}
+	if err := setEndpointOutputs(d, r); err != nil {
+		return diag.FromErr(err)
 	}
 	return nil
 }
 
 // configHasAttr reports whether key is set in the user's configuration.
 // Terraform only exposes the raw configuration during plan and apply, so this
-// is false during a refresh — Read compares against prior state instead.
+// is false during refresh. Observed state never establishes write ownership.
 func configHasAttr(d *schema.ResourceData, key string) bool {
 	raw := d.GetRawConfig()
 	if raw.IsNull() || !raw.IsKnown() || !raw.Type().IsObjectType() || !raw.Type().HasAttribute(key) {

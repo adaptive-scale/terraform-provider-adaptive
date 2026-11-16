@@ -208,7 +208,8 @@ func buildIntegrationConfig(typ string, d *schema.ResourceData) (interface{}, er
 
 // roundTripStringAttrs is every string attribute the builders read.
 var roundTripStringAttrs = []string{
-	"access_control_group", "access_control_method", "access_key_id",
+	"auth_mode", "bootstrap_servers", "cache_name", "cache_type", "admin_email",
+	"access_control_group", "access_control_method", "access_key_id", "allowed_commands", "app_key",
 	"annotations", "api_client_id", "api_client_secret", "api_key", "api_server",
 	"api_secret", "api_token", "application_id", "application_name", "arn",
 	"automation_mode", "aws_access_key_id", "aws_arn", "aws_region",
@@ -217,7 +218,7 @@ var roundTripStringAttrs = []string{
 	"client_configuration", "client_id", "client_key", "client_secret",
 	"clientcert", "cluster_cert", "cluster_token", "connect_server_url", "cpu",
 	"credential_json", "database_name", "dd_api_key", "dd_site", "default_user",
-	"domain", "fields", "host", "hostname", "image", "index", "key", "key_file",
+	"domain", "fields", "host", "hostname", "image", "index", "key", "key_file", "keyspace", "keyspaces_endpoint",
 	"ldap_encryption_method", "ldap_hostname", "ldap_port",
 	"ldap_search_bind_dn", "ldap_search_bind_password", "ldap_user_base_dn",
 	"ldap_user_name_attribute", "log_group_name", "log_stream_name", "login_url",
@@ -230,14 +231,15 @@ var roundTripStringAttrs = []string{
 	"service_account_name", "service_name", "shared_secret", "ssl_mode",
 	"storage", "sub_system_name", "tenant_id", "tls_ca_cert", "tls_cert_file",
 	"tls_key_file", "tls_root_cert", "token", "token_id", "tolerations", "uri",
-	"url", "urls", "username", "value", "warehouse", "webhook_url", "webui_port",
+	"url", "urls", "username", "value", "version", "warehouse", "webhook_url", "webui_port",
 }
 
 // roundTripBoolAttrs is every bool attribute the builders read.
 var roundTripBoolAttrs = []string{
-	"create_if_not_exists", "is_redis_labs", "old_version", "tls_enabled",
+	"use_msk_iam", "use_iam_auth", "allow_file_transfer",
+	"create_if_not_exists", "enable_allowed_commands", "is_redis_labs", "old_version", "tls_enabled",
 	"tls_skip_verify", "use_connect_server", "use_irsa", "use_proxy",
-	"use_rds_iam", "use_service_account", "use_tenant", "use_tls",
+	"use_rds_iam", "use_role_arn", "use_service_account", "use_tenant", "use_tls",
 }
 
 func roundTripSchema() map[string]*schema.Schema {

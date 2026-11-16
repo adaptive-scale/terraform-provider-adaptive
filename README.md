@@ -17,30 +17,26 @@ The [Adaptive Terraform Provider](https://registry.terraform.io/providers/adapti
 
 ### 1. Install Prerequisites
 
-- [Terraform](https://www.terraform.io/downloads.html) >= 1.0
-- [Adaptive CLI](https://docs.adaptive.live/cli)
+- [Terraform](https://www.terraform.io/downloads.html) >= 1.11 (CLI contract tests pin 1.11.4 and 1.14.3)
+- An authorized Adaptive service token and the intended workspace URL. The Adaptive CLI is optional when explicit credentials are provided.
 
 ### 2. Authenticate
 
+Obtain a least-privilege service token through your approved Adaptive administration workflow. Select the target workspace explicitly; do not place real tokens in checked-in files.
+
 ```bash
-# Login to Adaptive
-adaptive login
-
-# Generate a service token
-adaptive service-token create --name terraform-provider
-
-# Set the token as an environment variable
 export ADAPTIVE_SVC_TOKEN="your-service-token"
+export ADAPTIVE_URL="https://app.adaptive.live"
 ```
 
 ### 3. Configure the Provider
 
 ```hcl
 terraform {
+  required_version = ">= 1.11"
   required_providers {
     adaptive = {
       source  = "adaptive-scale/adaptive"
-      version = "~> 1.0"
     }
   }
 }
@@ -66,7 +62,7 @@ resource "adaptive_resource" "postgres" {
 resource "adaptive_endpoint" "postgres_access" {
   name     = "postgres-access"
   resource = adaptive_resource.postgres.name
-  ttl      = "8h"
+  ttl      = "6h"
   users    = ["developer@example.com"]
 }
 ```
@@ -92,7 +88,7 @@ terraform apply
 | **Remote Desktop** | RDP (single host, fleet, or LDAP-authenticated), VNC, Windows server groups, Chrome |
 | **Messaging** | RabbitMQ, Kafka, Confluent, Microsoft Teams, Slack |
 
-See the [examples directory](examples/) for configuration examples of each integration.
+See the [resource documentation](docs/resources/resource.md) for integration-specific inputs and configuration examples.
 
 ## Resources
 
@@ -112,7 +108,7 @@ The provider includes 7 resource types:
 
 Every resource now reads its real state back from the platform, so `terraform plan` reports changes made outside Terraform and a resource deleted out-of-band is planned for recreation instead of failing the refresh. All seven support `terraform import` by ID.
 
-Refresh is deliberately conservative about optional arguments: one your configuration never set is not populated from a server-side default, since that would show up as a diff on every plan. Two values the API never returns are handled through server-side fingerprints instead — the credentials on `adaptive_resource` (see its `redacted_digests` output) and the body of an `adaptive_script` — so a secret or script changed outside Terraform still surfaces as a pending change. Importing an `adaptive_resource` warns which credentials the platform withheld; write them into your configuration before the next apply, or the update will clear them.
+Optional-field ownership is contract-specific: omitted endpoint policy and selected integration controls retain observed values, while full-replacement fields can reset on removal. See each resource document for explicit omission and clearing rules. Resource credentials and script bodies depend on backend redaction; backend fingerprints detect supported out-of-band changes without returning the withheld values. `adaptive_resource.applied_digests` retains the recorded baseline across refreshes. Import cannot recover withheld credentials, and resource updates now reject omission of known held credentials before replacing configuration; explicitly setting a supported optional string credential to `""` authorizes clearing it. Missing fingerprint metadata is not evidence that a credential is absent. Credential arguments marked sensitive still persist in Terraform state: protect state and saved plans. See the resource's Secret Arguments section for coverage and compatibility limits.
 
 ### Migrating from `adaptive_msteams_workflow`
 
@@ -138,28 +134,30 @@ terraform import adaptive_resource.teams_alerts <resource-id>
 ## Documentation
 
 - [Terraform Guide](https://documentation.adaptive.live/developer-guide/terraform)
-- [Getting Started Guide](docs/guides/getting-started.md)
-- [Integration Guide](docs/guides/integrations.md)
-- [Access Control Guide](docs/guides/access-control.md)
+- [Provider Configuration](docs/index.md)
+- [Integration Contracts](docs/resources/resource.md)
+- [Endpoint Policy](docs/resources/endpoint.md)
+- [Authorization Policies](docs/resources/authorization.md)
 - [Provider Documentation](https://registry.terraform.io/providers/adaptive-scale/adaptive/latest/docs)
-- [Example Configurations](examples/)
+- [Parity Delivery and Compatibility](docs/parity-remediation-plan.md)
 
 ## Examples
 
-The [examples](examples/) directory contains working configurations for all supported integrations:
+Configuration examples are embedded in the generated [resource documents](docs/resources/resource.md). This checkout does not ship an `examples/` directory; optional example-generation scripts are development scaffolding, not preverified live targets.
 
-```bash
-# Navigate to an example
-cd examples/postgres
-
-# Initialize and apply
-terraform init
-terraform plan
-```
+The parity-hardening stack is unreleased. Use the locally built plugin for testing; these local commits do not publish a provider. For production, select and pin an actually published provider version compatible with the deployed backend.
 
 ## Development
 
 For contributors and local development:
+
+The ordinary offline suite is `make test`; `make build` compiles the provider. To exercise actual Terraform plan/apply/import behavior against a loopback fake API (no Adaptive account or live infrastructure), install Terraform and run:
+
+```bash
+ADAPTIVE_ENGINE_TEST=1 go test ./internal/provider -run '^Test(Secret|Mappings|Endpoint|Cloud|IntegrationFields|Families|CoreLifecycle)TerraformEngine$' -v -count=1 -timeout=180s
+```
+
+The seven opt-in suites build the local plugin and isolate CLI configuration/credentials against loopback fake APIs. Together they exercise all seven resource families plus mapping, policy and credential lifecycle regressions. CI runs the actual suites with Terraform 1.11.4 and 1.14.3; without `ADAPTIVE_ENGINE_TEST=1` they are skipped. They use legacy sensitive-state credentials, not native write-only inputs. Configuration persistence is not live IAM, TLS, connection, policy-enforcement or Kubernetes-cleanup proof.
 
 ```bash
 # Build and install locally

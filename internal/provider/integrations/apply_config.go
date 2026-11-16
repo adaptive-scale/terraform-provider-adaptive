@@ -12,12 +12,12 @@ import (
 // ApplyIntegrationConfig is the inverse of the SchemaTo* builders: it folds the
 // configuration the read endpoint returned back onto the resource attributes.
 //
-// Secrets never appear in the returned configuration — the server strips them
-// and names them in the redacted-keys list — so a key that is absent leaves its
-// attribute untouched rather than clearing it. A key that is present is always
-// written, including an empty value, which is how a field cleared out-of-band
-// makes it back into state. Keys the forward mapping derives (usePassword, the
-// hardcoded version/type constants, mysql's forced sslMode) are skipped: they
+// Correctly redacted backend responses omit credential values; do not assume
+// every backend format/classifier has complete coverage. A missing key leaves
+// its attribute untouched. Present values are normally written, including an
+// explicit empty value for a clear; mappings handle contract-specific nulls.
+// Keys the forward mapping derives (usePassword, the
+// hardcoded version/type constants) are skipped: they
 // carry no user intent to reconcile.
 func ApplyIntegrationConfig(d *schema.ResourceData, integrationType string, cfg map[string]interface{}) error {
 	if len(cfg) == 0 {
@@ -35,9 +35,16 @@ func ApplyIntegrationConfig(d *schema.ResourceData, integrationType string, cfg 
 func applyIntegrationMapping(a *configApplier, integrationType string) {
 	switch ProviderType(integrationType) {
 	case "aws":
-		a.str("aws_region_name", "region_name")
-		a.str("aws_access_key_id", "access_key_id")
-		a.str("aws_secret_access_key", "secret_access_key")
+		a.cloudString("aws_region_name", "region_name")
+		a.cloudString("aws_access_key_id", "access_key_id")
+		a.cloudString("aws_secret_access_key", "secret_access_key")
+		a.boolean("use_role_arn", "use_role_arn")
+		a.cloudString("aws_role_arn", "aws_role_arn")
+		a.boolean("use_service_account", "use_service_account")
+		a.cloudString("service_account", "service_account")
+		a.boolean("create_if_not_exists", "create_if_not_exists")
+		a.boolean("enable_allowed_commands", "enable_allowed_commands")
+		a.cloudString("allowed_commands", "allowed_commands")
 	case "azure":
 		a.str("tenantID", "tenant_id")
 		a.str("applicationID", "application_id")
@@ -54,6 +61,7 @@ func applyIntegrationMapping(a *configApplier, integrationType string) {
 		a.str("databaseName", "database_name")
 		a.str("hostname", "host")
 		a.str("port", "port")
+		a.str("sslMode", "ssl_mode")
 	case "cockroachdb":
 		a.str("username", "username")
 		a.str("password", "password")
@@ -66,13 +74,28 @@ func applyIntegrationMapping(a *configApplier, integrationType string) {
 		a.str("project_id", "project_id")
 		a.str("key_file", "key_file")
 	case "google":
+		a.cloudString("serviceAccount", "service_account")
+		a.cloudString("adminEmail", "admin_email")
+
 		a.str("domain", "domain")
 		a.str("clientID", "client_id")
 		a.str("clientSecret", "client_secret")
 	case "mongodb":
+		a.cloudString("clientCertificate", "client_certificate")
+		a.boolean("useTLS", "use_tls")
+		a.cloudString("version", "version")
+
 		a.str("uri", "uri")
 	case "mysql":
-		// sslMode is forced to "require" by the forward mapping; not an input.
+		a.cloudString("clientCert", "client_cert")
+		a.cloudString("clientKey", "client_key")
+		a.cloudString("rootCert", "root_cert")
+		a.boolean("oldVersion", "old_version")
+
+		a.boolean("useRdsIam", "use_rds_iam")
+		a.cloudString("authMode", "auth_mode")
+		a.applyIAMIdentity()
+		a.cloudString("sslMode", "ssl_mode")
 		a.str("username", "username")
 		a.str("password", "password")
 		a.str("databaseName", "database_name")
@@ -83,6 +106,7 @@ func applyIntegrationMapping(a *configApplier, integrationType string) {
 		a.str("clientID", "client_id")
 		a.str("clientSecret", "client_secret")
 	case "postgres":
+		a.cloudString("authMode", "auth_mode")
 		a.str("username", "username")
 		a.str("password", "password")
 		a.str("databaseName", "database_name")
@@ -93,15 +117,11 @@ func applyIntegrationMapping(a *configApplier, integrationType string) {
 		a.str("crtText", "tls_cert_file")
 		a.str("keyText", "tls_key_file")
 		a.boolean("useRdsIam", "use_rds_iam")
-		a.boolean("useIrsa", "use_irsa")
-		a.str("awsRegion", "aws_region")
-		a.str("awsRoleArn", "aws_role_arn")
-		a.str("awsAccessKeyId", "aws_access_key_id")
-		a.str("awsSecretAccessKey", "aws_secret_access_key")
-		a.str("awsServiceAccount", "aws_service_account")
+		a.applyIAMIdentity()
 	case "ssh":
-		// usePassword is derived from key, and password mirrors the key.
+		// Authentication mode is derived from key; credentials are independent.
 		a.str("username", "username")
+		a.str("password", "password")
 		a.str("hostname", "host")
 		a.str("port", "port")
 		a.str("sshKey", "key")
@@ -115,6 +135,8 @@ func applyIntegrationMapping(a *configApplier, integrationType string) {
 		a.str("nodeSelectorBytes", "node_selector")
 		a.str("affinityBytes", "node_affinity")
 	case "awsdocumentdb":
+		a.boolean("tlsEnabled", "tls_enabled")
+
 		a.str("uri", "uri")
 	case "zerotier":
 		a.str("network_id", "network_id")
@@ -126,6 +148,7 @@ func applyIntegrationMapping(a *configApplier, integrationType string) {
 		a.str("private_key", "private_key")
 		a.str("project_id", "project_id")
 	case "rdp_windows":
+		a.boolean("allowFileTransfer", "allow_file_transfer")
 		a.str("hostname", "hostname")
 		a.str("password", "password")
 		a.str("username", "username")
@@ -144,12 +167,16 @@ func applyIntegrationMapping(a *configApplier, integrationType string) {
 		a.str("secret_id", "secret_id")
 		a.str("key", "key")
 	case "sql_server":
+		a.cloudString("sslMode", "ssl_mode")
+
 		a.str("databaseName", "database_name")
 		a.str("hostname", "host")
 		a.str("port", "port")
 		a.str("username", "username")
 		a.str("password", "password")
 	case "azuresqlserver":
+		a.cloudString("sslMode", "ssl_mode")
+
 		a.str("hostname", "hostname")
 		a.str("port", "port")
 		a.str("username", "username")
@@ -160,7 +187,12 @@ func applyIntegrationMapping(a *configApplier, integrationType string) {
 		a.str("url", "url")
 	case "datadog":
 		a.str("dd_site", "dd_site")
-		a.str("dd_api_key", "dd_api_key")
+		if a.collect != nil || a.cfg["dd_api_key"] != nil {
+			a.str("dd_api_key", "dd_api_key")
+		}
+		if a.collect != nil || a.cfg["dd_app_key"] != nil {
+			a.str("dd_app_key", "app_key")
+		}
 	case "coralogix":
 		a.str("url", "uri")
 		a.str("privateKey", "private_key")
@@ -194,20 +226,25 @@ func applyIntegrationMapping(a *configApplier, integrationType string) {
 		a.str("password", "password")
 		a.str("index", "index")
 	case "paloalto_ngfw":
-		a.str("password", "password")
-		a.str("username", "username")
-		a.str("hostname", "hostname")
-		a.str("webui_port", "webui_port")
-		a.str("login_url", "login_url")
+		a.cloudString("password", "password")
+		a.cloudString("username", "username")
+		a.cloudString("hostname", "hostname")
+		a.cloudString("webui_port", "webui_port")
+		a.cloudString("login_url", "login_url")
+		a.applyManagedBrowserSettings()
+		a.cloudString("sshKey", "key")
+		a.cloudString("port", "port")
 	case "fortinet_ngfw", "cisco_ngfw", "hpe_switch":
 		// `type` is a per-case constant of the forward mapping, not an input.
-		a.str("hostname", "hostname")
-		a.str("login_url", "uri")
-		a.str("port", "port")
+		a.cloudString("hostname", "hostname")
+		a.cloudString("login_url", "uri")
+		a.cloudString("port", "port")
 		a.boolean("use_proxy", "use_proxy")
-		a.str("username", "username")
-		a.str("password", "password")
-		a.str("webui_port", "webui_port")
+		a.cloudString("username", "username")
+		a.cloudString("password", "password")
+		a.cloudString("webui_port", "webui_port")
+		a.applyManagedBrowserSettings()
+		a.cloudString("sshKey", "key")
 	case "snowflake":
 		a.str("databaseAccount", "hostname")
 		a.str("databaseUsername", "username")
@@ -221,16 +258,35 @@ func applyIntegrationMapping(a *configApplier, integrationType string) {
 		a.str("url", "uri")
 		a.str("sharedSecret", "shared_secret")
 	case "aruba_sw":
-		a.str("hostname", "hostname")
-		a.str("username", "username")
-		a.str("password", "password")
+		a.cloudString("hostname", "hostname")
+		a.cloudString("username", "username")
+		a.cloudString("password", "password")
+		a.applyManagedBrowserSettings()
+		a.cloudString("sshKey", "key")
+		a.cloudString("port", "port")
+		a.cloudString("webui_port", "webui_port")
+		a.cloudString("login_url", "login_url")
 	case "aruba_instant_on":
-		a.str("host", "host")
-		a.str("port", "port")
-		a.str("username", "username")
-		a.str("password", "password")
-		a.str("apiToken", "api_token")
+		a.arubaInstantOnAliases()
+		a.cloudString("port", "port")
+		a.cloudString("username", "username")
+		// Null or missing credentials are withheld; explicit empty clears them.
+		if a.collect != nil || a.cfg["password"] != nil {
+			a.cloudString("password", "password")
+		}
+		if a.collect != nil || a.cfg["sshKey"] != nil {
+			a.cloudString("sshKey", "key")
+		}
+		a.cloudString("webui_port", "webui_port")
+		a.cloudString("login_url", "login_url")
+		a.applyManagedBrowserSettings()
 	case "syslog":
+		a.boolean("tlsEnabled", "tls_enabled")
+		a.cloudString("caCertificate", "tls_ca_cert")
+		a.cloudString("clientCertificate", "client_certificate")
+		a.cloudString("clientKey", "client_key")
+		a.boolean("insecureSkipVerify", "tls_skip_verify")
+
 		a.str("hostname", "hostname")
 		a.str("port", "port")
 		a.str("protocol", "protocol")
@@ -240,12 +296,21 @@ func applyIntegrationMapping(a *configApplier, integrationType string) {
 	case "clickhouse":
 		a.str("username", "username")
 		a.str("password", "password")
-		a.str("databaseName", "database_name")
+		a.str("database", "database_name")
 		a.str("hostname", "host")
 		a.str("port", "port")
-		a.str("sslMode", "ssl_mode")
+		a.boolean("use-tls", "use_tls")
 	case "keyspaces":
+		a.cloudString("keyspace", "keyspace")
+		a.cloudString("keyspaces_endpoint", "keyspaces_endpoint")
+		a.cloudString("version", "version")
+		a.cloudString("aws_region_name", "aws_region_name")
+		a.cloudString("aws_access_key_id", "aws_access_key_id")
+		a.cloudString("aws_secret_access_key", "aws_secret_access_key")
+		a.boolean("use_role_arn", "use_role_arn")
+		a.cloudString("aws_role_arn", "aws_role_arn")
 		a.boolean("use_service_account", "use_service_account")
+		a.cloudString("service_account", "service_account")
 		a.boolean("create_if_not_exists", "create_if_not_exists")
 	case "rabbitmq":
 		a.str("url", "uri")
@@ -255,6 +320,8 @@ func applyIntegrationMapping(a *configApplier, integrationType string) {
 		a.str("endpoint", "uri")
 		a.str("key", "api_token")
 	case "services":
+		a.boolean("enableTLS", "tls_enabled")
+
 		a.str("urls", "urls")
 	case "serverlist":
 		a.hosts("hosts", "hosts")
@@ -289,6 +356,12 @@ func applyIntegrationMapping(a *configApplier, integrationType string) {
 		a.str("secret_id", "secret_id")
 		a.boolean("tlsEnabled", "tls_enabled")
 	case "awselasticcache":
+		a.boolean("useIamAuth", "use_iam_auth")
+		a.boolean("useIrsa", "use_irsa")
+		a.cloudString("aws_role_arn", "aws_role_arn")
+		a.cloudString("aws_service_account", "aws_service_account")
+		a.cloudString("cache_name", "cache_name")
+		a.cloudString("cache_type", "cache_type")
 		a.str("username", "username")
 		a.str("password", "password")
 		a.str("host", "host")
@@ -331,33 +404,41 @@ func applyIntegrationMapping(a *configApplier, integrationType string) {
 	case "digitalocean":
 		a.str("api_token", "api_token")
 	case "fortinet_analyzer", "fortinet_manager":
-		a.str("username", "username")
-		a.str("password", "password")
-		a.str("hostname", "hostname")
-		a.str("port", "port")
-		a.str("webui_port", "webui_port")
-		a.str("login_url", "login_url")
-		a.str("sshKey", "key")
+		a.cloudString("username", "username")
+		a.cloudString("password", "password")
+		a.cloudString("hostname", "hostname")
+		a.cloudString("port", "port")
+		a.cloudString("webui_port", "webui_port")
+		a.cloudString("login_url", "login_url")
+		a.cloudString("sshKey", "key")
+		a.applyManagedBrowserSettings()
 	case "heroku":
 		a.str("machine", "machine")
 		a.str("username", "username")
 		a.str("token", "token")
 	case "ivanti":
-		a.str("username", "username")
-		a.str("password", "password")
-		a.str("hostname", "hostname")
-		a.str("port", "port")
-		a.str("webui_port", "webui_port")
-		a.str("login_url", "login_url")
+		a.cloudString("username", "username")
+		a.cloudString("password", "password")
+		a.cloudString("hostname", "hostname")
+		a.cloudString("port", "port")
+		a.cloudString("webui_port", "webui_port")
+		a.cloudString("login_url", "login_url")
 		a.boolean("use_proxy", "use_proxy")
-		a.str("sshKey", "key")
+		a.cloudString("sshKey", "key")
+		a.applyManagedBrowserSettings()
 	case "juniper_sw", "sophos_fw":
-		a.str("username", "username")
-		a.str("password", "password")
-		a.str("hostname", "hostname")
-		a.str("port", "port")
-		a.str("sshKey", "key")
+		a.cloudString("username", "username")
+		a.cloudString("password", "password")
+		a.cloudString("hostname", "hostname")
+		a.cloudString("port", "port")
+		a.cloudString("sshKey", "key")
+		a.applyManagedBrowserSettings()
+		a.cloudString("webui_port", "webui_port")
+		a.cloudString("login_url", "login_url")
 	case "kafka":
+		a.boolean("useMskIam", "use_msk_iam")
+		a.cloudString("bootstrapServers", "bootstrap_servers")
+		a.applyIAMIdentity()
 		a.str("client_configuration", "client_configuration")
 	case "ldap":
 		a.str("hostname", "hostname")

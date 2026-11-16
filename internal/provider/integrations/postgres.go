@@ -30,46 +30,25 @@ type PostgresIntegrationConfiguration struct {
 	TLSCertFile  string `yaml:"crtText"`
 	TLSKeyFile   string `yaml:"keyText"`
 
-	// AWS RDS IAM authentication. These are only emitted when use_rds_iam is
-	// set, so a password resource marshals exactly as it did before.
-	UseRDSIAM          *bool  `yaml:"useRdsIam,omitempty"`
-	UseIRSA            *bool  `yaml:"useIrsa,omitempty"`
-	AWSRegion          string `yaml:"awsRegion,omitempty"`
-	AWSRoleARN         string `yaml:"awsRoleArn,omitempty"`
-	AWSAccessKeyID     string `yaml:"awsAccessKeyId,omitempty"`
-	AWSSecretAccessKey string `yaml:"awsSecretAccessKey,omitempty"`
-	AWSServiceAccount  string `yaml:"awsServiceAccount,omitempty"`
+	// Pointer switches preserve absent versus explicit false. Legacy authMode
+	// remains authoritative only while useRdsIam is absent.
+	UseRDSIAM   *bool  `yaml:"useRdsIam,omitempty"`
+	AuthMode    string `yaml:"authMode,omitempty"`
+	IAMIdentity `yaml:",inline"`
 }
 
-// rdsIAMFromSchema reads the AWS RDS IAM block off a resource. It returns a
-// zero value unless use_rds_iam is set, so password resources are untouched.
-//
-// use_irsa defaults to "no static keys were given", which matches how the
-// platform infers the credential source, and an explicit value overrides it.
+// rdsIAMFromSchema selects the same switch-over-authMode precedence as the
+// backend. Leave omitted IRSA switches nil instead of inventing a default; the
+// backend owns identity inference. Nonsecret identity persists while inactive,
+// but conditional static credentials must survive the held-secret write guard.
 func rdsIAMFromSchema(d *schema.ResourceData) PostgresIntegrationConfiguration {
-	useRDSIAM, _ := d.Get("use_rds_iam").(bool)
-	if !useRDSIAM {
-		return PostgresIntegrationConfiguration{}
+	switchValue := optionalBool(d, "use_rds_iam")
+	authMode := attrString(d, "auth_mode")
+	active := authMode == "aws_rds_iam"
+	if switchValue != nil {
+		active = *switchValue
 	}
-
-	accessKeyID, _ := d.Get("aws_access_key_id").(string)
-	useIRSA := accessKeyID == ""
-	if v, ok := d.GetOkExists("use_irsa"); ok {
-		if b, ok := v.(bool); ok {
-			useIRSA = b
-		}
-	}
-
-	cfg := PostgresIntegrationConfiguration{
-		UseRDSIAM:      &useRDSIAM,
-		UseIRSA:        &useIRSA,
-		AWSAccessKeyID: accessKeyID,
-	}
-	cfg.AWSRegion, _ = d.Get("aws_region").(string)
-	cfg.AWSRoleARN, _ = d.Get("aws_role_arn").(string)
-	cfg.AWSSecretAccessKey, _ = d.Get("aws_secret_access_key").(string)
-	cfg.AWSServiceAccount, _ = d.Get("aws_service_account").(string)
-	return cfg
+	return PostgresIntegrationConfiguration{UseRDSIAM: switchValue, AuthMode: authMode, IAMIdentity: iamIdentity(d, active)}
 }
 
 // TODO: .(string) is assumption will cause problems

@@ -2,18 +2,18 @@ package client
 
 import (
 	"context"
-	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"strings"
-	"time"
 
 	"github.com/hashicorp/terraform-plugin-log/tflog"
 )
 
 // CreateSession creates an endpoint (session) and waits for it to become
-// functional. The wait is best-effort: a session that is slow to come up is
-// still recorded in state, matching the behaviour Terraform users rely on.
+// administratively ready (created or paused). Readiness failures return both
+// the assigned identity and an error so Terraform can recover the recorded row.
+// This does not verify runtime connectivity or policy enforcement.
 func (c *Client) CreateSession(ctx context.Context, req CreateSessionRequest) (*CreateSessionResponse, error) {
 	tflog.Debug(ctx, "CreateSession called", map[string]interface{}{
 		"name":          req.SessionName,
@@ -54,18 +54,18 @@ func (c *Client) CreateSession(ctx context.Context, req CreateSessionRequest) (*
 	}
 
 	var response CreateSessionResponse
-	if err := json.NewDecoder(_response.Body).Decode(&response); err != nil {
+	if err := decodeResponse(_response.Body, &response); err != nil {
 		return nil, fmt.Errorf("failed to decode response body. err %w", err)
 	}
 
-	// Now wait for it to be functional. A session that never leaves "creating"
-	// is reported through the endpoint's own status on the next read, so the
-	// wait failing is not fatal to the create.
+	// Creation is not readiness: retain the ID and fail explicitly when the
+	// recorded endpoint cannot be confirmed ready within the caller's budget.
 	if _, err := c.waitForSession(ctx, response.ID); err != nil {
 		tflog.Error(ctx, "Failed to verify session after creation", map[string]interface{}{
 			"id":    response.ID,
 			"error": err.Error(),
 		})
+		return &response, fmt.Errorf("endpoint recorded but readiness unconfirmed: %w", err)
 	}
 	tflog.Debug(ctx, "Session successfully created", map[string]interface{}{
 		"id":   response.ID,
@@ -81,19 +81,30 @@ func (c *Client) ReadSession(ctx context.Context, sessionID string) (*SessionRea
 	return readTyped[SessionReadResponse](c, ctx, fmt.Sprintf("%s/read/%s", c.sessionAPI(), sessionID), "session", sessionID)
 }
 
-// waitForSession polls until the session leaves the "creating" status. A
+// waitForSession polls creating/restarting until created or paused. A
 // not-found read is retried: right after create the row may not be readable yet.
 func (c *Client) waitForSession(ctx context.Context, sessionID string) (*SessionReadResponse, error) {
-	return Do(
+	return DoContext(ctx,
 		func() (*SessionReadResponse, error) {
-			return c.ReadSession(ctx, sessionID)
-		}, RetryLimit(30), Sleep(10*time.Second), RetryResultChecker(func(intermedResult any) bool {
+			r, err := c.ReadSession(ctx, sessionID)
+			if err != nil {
+				return nil, err
+			}
+			if r != nil {
+				switch strings.ToLower(r.Status) {
+				case "created", "paused", "creating", "restarting":
+				default:
+					return nil, fmt.Errorf("endpoint readiness failed (status not ready); object remains recorded")
+				}
+			}
+			return r, nil
+		}, RetryLimit(30), Sleep(c.pollInterval), RetryResultChecker(func(intermedResult any) bool {
 			res, ok := intermedResult.(*SessionReadResponse)
 			if !ok || res == nil {
 				return true
 			}
-			// Stop once the status is terminal ("created", "failed", ...).
-			return strings.ToLower(res.Status) == "creating"
+			// Only transient provisioning statuses continue polling.
+			return strings.ToLower(res.Status) == "creating" || strings.ToLower(res.Status) == "restarting"
 		}))
 }
 
@@ -135,7 +146,7 @@ func (c *Client) UpdateSession(ctx context.Context, sessionID string, req Create
 	}
 
 	var response UpdateSessionResponse
-	if err := json.NewDecoder(_response.Body).Decode(&response); err != nil {
+	if err := decodeResponse(_response.Body, &response); err != nil {
 		return nil, fmt.Errorf("failed to decode response body. err %w", err)
 	}
 	tflog.Debug(ctx, "Session successfully updated", map[string]interface{}{
@@ -148,7 +159,7 @@ func (c *Client) UpdateSession(ctx context.Context, sessionID string, req Create
 // stopped and its row can be force-deleted.
 func isSessionReaped(status string) bool {
 	switch strings.ToLower(status) {
-	case "terminated", "marked-for-deletion", "does-not-exist", "failed", "failed-to-restart":
+	case "terminated", "marked-for-deletion", "failed", "failed-to-restart":
 		return true
 	}
 	return false
@@ -159,7 +170,8 @@ func isSessionReaped(status string) bool {
 // Terminating alone leaves the sessions row (and its integration association)
 // behind, which keeps the parent resource undeletable until the deferred
 // reaper runs. The force delete needs the terminal status the first step
-// establishes, so we wait for it before issuing it.
+// establishes, so we wait for it before issuing it. Row absence establishes
+// configuration deletion only; asynchronous Kubernetes cleanup is backend-owned.
 func (c *Client) DeleteSession(ctx context.Context, sessionID string) (bool, error) {
 	tflog.Debug(ctx, "DeleteSession called", map[string]interface{}{
 		"session_id": sessionID,
@@ -171,7 +183,19 @@ func (c *Client) DeleteSession(ctx context.Context, sessionID string) (bool, err
 
 	response, err := c.do(ctx, request)
 	if err != nil {
-		return false, fmt.Errorf("failed to request adaptive api. err %w", err)
+		// This backend returns a 200 string when termination finds no session.
+		// Only an independent read 404 establishes idempotent absence.
+		var statusErr *HTTPError
+		if errors.As(err, &statusErr) && statusErr.StatusCode == 200 && statusErr.Reason == "error while terminating session" {
+			if r, readErr := c.ReadSession(ctx, sessionID); readErr == nil && r == nil {
+				return true, nil
+			}
+		}
+		return false, fmt.Errorf("failed to request adaptive api: %w", err)
+	}
+	if response.StatusCode == http.StatusNotFound {
+		response.Body.Close()
+		return true, nil
 	}
 	if response.StatusCode != http.StatusOK {
 		body := readBody(response)
@@ -187,10 +211,21 @@ func (c *Client) DeleteSession(ctx context.Context, sessionID string) (bool, err
 
 	// Wait for the session to reach a terminal status. A read that 404s means
 	// the row is already gone, which is equally terminal.
-	resp, err := Do(
+	resp, err := DoContext(ctx,
 		func() (*SessionReadResponse, error) {
-			return c.ReadSession(ctx, sessionID)
-		}, RetryLimit(20), Sleep(10*time.Second), RetryResultChecker(func(intermedResult any) bool {
+			r, err := c.ReadSession(ctx, sessionID)
+			if err != nil {
+				return nil, err
+			}
+			if r != nil && !isSessionReaped(r.Status) {
+				switch strings.ToLower(r.Status) {
+				case "created", "creating", "restarting", "terminating", "paused", "pausing", "unhealthy":
+				default:
+					return nil, fmt.Errorf("endpoint deletion cannot proceed from reported status")
+				}
+			}
+			return r, nil
+		}, RetryLimit(20), Sleep(c.pollInterval), RetryResultChecker(func(intermedResult any) bool {
 			res, ok := intermedResult.(*SessionReadResponse)
 			if !ok {
 				return true
@@ -214,6 +249,14 @@ func (c *Client) DeleteSession(ctx context.Context, sessionID string) (bool, err
 
 	// Hard-delete the row so the resource it points at can be deleted right away.
 	if _, err := c.forceDeleteSession(ctx, sessionID); err != nil {
+		// The backend reports a missing row as 500 here. Only an independent
+		// authoritative read 404 can make that disappearance race idempotent.
+		var statusErr *HTTPError
+		if errors.As(err, &statusErr) && statusErr.StatusCode == 500 && statusErr.Reason == "failed to get session" {
+			if r, readErr := c.ReadSession(ctx, sessionID); readErr == nil && r == nil {
+				return true, nil
+			}
+		}
 		return false, err
 	}
 	tflog.Debug(ctx, "Session successfully deleted", map[string]interface{}{
@@ -239,6 +282,9 @@ func (c *Client) forceDeleteSession(ctx context.Context, sessionID string) (bool
 	}
 	defer _response.Body.Close()
 
+	if _response.StatusCode == http.StatusNotFound {
+		return true, nil
+	}
 	if _response.StatusCode != http.StatusOK {
 		body := readBody(_response)
 		tflog.Error(ctx, "Force delete failed", map[string]interface{}{

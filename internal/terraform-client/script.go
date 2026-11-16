@@ -2,7 +2,6 @@ package client
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"net/http"
 
@@ -49,7 +48,7 @@ func (c *Client) CreateScript(ctx context.Context, req ScriptRequest) (*CreateRe
 	}
 
 	var resp CreateResourceResponse
-	if err := json.NewDecoder(response.Body).Decode(&resp); err != nil {
+	if err := decodeResponse(response.Body, &resp); err != nil {
 		return nil, fmt.Errorf("failed to decode response body. err %w", err)
 	}
 	tflog.Debug(ctx, "Script successfully created", map[string]interface{}{

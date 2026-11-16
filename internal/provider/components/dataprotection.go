@@ -2,6 +2,7 @@ package components
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"sort"
 
@@ -18,6 +19,7 @@ var validMaskingTypes = []string{
 
 func ResourceAdaptiveDataProtection() *schema.Resource {
 	return &schema.Resource{
+		CustomizeDiff: familyPlan(familyInputPlan([]string{"resource"}, nil), rejectExistingChange("resource", "masking policy resource bindings are immutable; destroy turns masking off")),
 		Description: "Column-level masking policy for a database resource. Creating a policy for a resource " +
 			"that already has one (for example one configured in the UI) adopts and overwrites it rather than failing. " +
 			"Destroying it turns masking off; the generated `masked_<resource>` authorization and any masked views " +
@@ -46,9 +48,11 @@ func ResourceAdaptiveDataProtection() *schema.Resource {
 					"false, users see everything except the raw masked tables, which requires synced metadata.",
 			},
 			"masks": {
-				Type:        schema.TypeList,
-				Optional:    true,
-				Description: "Masking rules, grouped per database and table.",
+				// Retain the historical list layout while ignoring unambiguous rule reorderings.
+				DiffSuppressFunc: suppressMaskReorder,
+				Type:             schema.TypeList,
+				Optional:         true,
+				Description:      "Masking rules, grouped per database and table.",
 				Elem: &schema.Resource{
 					Schema: map[string]*schema.Schema{
 						"database_name": {
@@ -234,6 +238,9 @@ func setDataProtectionOutputs(d *schema.ResourceData, r *adaptive.DataProtection
 }
 
 func ResourceAdaptiveDataProtectionCreate(ctx context.Context, d *schema.ResourceData, m interface{}) diag.Diagnostics {
+	if err := validateFamilyInputs(d.Get, nil, []string{"resource"}, nil); err != nil {
+		return diag.FromErr(err)
+	}
 	client := m.(*adaptive.Client)
 
 	resp, err := client.CreateDataProtection(ctx, dataProtectionRequestFromSchema(d))
@@ -296,6 +303,9 @@ func ResourceAdaptiveDataProtectionRead(ctx context.Context, d *schema.ResourceD
 }
 
 func ResourceAdaptiveDataProtectionUpdate(ctx context.Context, d *schema.ResourceData, m interface{}) diag.Diagnostics {
+	if err := validateFamilyInputs(d.Get, nil, []string{"resource"}, nil); err != nil {
+		return diag.FromErr(err)
+	}
 	client := m.(*adaptive.Client)
 
 	// The policy is bound to its resource; moving it means a new policy.
@@ -328,8 +338,21 @@ func ResourceAdaptiveDataProtectionDelete(ctx context.Context, d *schema.Resourc
 	return nil
 }
 
-// sameMasks compares two mask sets structurally, ignoring the ordering of
-// databases, tables and columns.
+// suppressMaskReorder suppresses only a complete structurally equivalent policy.
+// Comparing the whole list prevents index-level suppression from concealing a
+// column move between tables, a changed mask, or removal/explicit clearing.
+func suppressMaskReorder(k string, oldValue, newValue string, d *schema.ResourceData) bool {
+	// SDK GetChange can retain the old block value when an optional nested
+	// list is omitted. Never suppress its explicit root removal diff.
+	if k == "masks.#" && oldValue != newValue {
+		return false
+	}
+	old, next := d.GetChange("masks")
+	return sameMasks(masksFromSchema(list(old)), masksFromSchema(list(next)))
+}
+
+// sameMasks compares policies structurally, ignoring database, table and column
+// ordering only where targets are unique (duplicate-target precedence is kept).
 func sameMasks(a, b []adaptive.DataProtectionMask) bool {
 	if len(a) != len(b) {
 		return false
@@ -339,20 +362,45 @@ func sameMasks(a, b []adaptive.DataProtectionMask) bool {
 
 func maskKey(masks []adaptive.DataProtectionMask) string {
 	dbs := make([]string, 0, len(masks))
+	databaseNames := make([]string, 0, len(masks))
 	for _, m := range masks {
+		databaseNames = append(databaseNames, m.DatabaseName)
 		tables := make([]string, 0, len(m.Tables))
+		tableNames := make([]string, 0, len(m.Tables))
 		for _, t := range m.Tables {
+			tableNames = append(tableNames, maskStructuralKey([]string{t.Schema, t.TableName}))
 			cols := make([]string, 0, len(t.MaskedColumns))
+			columnNames := make([]string, 0, len(t.MaskedColumns))
 			for _, c := range t.MaskedColumns {
-				cols = append(cols, c.ColumnName+"="+c.MaskingType)
+				columnNames = append(columnNames, c.ColumnName)
+				cols = append(cols, maskStructuralKey([]string{c.ColumnName, c.MaskingType}))
 			}
-			sort.Strings(cols)
+			sortUniqueMaskTargets(cols, columnNames)
 			masked := t.Masked != nil && *t.Masked
-			tables = append(tables, fmt.Sprintf("%s|%s|%t|%v", t.TableName, t.Schema, masked, cols))
+			tables = append(tables, maskStructuralKey([]interface{}{t.TableName, t.Schema, masked, cols}))
 		}
-		sort.Strings(tables)
-		dbs = append(dbs, fmt.Sprintf("%s>>%v", m.DatabaseName, tables))
+		sortUniqueMaskTargets(tables, tableNames)
+		dbs = append(dbs, maskStructuralKey([]interface{}{m.DatabaseName, tables}))
 	}
-	sort.Strings(dbs)
-	return fmt.Sprintf("%v", dbs)
+	sortUniqueMaskTargets(dbs, databaseNames)
+	return maskStructuralKey(dbs)
+}
+
+// A duplicated target is not a set: rule precedence may depend on its order.
+// Leave such lists ordered rather than suppressing a potentially real change.
+func sortUniqueMaskTargets(values, targets []string) {
+	seen := make(map[string]bool, len(targets))
+	for _, target := range targets {
+		if seen[target] {
+			return
+		}
+		seen[target] = true
+	}
+	sort.Strings(values)
+}
+
+// JSON framing keeps names containing delimiters distinct from adjacent rules.
+func maskStructuralKey(value interface{}) string {
+	encoded, _ := json.Marshal(value) // Only strings, booleans and slices above.
+	return string(encoded)
 }

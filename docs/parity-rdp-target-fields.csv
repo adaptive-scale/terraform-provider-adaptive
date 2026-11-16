@@ -1,0 +1,9 @@
+integration,yaml_key,wire_type,field_anchor,options
+adaptive_rdp,targets[].id,string,internal/provider/integrations/adaptive_rdp.go:16:2,
+adaptive_rdp,targets[].name,string,internal/provider/integrations/adaptive_rdp.go:17:2,omitempty
+adaptive_rdp,targets[].host,string,internal/provider/integrations/adaptive_rdp.go:18:2,
+adaptive_rdp,targets[].port,int,internal/provider/integrations/adaptive_rdp.go:19:2,
+adaptive_rdp,targets[].username,string,internal/provider/integrations/adaptive_rdp.go:20:2,
+adaptive_rdp,targets[].password,string,internal/provider/integrations/adaptive_rdp.go:21:2,
+adaptive_rdp,targets[].domain,string,internal/provider/integrations/adaptive_rdp.go:22:2,omitempty
+adaptive_rdp,targets[].record,*bool,internal/provider/integrations/adaptive_rdp.go:25:2,omitempty

@@ -1,6 +1,7 @@
 package client
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"time"
@@ -20,7 +21,7 @@ var (
 
 // IsTimeout returns true if the cause of the given error is a TimeoutError.
 func IsTimeout(err error) bool {
-	return errors.Is(err, ErrTimeout)
+	return errors.Is(err, ErrTimeout) || errors.Is(err, context.DeadlineExceeded)
 	// return errgo.Cause(err) == ErrTimeout
 }
 
@@ -75,9 +76,9 @@ func RetryResultChecker(resultChecker func(result any) bool) RetryOption {
 	}
 }
 
-// A default checker that returns true always, since it's any error is an error
+// Polling fails on errors unless retry is explicitly authorized.
 func defaultErrorChecker(result any, err error) bool {
-	return true
+	return false
 }
 
 func defaultResultChecker(result any) bool {
@@ -115,47 +116,41 @@ func zeroVal[T any]() T {
 }
 
 func Do[T any](op func() (T, error), retryOptions ...RetryOption) (T, error) {
+	return DoContext(context.Background(), op, retryOptions...)
+}
+
+// DoContext is the cancellation-aware polling variant. Operations must use
+// ctx themselves for in-flight cancellation. Errors stop polling by default;
+// callers can explicitly opt into retries with RetryChecker.
+func DoContext[T any](ctx context.Context, op func() (T, error), retryOptions ...RetryOption) (T, error) {
 	options := newRetryOptions(retryOptions...)
-
-	var timeout <-chan time.Time
 	if options.Timeout > 0 {
-		timeout = time.After(options.Timeout)
+		var cancel context.CancelFunc
+		ctx, cancel = context.WithTimeout(ctx, options.Timeout)
+		defer cancel()
 	}
-
-	tryCounter := 0
-	for {
-		// Check if we reached the timeout
-		select {
-		case <-timeout:
-			return zeroVal[T](), ErrTimeout
-			// return errgo.Mask(TimeoutError, errgo.Any)
-		default:
+	for attempt := 1; ; attempt++ {
+		if err := ctx.Err(); err != nil {
+			return zeroVal[T](), err
 		}
-
-		// Execute the op
-		tryCounter++
-		result, lastError := op()
-
-		// check if bad result
-		isBadResult := options.ResultChecker(result)
-		if isBadResult || lastError != nil {
-			// Is this an error worthy of being rerun
-			if isBadResult || (options.Checker != nil && options.Checker(result, lastError)) {
-				// Check max retries
-				if tryCounter >= options.RetryLimit {
-					options.AfterRetryLimit(lastError)
-					// return zeroVal[T](), fmt.Errorf("%w. last error: %v", ErrMaxRetriesReached, lastError)
-					return zeroVal[T](), fmt.Errorf("%w, (%d/%d). last error: %v", ErrMaxRetriesReached, tryCounter, options.RetryLimit, lastError)
-				}
-
-				if options.Sleep > 0 {
-					time.Sleep(options.Sleep)
-				}
-				continue
+		result, err := op()
+		if err != nil {
+			if options.Checker == nil || !options.Checker(result, err) {
+				return zeroVal[T](), err
 			}
-			return zeroVal[T](), lastError
-			// return zeroVal[T](), errgo.Mask(lastError, errgo.Any)
+		} else if options.ResultChecker == nil || !options.ResultChecker(result) {
+			return result, nil
 		}
-		return result, nil
+		if attempt >= options.RetryLimit {
+			options.AfterRetryLimit(err)
+			return zeroVal[T](), fmt.Errorf("%w (%d attempts)", ErrMaxRetriesReached, attempt)
+		}
+		timer := time.NewTimer(options.Sleep)
+		select {
+		case <-ctx.Done():
+			timer.Stop()
+			return zeroVal[T](), ctx.Err()
+		case <-timer.C:
+		}
 	}
 }

@@ -11,6 +11,12 @@ The `adaptive_dataprotection` resource defines a column-level masking policy for
 
 A resource can only carry one policy. Creating a policy for a resource that already has one — for example one configured in the UI — adopts and overwrites it rather than failing, so `terraform apply` is authoritative from that point on.
 
+## Binding, removal, and readiness
+
+The resource binding cannot change in place; Terraform rejects rebinding during planning and apply instead of scheduling a replacement whose teardown could turn off a newly adopted policy. Nested rules are managed as a complete policy, including final removals; equivalent rule ordering does not imply a new policy.
+
+Destroy applies the masking-off shape (`scoped: false`, empty masks). It does not delete the backing authorization or guarantee that previously provisioned views have been removed. Configuration persistence is distinct from backend authorization publication and live masked-view creation; a successful configuration API test is not runtime masking proof.
+
 ## Example Usage
 
 ### Masking Customer PII

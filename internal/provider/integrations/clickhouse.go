@@ -6,18 +6,13 @@ type ClickHouseIntegrationConfiguration struct {
 	Name         string `yaml:"name"`
 	Username     string `yaml:"username"`
 	Password     string `yaml:"password"`
-	DatabaseName string `yaml:"databaseName"`
+	DatabaseName string `yaml:"database"`
 	HostName     string `yaml:"hostname"`
 	Port         string `yaml:"port"`
-	SSLMode      string `yaml:"sslMode"`
+	UseTLS       bool   `yaml:"use-tls"`
 }
 
 func SchemaToClickHouseIntegrationConfiguration(d *schema.ResourceData) ClickHouseIntegrationConfiguration {
-	sslMode := ""
-	if v, ok := d.GetOk("ssl_mode"); ok {
-		sslMode = v.(string)
-	}
-
 	return ClickHouseIntegrationConfiguration{
 		Name:         d.Get("name").(string),
 		Username:     d.Get("username").(string),
@@ -25,6 +20,6 @@ func SchemaToClickHouseIntegrationConfiguration(d *schema.ResourceData) ClickHou
 		DatabaseName: d.Get("database_name").(string),
 		HostName:     d.Get("host").(string),
 		Port:         d.Get("port").(string),
-		SSLMode:      sslMode,
+		UseTLS:       d.Get("use_tls").(bool),
 	}
 }

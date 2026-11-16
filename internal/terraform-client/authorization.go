@@ -2,11 +2,9 @@ package client
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"net/http"
 	"strings"
-	"time"
 
 	"github.com/hashicorp/terraform-plugin-log/tflog"
 )
@@ -33,10 +31,17 @@ func (c *Client) ReadAuthorization(ctx context.Context, authID string) (*Authori
 // status. A not-found read is retried: right after create the row may not be
 // readable yet.
 func (c *Client) waitForAuthorization(ctx context.Context, authID string) (*AuthorizationReadResponse, error) {
-	return Do(
+	return DoContext(ctx,
 		func() (*AuthorizationReadResponse, error) {
-			return c.ReadAuthorization(ctx, authID)
-		}, RetryLimit(20), Sleep(10*time.Second), RetryResultChecker(func(intermedResult any) bool {
+			r, err := c.ReadAuthorization(ctx, authID)
+			if err != nil {
+				return nil, err
+			}
+			if r != nil && r.Status != "creating" && r.Status != "created" {
+				return nil, fmt.Errorf("authorization readiness failed")
+			}
+			return r, nil
+		}, RetryLimit(20), Sleep(c.pollInterval), RetryResultChecker(func(intermedResult any) bool {
 			res, ok := intermedResult.(*AuthorizationReadResponse)
 			if !ok || res == nil {
 				return true
@@ -90,7 +95,7 @@ func (c *Client) CreateAuthorization(ctx context.Context, aName, description, pe
 	}
 
 	var response CreateAuthorizationResponse
-	if err := json.NewDecoder(_response.Body).Decode(&response); err != nil {
+	if err := decodeResponse(_response.Body, &response); err != nil {
 		return nil, fmt.Errorf("failed to decode response body. err %w", err)
 	}
 
@@ -100,7 +105,7 @@ func (c *Client) CreateAuthorization(ctx context.Context, aName, description, pe
 			"id":    response.ID,
 			"error": err.Error(),
 		})
-		return nil, fmt.Errorf("failed to create authorization %s: %w", response.ID, err)
+		return &response, fmt.Errorf("authorization recorded but readiness unconfirmed: %w", err)
 	}
 	tflog.Debug(ctx, "Authorization successfully created and verified", map[string]interface{}{
 		"id":   response.ID,
@@ -152,9 +157,10 @@ func (c *Client) UpdateAuthorization(ctx context.Context, authID, newName, newDe
 	}
 
 	var response UpdateAuthorizationResponse
-	if err := json.NewDecoder(_response.Body).Decode(&response); err != nil {
+	if err := decodeResponse(_response.Body, &response); err != nil {
 		return nil, fmt.Errorf("failed to decode response body. err %w", err)
 	}
+	response.ID = authID
 	tflog.Debug(ctx, "Authorization successfully updated", map[string]interface{}{
 		"auth_id": authID,
 	})

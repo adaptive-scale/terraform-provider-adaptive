@@ -41,6 +41,31 @@ jobs:
       run: |
         go build -v .
 
+  engine:
+    name: Terraform CLI lifecycle contracts (${{ matrix.terraform }})
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    strategy:
+      fail-fast: false
+      matrix:
+        terraform: ['1.11.4', '1.14.3']
+    steps:
+      - uses: actions/checkout@cbb722410c2e876e24abbe8de2cc27693e501dcb # v4.0.0
+      - uses: actions/setup-go@3041bf56c941b39c61721a86cd11f3bb1338122a # v5.2.0
+        with:
+          go-version-file: 'go.mod'
+          cache: true
+      - uses: hashicorp/setup-terraform@b9cd54a3c349d3f38e8881555d616ced269862dd # v3.1.2
+        with:
+          terraform_version: ${{ matrix.terraform }}
+          terraform_wrapper: false
+      - run: go mod download
+      - name: Exercise real CLI with a local fake API
+        env:
+          ADAPTIVE_ENGINE_TEST: "1"
+        run: go test ./internal/provider -run '^Test(Secret|Mappings|Endpoint|Cloud|IntegrationFields|Families|CoreLifecycle)TerraformEngine$' -v -count=1 -timeout=180s
+
   generate:
     runs-on: ubuntu-latest
     steps:
@@ -49,60 +74,26 @@ jobs:
         with:
           go-version-file: 'go.mod'
           cache: true
-      - run: go generate ./...
+      - uses: hashicorp/setup-terraform@b9cd54a3c349d3f38e8881555d616ced269862dd # v3.1.2
+        with:
+          terraform_version: '1.14.3'
+          terraform_wrapper: false
+      - run: make docs
       - name: git diff
         run: |
           git diff --compact-summary --exit-code || \
             (echo; echo "Unexpected difference in directories after code generation. Run 'go generate ./...' command and commit."; exit 1)
 
-  # run acceptance tests in a matrix with Terraform core versions
   test:
-    name: Matrix Test
+    name: Unit contracts (race)
     needs: build
     runs-on: ubuntu-latest
-    timeout-minutes: 15
-    strategy:
-      fail-fast: false
-      matrix:
-        # list whatever Terraform versions here you would like to support
-        terraform:
-          - '0.12.*'
-          - '0.13.*'
-          - '0.14.*'
-          - '0.15.*'
-          - '1.0.*'
-          - '1.1.*'
-          - '1.2.*'
+    timeout-minutes: 10
     steps:
-
-    - name: Check out code into the Go module directory
-      uses: actions/checkout@cbb722410c2e876e24abbe8de2cc27693e501dcb # v4.0.0
-
-    - name: Set up Go
-      uses: actions/setup-go@3041bf56c941b39c61721a86cd11f3bb1338122a # v5.2.0
-      with:
-        go-version-file: 'go.mod'
-        cache: true
-      id: go
-
-    - uses: hashicorp/setup-terraform@b9cd54a3c349d3f38e8881555d616ced269862dd # v3.1.2
-      with:
-        terraform_version: ${{ matrix.terraform }}
-        terraform_wrapper: false
-
-    - name: Get dependencies
-      run: |
-        go mod download
-        
-    - name: TF acceptance tests
-      timeout-minutes: 10
-      env:
-        TF_ACC: "1"
-
-        # Set whatever additional acceptance test env vars here. You can
-        # optionally use data from your repository secrets using the
-        # following syntax:
-        # SOME_VAR: ${{ secrets.SOME_VAR }}
-
-      run: |
-        go test -v -cover ./internal/...
+      - uses: actions/checkout@cbb722410c2e876e24abbe8de2cc27693e501dcb # v4.0.0
+      - uses: actions/setup-go@3041bf56c941b39c61721a86cd11f3bb1338122a # v5.2.0
+        with:
+          go-version-file: 'go.mod'
+          cache: true
+      - run: go mod download
+      - run: go test -race ./... -count=1 -timeout=180s

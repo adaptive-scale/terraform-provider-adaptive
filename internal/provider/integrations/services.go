@@ -14,6 +14,8 @@ import (
 )
 
 type ServiceListIntegrationConfiguration struct {
+	EnableTLS bool `yaml:"enableTLS"`
+
 	Name    string `yaml:"name"`
 	Version string `yaml:"version"`
 	URLs    string `yaml:"urls"`
@@ -21,8 +23,9 @@ type ServiceListIntegrationConfiguration struct {
 
 func SchemaToServiceListIntegrationConfiguration(d *schema.ResourceData) ServiceListIntegrationConfiguration {
 	return ServiceListIntegrationConfiguration{
-		Version: "1",
-		Name:    d.Get("name").(string),
-		URLs:    d.Get("urls").(string),
+		EnableTLS: attrBool(d, "tls_enabled"),
+		Version:   "1",
+		Name:      d.Get("name").(string),
+		URLs:      d.Get("urls").(string),
 	}
 }

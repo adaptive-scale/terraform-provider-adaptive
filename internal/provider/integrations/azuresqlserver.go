@@ -7,6 +7,8 @@ import (
 )
 
 type AzureSQLServerIntegrationConfiguration struct {
+	SSLMode string `yaml:"sslMode"`
+
 	Name         string `yaml:"name"`
 	Hostname     string `yaml:"hostname"`
 	Port         string `yaml:"port"`
@@ -48,6 +50,7 @@ func SchemaToAzureSQLServerIntegrationConfiguration(d *schema.ResourceData) (Azu
 	}
 
 	return AzureSQLServerIntegrationConfiguration{
+		SSLMode:      attrString(d, "ssl_mode"),
 		Name:         name,
 		Hostname:     hostname,
 		Port:         port,

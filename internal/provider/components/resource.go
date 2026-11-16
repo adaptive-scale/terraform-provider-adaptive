@@ -135,11 +135,12 @@ func validateIntegrationType(i any, p cty.Path) diag.Diagnostics {
 // - Authorization
 
 func ResourceAdaptiveResource() *schema.Resource {
-	return &schema.Resource{
+	return withCloudConfigOwnership(&schema.Resource{
 		CreateContext: ResourceAdaptiveResourceCreate,
 		ReadContext:   ResourceAdaptiveResourceRead,
 		UpdateContext: ResourceAdaptiveResourceUpdate,
 		DeleteContext: ResourceAdaptiveResourceDelete,
+		CustomizeDiff: rdpTargetCustomizeDiff,
 		Timeouts: &schema.ResourceTimeout{
 			Create: schema.DefaultTimeout(10 * time.Minute),
 			Update: schema.DefaultTimeout(10 * time.Minute),
@@ -214,7 +215,7 @@ func ResourceAdaptiveResource() *schema.Resource {
 				Type:        schema.TypeString,
 				Optional:    true,
 				Sensitive:   true,
-				Description: "The root certificate to use for the CockroachDB instance.",
+				Description: "Root certificate for MySQL, ProxySQL, YugabyteDB, or CockroachDB Secrets Manager. Plain Postgres/CockroachDB use tls_root_cert.",
 			},
 			"ssl_mode": {
 				Type:     schema.TypeString,
@@ -224,7 +225,7 @@ func ResourceAdaptiveResource() *schema.Resource {
 						return nil, nil
 					}
 					validValues := []string{
-						"prefer", "allow", "require", "verify-ca", "verify-full", "disable",
+						"prefer", "allow", "require", "verify-ca", "verify-full", "disable", "false", "skip-verify", "verify_identity", "verify_ca", "required", "preferred", "disabled",
 					}
 
 					if !slices.Contains(validValues, i.(string)) {
@@ -233,44 +234,52 @@ func ResourceAdaptiveResource() *schema.Resource {
 
 					return nil, nil
 				},
-				Description: "The SSL mode to use when connecting to the database. Used by CockroachDB, Postgres, Mysql resources",
+				Description: "SSL mode for MySQL, Postgres, CockroachDB, Redshift, ProxySQL, SQL Server, and Azure SQL Server. SQL Server/Azure SQL additionally support false and skip-verify; MySQL/ProxySQL accept only verify_identity, verify_ca, required, preferred, disabled, the legacy CLI prefix require (preserved literally), or empty (omit the CLI SSL-mode flag). PostgreSQL spellings such as verify-full are not MySQL/ProxySQL modes. Use required rather than legacy require for ProxySQL CLI export/apply compatibility. Absent MySQL mode defaults to require for compatibility; absent ProxySQL mode remains empty. ClickHouse uses use_tls.",
 			},
+			"admin_email":         {Type: schema.TypeString, Optional: true, Description: "Google directory delegated administrator email."},
+			"allow_file_transfer": {Type: schema.TypeBool, Optional: true, Description: "Allow Windows RDP file transfer; explicit false disables it."},
+			"auth_mode":           {Type: schema.TypeString, Optional: true, Description: "Legacy MySQL/Postgres authentication mode: password or aws_rds_iam. An explicitly configured use_rds_iam switch takes precedence; omit it to retain auth-mode-only configurations."},
+			"use_msk_iam":         {Type: schema.TypeBool, Optional: true, Description: "Use AWS MSK IAM authentication for Kafka. Omitted switches retain backend nil/inference; explicit false disables IAM."},
+			"use_iam_auth":        {Type: schema.TypeBool, Optional: true, Description: "Use AWS IAM authentication for ElastiCache. Omit to preserve observation; explicitly set false to disable."},
+			"bootstrap_servers":   {Type: schema.TypeString, Optional: true, Description: "Comma-separated Kafka broker host:port string for MSK IAM. Empty falls back to bootstrap.servers in client_configuration."},
+			"cache_name":          {Type: schema.TypeString, Optional: true, Description: "ElastiCache replication group or serverless cache identifier used for IAM token signing. Empty allows backend hostname inference."},
+			"cache_type":          {Type: schema.TypeString, Optional: true, Description: "ElastiCache IAM signing resource type: serverless or replication_group. Empty allows backend hostname inference."},
 			"use_rds_iam": {
 				Type:        schema.TypeBool,
 				Optional:    true,
-				Description: "Authenticate with short-lived AWS RDS IAM auth tokens instead of a stored password. The database user must be granted rds_iam, the RDS instance must have IAM authentication enabled, and `ssl_mode` cannot be `disable`. Used by Postgres resources.",
+				Description: "Authenticate Postgres/MySQL with short-lived AWS RDS IAM tokens. Enable IAM on RDS and provision the database user for the target engine. Omit to preserve backend auth-mode inference; explicit false overrides legacy auth_mode. TLS cannot be disabled.",
 			},
 			"use_irsa": {
 				Type:        schema.TypeBool,
 				Optional:    true,
-				Description: "Mint RDS IAM tokens with `aws_service_account`, or with the platform's own IRSA / instance-profile identity when it is empty. Set to false to use `aws_access_key_id` / `aws_secret_access_key` instead. Only used when `use_rds_iam` is set.",
+				Description: "Select the AWS identity source for Postgres/MySQL RDS IAM, Kafka MSK IAM, or ElastiCache IAM. False selects static keys. Omission preserves backend inference. Kafka sessions require a role or service account, not a bare platform identity.",
 			},
 			"aws_region": {
 				Type:        schema.TypeString,
 				Optional:    true,
-				Description: "The AWS region used to mint RDS IAM tokens. Leave empty to auto-detect from an *.rds.amazonaws.com hostname. Only used when `use_rds_iam` is set.",
+				Description: "AWS region for Postgres/MySQL RDS IAM or Kafka MSK IAM. Empty allows supported backend hostname/broker inference. ElastiCache and Keyspaces use aws_region_name.",
 			},
 			"aws_role_arn": {
 				Type:        schema.TypeString,
 				Optional:    true,
-				Description: "An IAM role to assume when minting RDS IAM tokens. With IRSA it overrides the service account's eks.amazonaws.com/role-arn annotation. Only used when `use_rds_iam` is set.",
+				Description: "Role ARN for AWS CLI, Keyspaces, Postgres/MySQL RDS IAM, Kafka MSK IAM, or ElastiCache IAM. Omit to preserve observed ownership; explicit empty clears.",
 			},
 			"aws_access_key_id": {
 				Type:        schema.TypeString,
 				Optional:    true,
 				Sensitive:   true,
-				Description: "Static AWS access key id used to mint RDS IAM tokens. Requires `use_irsa = false`.",
+				Description: "Static AWS access key ID for Keyspaces, ElastiCache, Postgres/MySQL RDS IAM, or Kafka MSK IAM. AWS CLI uses access_key_id instead.",
 			},
 			"aws_secret_access_key": {
 				Type:        schema.TypeString,
 				Optional:    true,
 				Sensitive:   true,
-				Description: "Static AWS secret access key used to mint RDS IAM tokens. Requires `use_irsa = false`.",
+				Description: "Static AWS secret access key for Keyspaces, ElastiCache, Postgres/MySQL RDS IAM, or Kafka MSK IAM. AWS CLI uses secret_access_key instead.",
 			},
 			"aws_service_account": {
 				Type:        schema.TypeString,
 				Optional:    true,
-				Description: "Name of a Kubernetes ServiceAccount in the session cluster annotated with eks.amazonaws.com/role-arn; the platform mints RDS IAM tokens on its behalf. Requires `use_irsa = true`.",
+				Description: "Kubernetes ServiceAccount identity for Postgres/MySQL RDS IAM, Kafka MSK IAM, or ElastiCache IAM. Backend identity inference applies when use_irsa is omitted.",
 			},
 			"api_server": {
 				Type:        schema.TypeString,
@@ -465,7 +474,7 @@ func ResourceAdaptiveResource() *schema.Resource {
 			"aws_region_name": {
 				Type:        schema.TypeString,
 				Optional:    true,
-				Description: "The AWS region of the AWS Secrets Manager secret",
+				Description: "Keyspaces AWS region, or the AWS region of an AWS Secrets Manager secret. AWS CLI uses region_name instead.",
 			},
 			"api_token": {
 				Type:        schema.TypeString,
@@ -535,12 +544,37 @@ func ResourceAdaptiveResource() *schema.Resource {
 			"use_service_account": {
 				Type:        schema.TypeBool,
 				Optional:    true,
-				Description: "Whether to use service account for authentication. Used by GCP resource",
+				Description: "Whether to use service account authentication. Used by AWS CLI and Keyspaces; omit to preserve observation and explicitly set false to disable.",
+			},
+			"use_role_arn": {
+				Type:        schema.TypeBool,
+				Optional:    true,
+				Description: "Use AWS role authentication for AWS CLI or Keyspaces. Role authentication takes precedence when use_service_account is also true.",
+			},
+			"enable_allowed_commands": {
+				Type:        schema.TypeBool,
+				Optional:    true,
+				Description: "AWS CLI only: when enabled and both command and parameter are nonempty strings, the backend checks the requested service/subcommand against allowed_commands. If CLI parameters are absent or either value is missing, empty, or not a string, it falls back to an interactive /bin/bash shell before allowlist validation, even when enabled. This is not a command-only security boundary. Empty or whitespace-only allowed_commands means allow all, not deny all. This is separate from authorization resource scoping.",
+			},
+			"allowed_commands": {
+				Type:        schema.TypeString,
+				Optional:    true,
+				Description: "AWS CLI only: comma-separated service:subcommand entries, used when enable_allowed_commands is true. Empty means allow all, NOT deny all.",
+			},
+			"keyspace": {
+				Type:        schema.TypeString,
+				Optional:    true,
+				Description: "Keyspaces keyspace.",
+			},
+			"keyspaces_endpoint": {
+				Type:        schema.TypeString,
+				Optional:    true,
+				Description: "Keyspaces Cassandra endpoint hostname.",
 			},
 			"create_if_not_exists": {
 				Type:        schema.TypeBool,
 				Optional:    true,
-				Description: "Whether to create the Keyspaces keyspace if it does not exist",
+				Description: "AWS CLI/Keyspaces: create the Kubernetes service account if missing (NOT the keyspace). Omit to preserve observation; explicit false disables creation.",
 			},
 			"network_id": {
 				Type:        schema.TypeString,
@@ -583,6 +617,7 @@ func ResourceAdaptiveResource() *schema.Resource {
 				Description: "The API key",
 			},
 			"app_id": {
+				Deprecated:  "Unsupported legacy argument with no wire mapping; use client_id for OAuth integrations.",
 				Type:        schema.TypeString,
 				Optional:    true,
 				Description: "The app ID",
@@ -591,24 +626,27 @@ func ResourceAdaptiveResource() *schema.Resource {
 				Type:        schema.TypeString,
 				Optional:    true,
 				Sensitive:   true,
-				Description: "The app key",
+				Description: "The application key. Used by Datadog (dd_app_key on the wire).",
 			},
 			"version": {
 				Type:        schema.TypeString,
 				Optional:    true,
-				Description: "The version",
+				Description: "Configuration version for Keyspaces or MongoDB. Other integration versions are provider-owned envelope constants.",
 			},
 			"database_account": {
+				Deprecated:  "Unsupported legacy argument with no wire mapping; use hostname for Snowflake.",
 				Type:        schema.TypeString,
 				Optional:    true,
 				Description: "The database account",
 			},
 			"database_username": {
+				Deprecated:  "Unsupported legacy argument with no wire mapping; use username.",
 				Type:        schema.TypeString,
 				Optional:    true,
 				Description: "The database username",
 			},
 			"database_password": {
+				Deprecated:  "Unsupported legacy argument with no wire mapping; use password.",
 				Type:        schema.TypeString,
 				Optional:    true,
 				Sensitive:   true,
@@ -633,7 +671,8 @@ func ResourceAdaptiveResource() *schema.Resource {
 			"service_account": {
 				Type:        schema.TypeString,
 				Optional:    true,
-				Description: "1Password service account token.",
+				Sensitive:   true,
+				Description: "Google directory service-account JSON credential, 1Password service-account token, or AWS CLI/Keyspaces Kubernetes service-account name. Sensitive values remain in Terraform state. Directory backend redaction is not guaranteed for every representation.",
 			},
 			"use_connect_server": {
 				Type:        schema.TypeBool,
@@ -648,6 +687,7 @@ func ResourceAdaptiveResource() *schema.Resource {
 			"value": {
 				Type:        schema.TypeString,
 				Optional:    true,
+				Sensitive:   true,
 				Description: "The value to encrypt. Used by the adaptiveencrypt resource.",
 			},
 			"cpu": {
@@ -678,40 +718,41 @@ func ResourceAdaptiveResource() *schema.Resource {
 			"tls_enabled": {
 				Type:        schema.TypeBool,
 				Optional:    true,
-				Description: "Connect over TLS. Used by the redis, awselasticcache and awsdocumentdb_aws_secret_manager resources.",
+				Description: "Connect over TLS. Used by Redis, ElastiCache, DocumentDB (including Secrets Manager), syslog, and services.",
 			},
 			"tls_skip_verify": {
 				Type:        schema.TypeBool,
 				Optional:    true,
-				Description: "Skip verification of the server certificate. Used by the redis and awselasticcache resources.",
+				Description: "Skip verification of the server certificate. Used by Redis, ElastiCache, and syslog.",
 			},
 			"use_tls": {
 				Type:        schema.TypeBool,
 				Optional:    true,
-				Description: "Connect over TLS. Used by the mongodb36 resource.",
+				Computed:    true,
+				Description: "Connect over TLS. Used by ClickHouse, MongoDB, and mongodb36. Omission preserves observed TLS on refresh/import; configure false explicitly to disable it. ClickHouse does not support ssl_mode.",
 			},
 			"tls_ca_cert": {
 				Type:        schema.TypeString,
 				Optional:    true,
-				Description: "CA certificate used to verify the server. Used by the redis resource.",
+				Description: "CA certificate used to verify the server. Used by Redis and syslog.",
 			},
 			"client_cert": {
 				Type:        schema.TypeString,
 				Optional:    true,
 				Sensitive:   true,
-				Description: "Client certificate presented to the server. Used by the proxysql resource.",
+				Description: "Client certificate presented to the server. Used by MySQL and ProxySQL.",
 			},
 			"client_key": {
 				Type:        schema.TypeString,
 				Optional:    true,
 				Sensitive:   true,
-				Description: "Private key for `client_cert`. Used by the proxysql resource.",
+				Description: "Client TLS private key. Used by MySQL, ProxySQL, and syslog (with client_certificate).",
 			},
 			"client_certificate": {
 				Type:        schema.TypeString,
 				Optional:    true,
 				Sensitive:   true,
-				Description: "Client certificate bundle. Used by the mongodb36 resource.",
+				Description: "Client certificate bundle. Used by MongoDB, mongodb36, and syslog.",
 			},
 			"client_configuration": {
 				Type:        schema.TypeString,
@@ -738,21 +779,24 @@ func ResourceAdaptiveResource() *schema.Resource {
 			"automation_mode": {
 				Type:        schema.TypeString,
 				Optional:    true,
-				Description: "Browser automation mode. Used by the chrome resource.",
+				Description: "Browser automation mode for Chrome and the eleven supported managed network-device integrations.",
 			},
 			"fields": {
 				Type:        schema.TypeString,
 				Optional:    true,
-				Description: "Form fields to fill during automated login. Used by the chrome resource.",
+				Sensitive:   true,
+				Description: "Form fields to fill during automated login for Chrome and managed network-device browser sessions.",
 			},
 			"script": {
 				Type:        schema.TypeString,
 				Optional:    true,
-				Description: "Automation script to run in the browser. Used by the chrome resource.",
+				Sensitive:   true,
+				Description: "Automation script to run for Chrome and managed network-device browser sessions.",
 			},
 			"prestart": {
 				Type:        schema.TypeString,
 				Optional:    true,
+				Sensitive:   true,
 				Description: "Commands to run before the browser starts. Used by the chrome resource.",
 			},
 			"ldap_hostname": {
@@ -794,7 +838,7 @@ func ResourceAdaptiveResource() *schema.Resource {
 			"old_version": {
 				Type:        schema.TypeBool,
 				Optional:    true,
-				Description: "Target a pre-2.x ProxySQL admin interface. Used by the proxysql resource.",
+				Description: "Use the old-version client behavior for MySQL or ProxySQL.",
 			},
 			"proxysql_admin_port": {
 				Type:        schema.TypeString,
@@ -855,6 +899,12 @@ func ResourceAdaptiveResource() *schema.Resource {
 			// redacted_digests field did) destroys the evidence the comparison
 			// just produced, which is why out-of-band secret changes never
 			// reached the plan.
+			"known_empty_secret_keys": {
+				Type:        schema.TypeList,
+				Computed:    true,
+				Elem:        &schema.Schema{Type: schema.TypeString},
+				Description: "Server configuration keys of scalar sensitive strings explicitly observed empty. Retained until a verified provider write reconciles a subsequent credential addition; absent keys remain unknown.",
+			},
 			"applied_digests": {
 				Type:     schema.TypeMap,
 				Computed: true,
@@ -870,9 +920,10 @@ func ResourceAdaptiveResource() *schema.Resource {
 				Elem: &schema.Resource{
 					Schema: map[string]*schema.Schema{
 						"id": {
-							Type:        schema.TypeString,
-							Required:    true,
-							Description: "Unique identifier for the target within the fleet.",
+							Type:         schema.TypeString,
+							Required:     true,
+							ValidateFunc: integrations.ValidateAdaptiveRDPTargetString,
+							Description:  "Unique identifier for the target within the fleet.",
 						},
 						"name": {
 							Type:        schema.TypeString,
@@ -880,20 +931,23 @@ func ResourceAdaptiveResource() *schema.Resource {
 							Description: "Human-friendly name shown in the in-browser target picker.",
 						},
 						"host": {
-							Type:        schema.TypeString,
-							Required:    true,
-							Description: "Hostname or IP of the Windows server.",
+							Type:         schema.TypeString,
+							Required:     true,
+							ValidateFunc: integrations.ValidateAdaptiveRDPTargetString,
+							Description:  "Hostname or IP of the Windows server.",
 						},
 						"port": {
-							Type:        schema.TypeInt,
-							Optional:    true,
-							Default:     3389,
-							Description: "RDP port. Defaults to 3389.",
+							Type:         schema.TypeInt,
+							Optional:     true,
+							Default:      3389,
+							ValidateFunc: integrations.ValidateAdaptiveRDPTargetPort,
+							Description:  "RDP port. Defaults to 3389.",
 						},
 						"username": {
-							Type:        schema.TypeString,
-							Required:    true,
-							Description: "Username to authenticate with the target.",
+							Type:         schema.TypeString,
+							Required:     true,
+							ValidateFunc: integrations.ValidateAdaptiveRDPTargetString,
+							Description:  "Username to authenticate with the target.",
 						},
 						"password": {
 							Type:        schema.TypeString,
@@ -915,32 +969,29 @@ func ResourceAdaptiveResource() *schema.Resource {
 				},
 			},
 		},
-	}
+	})
 }
 
 // Returns a YAML marshallable struct for the integration configuration
 func schemaToResourceIntegrationConfiguration(d *schema.ResourceData, intType string) (any, error) {
+	if err := validateResourceControlPresence(intType, d.GetRawConfig()); err != nil {
+		return nil, err
+	}
+	if err := validateResourceContractInputs(intType, d.Get); err != nil {
+		return nil, err
+	}
 	// The provider shares one flat schema across all integration types, so a
 	// `targets` block on any other type would be accepted and then silently
 	// ignored. Reject it so the config can't drift from what actually runs.
 	if _, ok := d.GetOk("targets"); ok && intType != "adaptive_rdp" {
 		return nil, fmt.Errorf("`targets` is only supported by resources of type \"adaptive_rdp\", not %q", intType)
 	}
-	// Same reasoning for the AWS RDS IAM block: only postgres reads it, so
-	// setting it on any other type would be silently dropped. The static key
-	// pair is exempt for awselasticcache, which reads the same two arguments
-	// for its own AWS access-control lookups.
-	if intType != "postgres" {
-		keys := []string{"use_rds_iam", "use_irsa", "aws_region", "aws_role_arn", "aws_service_account"}
-		if intType != "awselasticcache" {
-			keys = append(keys, "aws_access_key_id", "aws_secret_access_key")
-		}
-		for _, key := range keys {
-			if _, ok := d.GetOk(key); ok {
-				return nil, fmt.Errorf("`%s` is only supported by resources of type \"postgres\", not %q", key, intType)
-			}
-		}
+	// Cloud omission ownership requires the raw Terraform configuration before
+	// this shared capability guard can permit a full-replacement update.
+	if err := validateCloudConfigOwnership(intType, d.Id() != "", d.GetRawConfig()); err != nil {
+		return nil, err
 	}
+
 	switch intType {
 	case "aws":
 		return integrations.SchemaToAWSIntegrationConfiguration(d), nil
@@ -1157,7 +1208,7 @@ func ResourceAdaptiveResourceCreate(ctx context.Context, d *schema.ResourceData,
 	// Best-effort: capture the server's secret fingerprints so the next refresh
 	// can tell whether a credential changed out-of-band.
 	if r, rerr := client.ReadResource(ctx, resp.ID); rerr == nil && r != nil {
-		if err := d.Set("applied_digests", r.RedactedDigests); err != nil {
+		if err := captureResourceSecretDigests(d, r); err != nil {
 			return diag.FromErr(err)
 		}
 	}
@@ -1184,6 +1235,13 @@ func ResourceAdaptiveResourceRead(ctx context.Context, d *schema.ResourceData, m
 	isImport := isImportRead(d, "name")
 	if missingOnImport(d, isImport, r.Name) {
 		return nil
+	}
+
+	// Decode nested configuration against a detached state first. A malformed
+	// targets document must not leave name, tags, or credentials half-refreshed.
+	staged := ResourceAdaptiveResource().Data(d.State())
+	if err := integrations.ApplyIntegrationConfig(staged, r.IntegrationType, r.Configuration); err != nil {
+		return diag.FromErr(err)
 	}
 
 	if err := d.Set("name", r.Name); err != nil {
@@ -1217,27 +1275,38 @@ func ResourceAdaptiveResourceRead(ctx context.Context, d *schema.ResourceData, m
 	// renders as (sensitive value) and no value is disclosed — the attribute name
 	// carries the information.
 	//
-	// What the marker produces:
-	//   - configuration sets it -> ~ password, and apply re-applies its value
-	//   - it does not           -> ~ password -> "", and apply clears it
-	//                              server-side, because the configuration owns
-	//                              the whole config blob
+	// A configured legacy argument can propose restoration of its desired
+	// value. Omitted held credentials cannot safely be merged into a full
+	// replacement: Update rejects them rather than silently clearing them.
+	// Terraform may retain refreshed markers under ignore_changes, so Update
+	// validates planned/configured values and the actual serialized payload
+	// before sending any mutation; it does not assume Get reads raw input.
 	//
-	// Nothing writes state back to the server (Create and Update build the blob
-	// from the configuration), so a fingerprint sitting in a secret argument can
-	// never be applied as one.
-	//
-	// An empty recorded map (import, a resource predating this field, an older
-	// server) is seeded by the d.Set below rather than reported: with no
-	// baseline, every key would look drifted.
+	// An empty legacy baseline is unknown and may be seeded on refresh.
+	// Per-key known-empty provenance is different: the first server fingerprint
+	// for such a key is actionable drift, and refresh must not seed it away.
 	// Two different reasons a drifted key cannot be marked, kept apart because
 	// they mean different things to whoever reads the warning.
+	// An explicit empty value is authoritative evidence of a clear. Missing
+	// fields or digests are not: older servers and redacted reads omit them.
+	// Materialize an empty computed map too: an empty-credential import must
+	// not schedule a write just to change null into a known empty baseline.
+	drifted, evidenceErr := refreshResourceSecretEvidence(d, r)
+	if evidenceErr != nil {
+		return diag.FromErr(evidenceErr)
+	}
 	var unmapped []string  // names no single attribute at all
 	var notSecret []string // names one, but the schema does not call it sensitive
-	if recorded := stateStringMap(d, "applied_digests"); len(recorded) > 0 && len(r.RedactedDigests) > 0 {
-		for _, k := range driftedDigestKeys(recorded, r.RedactedDigests) {
+	if len(drifted) > 0 {
+		for _, k := range drifted {
 			attr, ok := integrations.AttrForConfigKey(r.IntegrationType, k)
 			switch {
+			case integrations.ProviderType(r.IntegrationType) == "adaptive_rdp" && k == "targets":
+				diags = append(diags, diag.Diagnostic{
+					Severity: diag.Warning,
+					Summary:  fmt.Sprintf("resource %q: RDP configuration changed outside this configuration", r.Name),
+					Detail:   "The aggregate RDP configuration no longer matches the last-applied fingerprint. This warning does not attribute the change to any target or credential and does not force a Terraform update. Explicitly resupply the intended targets configuration to reconcile it.",
+				})
 			case !ok:
 				unmapped = append(unmapped, k)
 			case !isSecretStringAttr(attr):
@@ -1254,14 +1323,9 @@ func ResourceAdaptiveResourceRead(ctx context.Context, d *schema.ResourceData, m
 		}
 	}
 
-	if err := d.Set("applied_digests", r.RedactedDigests); err != nil {
-		return diag.FromErr(err)
-	}
-
 	if len(unmapped) > 0 {
-		// The dotted and indexed paths the server emits for nested secrets, and
-		// the config keys that mirror another (ssh writes the key material to
-		// both sshKey and password, and the read arm reconciles via sshKey).
+		// Dotted and indexed paths, or keys outside the reverse mapping,
+		// cannot be represented by a single scalar credential argument.
 		// Reporting them by name keeps the drift visible rather than dropping it.
 		diags = append(diags, diag.Diagnostic{
 			Severity: diag.Warning,
@@ -1286,11 +1350,50 @@ func ResourceAdaptiveResourceRead(ctx context.Context, d *schema.ResourceData, m
 		diags = append(diags, diag.Diagnostic{
 			Severity: diag.Warning,
 			Summary:  fmt.Sprintf("resource %q was imported without its credentials", r.Name),
-			Detail: fmt.Sprintf("The server withholds %s. Set the matching arguments in your configuration, "+
-				"or the next update will clear them.", strings.Join(r.RedactedKeys, ", ")),
+			Detail: fmt.Sprintf("The server withholds %s. Supply the matching arguments before updating this resource; "+
+				"updates that would omit known server-held credentials are rejected. Set a supported optional string argument explicitly to \"\" only to authorize clearing it.", strings.Join(r.RedactedKeys, ", ")),
 		})
 	}
 	return diags
+}
+
+// captureResourceSecretDigests records an acknowledged write (or initial read).
+// Incomplete post-write reads retain the previous evidence, except for fields
+// explicitly confirmed clear. Capture remains best-effort until the backend
+// returns fingerprints atomically with the write response.
+func captureResourceSecretDigests(d *schema.ResourceData, r *adaptive.ResourceReadResponse) error {
+	// Validate the read before advancing either piece of credential evidence.
+	staged := ResourceAdaptiveResource().Data(d.State())
+	if err := integrations.ApplyIntegrationConfig(staged, r.IntegrationType, r.Configuration); err != nil {
+		return err
+	}
+	applied := pruneClearedSecretDigests(stateStringMap(d, "applied_digests"), r.Configuration)
+	known := knownEmptySecretKeys(d)
+	for key, digest := range r.RedactedDigests {
+		if digest != "" {
+			applied[key] = digest
+			delete(known, key)
+		}
+	}
+	observeEmptySecretKeys(known, r)
+	if err := d.Set("applied_digests", applied); err != nil {
+		return err
+	}
+	return setKnownEmptySecretKeys(d, known)
+}
+
+// pruneClearedSecretDigests keeps last-write evidence unless the server
+// explicitly reports the corresponding value as an empty string. Never infer
+// a clear from an absent key, an omitted digest, or a failed read.
+func pruneClearedSecretDigests(applied map[string]string, cfg map[string]interface{}) map[string]string {
+	out := make(map[string]string, len(applied))
+	for key, digest := range applied {
+		if value, ok := cfg[key].(string); ok && value == "" {
+			continue
+		}
+		out[key] = digest
+	}
+	return out
 }
 
 // isSecretStringAttr reports whether an attribute can carry a drift marker: a
@@ -1305,11 +1408,9 @@ func isSecretStringAttr(attr string) bool {
 // recorded at the last write — either because the value behind it changed, or
 // because the server now holds a secret where it recorded none.
 //
-// A key that only appeared since the last write used to be dismissed as "not
-// drift". It is drift: someone setting a password in the UI where there was none
-// is exactly the change an operator needs to see. The wholesale empty-map guard
-// at the call site is what keeps an import or a first refresh after upgrade from
-// reporting every key as new.
+// New keys are drift against a nonempty applied baseline. Read also checks
+// known-empty per-key provenance, distinguishing a first addition from an
+// unknown empty legacy baseline without inventing a server fingerprint.
 //
 // Keys that disappeared are not reported: the secret is gone, there is nothing
 // to reconcile, and the ordinary diff already covers a configuration removing
@@ -1326,6 +1427,10 @@ func driftedDigestKeys(applied, current map[string]string) []string {
 }
 
 func ResourceAdaptiveResourceUpdate(ctx context.Context, d *schema.ResourceData, m interface{}) diag.Diagnostics {
+	oldType, newType := d.GetChange("type")
+	if err := validateResourceTypeTransition(d.Id(), oldType, newType); err != nil {
+		return diag.FromErr(err)
+	}
 	client := m.(*adaptive.Client)
 	resourceID := d.Id()
 
@@ -1354,6 +1459,10 @@ func ResourceAdaptiveResourceUpdate(ctx context.Context, d *schema.ResourceData,
 		return diag.FromErr(err)
 	}
 
+	if err := validateResourceSecretUpdate(ctx, d, client, config); err != nil {
+		return diag.FromErr(err)
+	}
+
 	_, err = client.UpdateResource(ctx, resourceID, integrations.WireType(iType), config, userTags, defaultCluster)
 	if err != nil {
 		return diag.FromErr(err)
@@ -1361,7 +1470,7 @@ func ResourceAdaptiveResourceUpdate(ctx context.Context, d *schema.ResourceData,
 
 	// Best-effort refresh of the secret fingerprints after the write.
 	if r, rerr := client.ReadResource(ctx, resourceID); rerr == nil && r != nil {
-		if err := d.Set("applied_digests", r.RedactedDigests); err != nil {
+		if err := captureResourceSecretDigests(d, r); err != nil {
 			return diag.FromErr(err)
 		}
 	}

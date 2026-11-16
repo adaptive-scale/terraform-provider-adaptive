@@ -1,0 +1,231 @@
+#!/usr/bin/expect -f
+# A private PTY is required by Adaptive's output recorder. Never log its output.
+log_user 0
+if {$argc < 4 || $argc > 6} {
+    puts stderr "Usage: check-postgres-client.sh ENDPOINT SQL_FILE PORT_OR_auto REPORT_TSV \[EXPECTED_SQLSTATE|-\] \[none|proxy-redact|proxy-policy\]"
+    exit 2
+}
+lassign $argv endpoint sqlfile port report expected assertion
+if {$expected eq ""} {set expected -}
+if {$assertion eq ""} {set assertion none}
+proc setting {key fallback} {
+    if {[info exists ::env($key)]} {return $::env($key)}
+    return $fallback
+}
+set adaptive [setting ADAPTIVE_BIN adaptive]
+set psql [setting PSQL_BIN psql]
+set connect_timeout [setting CONNECT_TIMEOUT 90]
+set query_timeout [setting QUERY_TIMEOUT 30]
+set started [clock seconds]
+set phase preflight
+set cleanup OK
+set sqlstate -
+set connect_id ""
+set connect_pid ""
+set query_id ""
+set query_pid ""
+set password ""
+set finishing 0
+proc stop_child {id pid} {
+    global cleanup
+    if {$id eq "" || $pid eq ""} {return}
+    catch {send -i $id -- "\003"}
+    set ended 0
+    set timeout 3
+    catch {
+        expect {
+            -i $id
+            eof {set ended 1}
+            timeout {}
+        }
+    }
+    if {!$ended && ![catch {exec kill -0 $pid}]} {
+        catch {exec kill -TERM $pid}
+        set timeout 2
+        catch {
+            expect {
+                -i $id
+                eof {set ended 1}
+                timeout {}
+            }
+        }
+        if {!$ended && ![catch {exec kill -0 $pid}]} {
+            catch {exec kill -KILL $pid}
+            set cleanup FORCED
+        }
+    }
+    catch {close -i $id}
+    catch {wait -i $id}
+}
+proc finish {result reason code} {
+    global finishing connect_id connect_pid query_id query_pid password cleanup
+    global endpoint phase sqlstate started report
+    if {$finishing} {exit $code}
+    set finishing 1
+    trap SIG_IGN {SIGINT SIGTERM SIGHUP}
+    stop_child $query_id $query_pid
+    stop_child $connect_id $connect_pid
+    set password ""
+    if {$cleanup ne "OK"} {set result FAIL; set code 1}
+    set seconds [expr {[clock seconds]-$started}]
+    if {[catch {
+        set f [open $report a]
+        fconfigure $f -translation lf
+        puts $f "$endpoint\t$phase\t$result\t$sqlstate\t$cleanup\t$seconds\t$reason"
+        close $f
+    }]} {set result FAIL; set reason report_write_failed; set code 1}
+    puts "$endpoint | $phase | $result | SQLSTATE=$sqlstate | cleanup=$cleanup | $reason"
+    exit $code
+}
+trap {finish INTERRUPTED signal 130} {SIGINT SIGTERM SIGHUP}
+proc run {} {
+    global adaptive psql connect_timeout query_timeout endpoint sqlfile port expected assertion
+    global connect_id connect_pid query_id query_pid phase password sqlstate
+    if {![file readable $sqlfile]} {finish FAIL unreadable_sql_file 1}
+    foreach executable [list $adaptive $psql lsof] {
+        if {[auto_execok $executable] eq ""} {finish FAIL missing_executable 1}
+    }
+    foreach value [list $connect_timeout $query_timeout] {
+        if {![regexp {^[1-9][0-9]*$} $value]} {finish FAIL invalid_timeout 1}
+    }
+    if {$expected ne "-" && ![regexp {^[0-9A-Z]{5}$} $expected]} {finish FAIL invalid_sqlstate 1}
+    if {$assertion ni {none proxy-redact proxy-policy} || ($assertion ne "none" && $expected ne "-")} {finish FAIL invalid_assertion_mode 1}
+    if {[setting ADAPTIVE_IGNORE_SSL false] eq "true"} {finish FAIL tls_verification_disabled 1}
+    set command [list $adaptive connect $endpoint]
+    if {$port ne "auto"} {
+        if {![regexp {^[1-9][0-9]{3,4}$} $port] || $port < 1024 || $port > 65534} {finish FAIL invalid_port 1}
+        if {![catch {exec lsof -nP -t -iTCP:$port -sTCP:LISTEN}]} {finish FAIL port_already_in_use 1}
+        lappend command --bind-ip 127.0.0.1 --port $port
+    } else {set port ""}
+    spawn -noecho /bin/sh -c {stty rows 40 columns 120; exec "$@"} runner {*}$command
+    set connect_id $spawn_id
+    set connect_pid [exp_pid -i $connect_id]
+    set phase forward_readiness
+    set username ""
+    set database ""
+    set appname ""
+    set ready 0
+    set timeout 1
+    set deadline [expr {[clock seconds]+$connect_timeout}]
+    while {[clock seconds] < $deadline} {
+        expect {
+            -i $connect_id
+            -re {user = ([^\r\n]+)} {set username $expect_out(1,string)}
+            -re {password = ([^\r\n]+)} {set password $expect_out(1,string)}
+            -re {dbname = ([^\r\n]+)} {set database $expect_out(1,string)}
+            -re {application_name=([a-zA-Z0-9_-]+)} {set appname $expect_out(1,string)}
+            -re {(?:no port provided, using port|started local service at port) ([0-9]+)} {set port $expect_out(1,string)}
+            eof {finish FAIL adaptive_connect_exited 1}
+            timeout {}
+        }
+        if {$port ne "" && $username ne "" && $password ne "" && $database ne "" && $appname ne ""} {
+            # Passive, PID-scoped check: never send a dummy connection into the DB tunnel.
+            if {![catch {exec lsof -nP -a -p $connect_pid -iTCP:$port -sTCP:LISTEN -t}]} {set ready 1; break}
+        }
+    }
+    if {!$ready} {
+        set missing {}
+        foreach field {username password database appname port} {
+            if {[set $field] eq ""} {lappend missing $field}
+        }
+        if {[llength $missing]} {finish FAIL "credentials_missing_[join $missing _]" 1}
+        finish FAIL local_listener_timeout 1
+    }
+    set phase query
+    set ::env(PGPASSWORD) $password
+    set ::env(PGAPPNAME) $appname
+    set ::env(PGCONNECT_TIMEOUT) 10
+    # Do not inject PGOPTIONS: the PostgreSQL proxy rejects the startup
+    # "options" parameter. The parent enforces the query deadline below.
+    spawn -noecho $psql --host localhost --port $port --username $username --dbname $database --no-password --no-psqlrc --tuples-only --no-align --set=ON_ERROR_STOP=1 --set=VERBOSITY=sqlstate --file $sqlfile
+    set query_id $spawn_id
+    set query_pid [exp_pid -i $query_id]
+    unset ::env(PGPASSWORD) ::env(PGAPPNAME)
+    set password ""
+    set timeout $query_timeout
+    set query_reason query_failed
+    set mask_active 0
+    set mask_blocks 0
+    set mask_rows 0
+    set mask_empty 0
+    set mask_bad 0
+    set deny_active 0
+    set deny_blocks 0
+    set deny_errors 0
+    set deny_missing 0
+    set deny_wrong ""
+    if {$assertion ne "none"} {
+        # Validate returned field values locally: a SQL-side aggregate would
+        # inspect the original backend values, not the proxy's rewritten output.
+        expect {
+            -i $query_id
+            -re {([^\r\n]+)[\r\n]+} {
+                set line $expect_out(1,string)
+                if {[regexp {(?:ERROR|FATAL):[ \t]+([0-9A-Z]{5})} $line _ code]} {
+                    if {$deny_active} {
+                        incr deny_errors
+                        if {$code ne "42501"} {set deny_wrong $code}
+                    } else {set sqlstate $code}
+                }
+                if {$line eq "E2E_DENY_BEGIN"} {
+                    if {$deny_active || $mask_active} {set mask_bad 1}
+                    set deny_active 1
+                    set deny_errors 0
+                } elseif {$line eq "E2E_DENY_END"} {
+                    if {!$deny_active || $deny_errors != 1} {set deny_missing 1}
+                    set deny_active 0
+                    incr deny_blocks
+                } elseif {$line eq "E2E_MASK_BEGIN"} {
+                    if {$mask_active} {set mask_bad 1}
+                    set mask_active 1
+                    set mask_rows 0
+                } elseif {$line eq "E2E_MASK_END"} {
+                    if {!$mask_active} {set mask_bad 1}
+                    if {$mask_rows == 0} {set mask_empty 1}
+                    set mask_active 0
+                    incr mask_blocks
+                } elseif {$mask_active} {
+                    incr mask_rows
+                    if {$line ne "\[REDACTED\]"} {set mask_bad 1}
+                }
+                exp_continue -continue_timer
+            }
+            eof {}
+            timeout {finish FAIL query_timeout 1}
+        }
+    } else {
+        expect {
+            -i $query_id
+            -re {unsupported startup parameter} {set query_reason startup_parameter_rejected; exp_continue -continue_timer}
+            -re {password authentication failed} {set query_reason authentication_failed; exp_continue -continue_timer}
+            -re {[Cc]onnection refused} {set query_reason connection_refused; exp_continue -continue_timer}
+            -re {(?:ERROR|FATAL):[ \t]+([0-9A-Z]{5})} {set sqlstate $expect_out(1,string); exp_continue -continue_timer}
+            eof {}
+            timeout {finish FAIL query_timeout 1}
+        }
+    }
+    set outcome [wait -i $query_id]
+    set query_id ""
+    set query_pid ""
+    if {[llength $outcome] != 4 || [lindex $outcome 2] != 0} {finish FAIL query_process_failed 1}
+    set code [lindex $outcome 3]
+    if {$expected eq "-"} {
+        if {$assertion eq "proxy-policy" && $sqlstate ne "-"} {set query_reason allowed_query_denied}
+        if {$code != 0 || $sqlstate ne "-"} {finish FAIL $query_reason 1}
+    } elseif {$code == 0 || $sqlstate ne $expected} {finish FAIL expected_denial_not_observed 1}
+    if {$assertion ne "none"} {
+        if {$deny_wrong ne ""} {set sqlstate $deny_wrong; finish FAIL unexpected_sqlstate 1}
+        if {$deny_missing} {finish FAIL expected_denial_not_observed 1}
+        if {$deny_active || $mask_active} {finish FAIL policy_result_incomplete 1}
+        if {$assertion eq "proxy-redact" && $mask_blocks == 0} {finish FAIL mask_result_incomplete 1}
+        if {$mask_empty} {finish FAIL empty_mask_sample 1}
+        if {$mask_bad} {finish FAIL mask_not_applied 1}
+        if {$assertion eq "proxy-policy"} {
+            if {$deny_blocks == 0} {finish FAIL policy_result_incomplete 1}
+            finish PASS proxy_policy_verified 0
+        }
+        finish PASS proxy_redaction_verified 0
+    }
+    finish PASS expected_query_result 0
+}
+if {[catch {run}]} {finish FAIL runner_internal_error 1}

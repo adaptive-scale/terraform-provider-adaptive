@@ -21,6 +21,6 @@ func SchemaToAWSRedshiftIntegrationConfiguration(d *schema.ResourceData) AWSReds
 		DatabaseName: d.Get("database_name").(string),
 		HostName:     d.Get("host").(string),
 		Port:         d.Get("port").(string),
-		// SSLMode:      d.Get("ssl_mode").(string),
+		SSLMode:      d.Get("ssl_mode").(string),
 	}
 }

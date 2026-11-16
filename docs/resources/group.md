@@ -13,6 +13,12 @@ The `adaptive_group` resource creates logical groupings of users and endpoints f
 - **Assign endpoints** - Grant group members access to specific endpoints
 - **Simplify management** - Add or remove users from groups instead of individual endpoints
 
+## Ownership and partial creation
+
+Members and endpoints are managed as complete sets; empty lists remove the last entries. Blank names and membership entries are rejected. The current Slack contract also sends the configured channel on every group update: omission sends an empty channel and can clear a remote-only value. Ordinary refresh does not adopt an unconfigured remote-only channel; import does adopt it. Configure the channel explicitly if it must be retained through updates.
+
+Group creation and Slack assignment use separate backend requests. If Slack assignment fails after creation, Terraform retains the group ID, records the observed channel when available and emits a warning. Run plan/apply again to reconcile that same group rather than creating a duplicate. The warning is not a claim that Slack assignment succeeded. Backend membership/Slack updates are not guaranteed atomic.
+
 ## Example Usage
 
 ### Basic Group
@@ -222,7 +228,7 @@ resource "adaptive_group" "project" {
 
 - `endpoints` (List of String) List of names of endpoints to add to this group. If empty, the group will be created without endpoints.
 - `members` (List of String) List of emails to add to the team. If empty, the group will be created without members.
-- `slack_channel_id` (String) Slack channel ID access requests for this group are routed to.
+- `slack_channel_id` (String) Slack channel ID access requests for this group are routed to. A remote-only channel is not adopted on ordinary refresh; any group update sends the configured channel (empty when omitted), clearing an omitted remote channel. Import adopts the existing channel.
 
 ### Read-Only
 

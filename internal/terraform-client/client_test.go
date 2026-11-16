@@ -256,12 +256,11 @@ func TestGetScheduleDecodesFullReadView(t *testing.T) {
 	}
 }
 
-// EndpointNames falls back to the older mappedEndpoints key so a schedule read
-// against an older backend still reports its endpoints.
-func TestScheduleEndpointNamesFallback(t *testing.T) {
-	r := &ScheduleResponse{MappedEndpoints: []string{"ep1"}}
-	if got := r.EndpointNames(); len(got) != 1 || got[0] != "ep1" {
-		t.Errorf("fallback to mappedEndpoints: got %v", got)
+// mappedEndpoints contains opaque IDs, not canonical endpoint names.
+func TestScheduleEndpointNamesNeverAdoptsLegacyIDs(t *testing.T) {
+	r := &ScheduleResponse{MappedEndpoints: []string{"endpoint-id"}}
+	if got := r.EndpointNames(); len(got) != 0 {
+		t.Errorf("unresolved mapped endpoint IDs must not become names: got %v", got)
 	}
 	r.Endpoints = []string{"ep2"}
 	if got := r.EndpointNames(); len(got) != 1 || got[0] != "ep2" {
@@ -306,8 +305,8 @@ func TestReadSurfacesServerError(t *testing.T) {
 	})
 	if _, err := c.ReadAuthorization(context.Background(), "a-1"); err == nil {
 		t.Fatal("expected an error on a 500 read")
-	} else if !strings.Contains(err.Error(), "boom") {
-		t.Errorf("error should carry the server body: %v", err)
+	} else if strings.Contains(err.Error(), "boom") || !strings.Contains(err.Error(), "500") {
+		t.Errorf("error must retain status without the arbitrary server body: %v", err)
 	}
 }
 
@@ -321,7 +320,7 @@ func TestCreateSessionSerializesNewFields(t *testing.T) {
 	rec := &recorder{}
 	c := serve(t, rec, func(w http.ResponseWriter, r *http.Request) {
 		if strings.Contains(r.URL.Path, "/read/") {
-			_, _ = w.Write([]byte(`{"id":"s-1","status":"created"}`))
+			_, _ = w.Write([]byte(`{"id":"s-1","name":"endpoint","status":"created"}`))
 			return
 		}
 		_, _ = w.Write([]byte(`{"id":"s-1"}`))
@@ -416,6 +415,10 @@ func TestCreateSessionOmitsUnsetOptionalJITFields(t *testing.T) {
 func TestScriptRequestPayloadKeys(t *testing.T) {
 	rec := &recorder{}
 	c := serve(t, rec, func(w http.ResponseWriter, r *http.Request) {
+		if strings.Contains(r.URL.Path, "/update/") {
+			_, _ = w.Write([]byte(`"success"`))
+			return
+		}
 		_, _ = w.Write([]byte(`{"id":"sc-1"}`))
 	})
 
@@ -458,7 +461,7 @@ func TestScriptRequestPayloadKeys(t *testing.T) {
 func TestUpdateTeamSendsSlackChannelID(t *testing.T) {
 	rec := &recorder{}
 	c := serve(t, rec, func(w http.ResponseWriter, r *http.Request) {
-		_, _ = w.Write([]byte(`{}`))
+		_, _ = w.Write([]byte(`{"status":"team updated successfully"}`))
 	})
 
 	if err := c.UpdateTeam(context.Background(), "t-1", "oncall", []string{"a@x.com"}, []string{"ep1"}, "C123"); err != nil {
@@ -507,6 +510,10 @@ func TestCreateTeamPayload(t *testing.T) {
 func TestDataProtectionCRUDPaths(t *testing.T) {
 	rec := &recorder{}
 	c := serve(t, rec, func(w http.ResponseWriter, r *http.Request) {
+		if strings.Contains(r.URL.Path, "/delete/") {
+			_, _ = w.Write([]byte(`{"id":"res-1","message":"data protection turned off"}`))
+			return
+		}
 		_, _ = w.Write([]byte(`{"id":"res-1","resourceName":"prod-db","authorizationName":"masked_prod-db",
 			"scoped":true,"status":"applied","lastAppliedAt":"2026-01-01T00:00:00Z",
 			"masks":[{"databaseName":"app","tables":[{"tableName":"users","schema":"public","masked":true,
@@ -600,10 +607,14 @@ func TestDeleteSessionForceDeletesAfterTermination(t *testing.T) {
 		seen = append(seen, r.URL.Path)
 		mu.Unlock()
 		if strings.Contains(r.URL.Path, "/read/") {
-			_, _ = w.Write([]byte(`{"id":"s-1","status":"terminated"}`))
+			_, _ = w.Write([]byte(`{"id":"s-1","name":"endpoint","status":"terminated"}`))
 			return
 		}
-		_, _ = w.Write([]byte(`{}`))
+		if strings.Contains(r.URL.Path, "/forcedelete/") {
+			_, _ = w.Write([]byte(`{"status":"session deleted successfully"}`))
+			return
+		}
+		_, _ = w.Write([]byte(`{"id":"s-1","name":"endpoint","status":"terminating"}`))
 	})
 
 	ok, err := c.DeleteSession(context.Background(), "s-1")
@@ -635,11 +646,11 @@ func TestDeleteSessionSkipsForceDeleteWhenAlreadyGone(t *testing.T) {
 			mu.Lock()
 			forced = true
 			mu.Unlock()
-			_, _ = w.Write([]byte(`{}`))
+			_, _ = w.Write([]byte(`{"status":"session deleted successfully"}`))
 		case strings.Contains(r.URL.Path, "/read/"):
 			http.Error(w, `{"error":"not found"}`, http.StatusNotFound)
 		default:
-			_, _ = w.Write([]byte(`{}`))
+			_, _ = w.Write([]byte(`{"id":"s-1","name":"endpoint","status":"terminating"}`))
 		}
 	})
 

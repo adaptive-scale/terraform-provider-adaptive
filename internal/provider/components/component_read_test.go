@@ -293,8 +293,8 @@ func TestScriptReadClearsCommandOnDigestDrift(t *testing.T) {
 	if got := d.Get("command").(string); got != "" {
 		t.Errorf("command should be cleared on digest drift, got %q", got)
 	}
-	if got := d.Get("command_digest").(string); got != "sha256:new" {
-		t.Errorf("command_digest should be refreshed, got %q", got)
+	if got := d.Get("command_digest").(string); got != "sha256:old" {
+		t.Errorf("command_digest must retain the last-write baseline, got %q", got)
 	}
 }
 

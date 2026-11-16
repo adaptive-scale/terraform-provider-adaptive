@@ -1,0 +1,357 @@
+{
+  "version": 1,
+  "source_commit": "84c21f28681ea383a3762ecad677b1c050ddb007",
+  "source_anchors": [
+    "internal/provider/integrations/aws.go",
+    "internal/provider/integrations/keyspaces.go",
+    "internal/provider/integrations/iam_config.go",
+    "internal/provider/integrations/postgres.go",
+    "internal/provider/integrations/mysql.go",
+    "internal/provider/integrations/kafka.go",
+    "internal/provider/integrations/awselasticache.go",
+    "internal/provider/integrations/ssh.go",
+    "internal/provider/integrations/google.go",
+    "docs/parity-current-integration-fields.csv"
+  ],
+  "cases": [
+    {
+      "id": "auth-aws-role",
+      "type": "aws",
+      "attributes": {
+        "use_role_arn": true,
+        "use_service_account": false,
+        "aws_role_arn": "arn:aws:iam::000000000000:role/tf-live-auth-dummy",
+        "service_account": "tf-live-auth-dummy",
+        "create_if_not_exists": false,
+        "region_name": "us-east-1",
+        "access_key_id": "TF_LIVE_AUTH_DUMMY_ACCESS",
+        "secret_access_key": "tf-live-auth-dummy-secret"
+      },
+      "notes": "Persistence only. Both switches: source documents role precedence; runtime NOTRUN. Provisioning disabled.",
+      "runtime_auth_precedence": "NOTRUN"
+    },
+    {
+      "id": "auth-aws-service-account",
+      "type": "aws",
+      "attributes": {
+        "use_role_arn": false,
+        "use_service_account": true,
+        "aws_role_arn": "arn:aws:iam::000000000000:role/tf-live-auth-dummy",
+        "service_account": "tf-live-auth-dummy",
+        "create_if_not_exists": false,
+        "region_name": "us-east-1",
+        "access_key_id": "TF_LIVE_AUTH_DUMMY_ACCESS",
+        "secret_access_key": "tf-live-auth-dummy-secret"
+      },
+      "notes": "Persistence only. Both switches: source documents role precedence; runtime NOTRUN. Provisioning disabled.",
+      "runtime_auth_precedence": "NOTRUN"
+    },
+    {
+      "id": "auth-aws-both",
+      "type": "aws",
+      "attributes": {
+        "use_role_arn": true,
+        "use_service_account": true,
+        "aws_role_arn": "arn:aws:iam::000000000000:role/tf-live-auth-dummy",
+        "service_account": "tf-live-auth-dummy",
+        "create_if_not_exists": false,
+        "region_name": "us-east-1",
+        "access_key_id": "TF_LIVE_AUTH_DUMMY_ACCESS",
+        "secret_access_key": "tf-live-auth-dummy-secret"
+      },
+      "notes": "Persistence only. Both switches: source documents role precedence; runtime NOTRUN. Provisioning disabled.",
+      "runtime_auth_precedence": "NOTRUN"
+    },
+    {
+      "id": "auth-keyspaces-role",
+      "type": "keyspaces",
+      "attributes": {
+        "use_role_arn": true,
+        "use_service_account": false,
+        "aws_role_arn": "arn:aws:iam::000000000000:role/tf-live-auth-dummy",
+        "service_account": "tf-live-auth-dummy",
+        "create_if_not_exists": false,
+        "aws_region_name": "us-east-1",
+        "aws_access_key_id": "TF_LIVE_AUTH_DUMMY_ACCESS",
+        "aws_secret_access_key": "tf-live-auth-dummy-secret",
+        "keyspace": "tf_live_auth",
+        "keyspaces_endpoint": "tf-live-auth.invalid",
+        "version": "1.0"
+      },
+      "notes": "Persistence only. Both switches: source documents role precedence; runtime NOTRUN. Provisioning disabled.",
+      "runtime_auth_precedence": "NOTRUN"
+    },
+    {
+      "id": "auth-keyspaces-service-account",
+      "type": "keyspaces",
+      "attributes": {
+        "use_role_arn": false,
+        "use_service_account": true,
+        "aws_role_arn": "arn:aws:iam::000000000000:role/tf-live-auth-dummy",
+        "service_account": "tf-live-auth-dummy",
+        "create_if_not_exists": false,
+        "aws_region_name": "us-east-1",
+        "aws_access_key_id": "TF_LIVE_AUTH_DUMMY_ACCESS",
+        "aws_secret_access_key": "tf-live-auth-dummy-secret",
+        "keyspace": "tf_live_auth",
+        "keyspaces_endpoint": "tf-live-auth.invalid",
+        "version": "1.0"
+      },
+      "notes": "Persistence only. Both switches: source documents role precedence; runtime NOTRUN. Provisioning disabled.",
+      "runtime_auth_precedence": "NOTRUN"
+    },
+    {
+      "id": "auth-keyspaces-both",
+      "type": "keyspaces",
+      "attributes": {
+        "use_role_arn": true,
+        "use_service_account": true,
+        "aws_role_arn": "arn:aws:iam::000000000000:role/tf-live-auth-dummy",
+        "service_account": "tf-live-auth-dummy",
+        "create_if_not_exists": false,
+        "aws_region_name": "us-east-1",
+        "aws_access_key_id": "TF_LIVE_AUTH_DUMMY_ACCESS",
+        "aws_secret_access_key": "tf-live-auth-dummy-secret",
+        "keyspace": "tf_live_auth",
+        "keyspaces_endpoint": "tf-live-auth.invalid",
+        "version": "1.0"
+      },
+      "notes": "Persistence only. Both switches: source documents role precedence; runtime NOTRUN. Provisioning disabled.",
+      "runtime_auth_precedence": "NOTRUN"
+    },
+    {
+      "id": "auth-postgres-iam-static",
+      "type": "postgres",
+      "attributes": {
+        "use_irsa": false,
+        "aws_region": "us-east-1",
+        "aws_role_arn": "arn:aws:iam::000000000000:role/tf-live-auth-dummy",
+        "aws_service_account": "tf-live-auth-dummy",
+        "aws_access_key_id": "TF_LIVE_AUTH_DUMMY_ACCESS",
+        "aws_secret_access_key": "tf-live-auth-dummy-secret",
+        "use_rds_iam": true,
+        "auth_mode": "aws_rds_iam",
+        "host": "tf-live-auth.invalid",
+        "port": "5432",
+        "username": "tf_live_auth",
+        "database_name": "tf_live_auth",
+        "ssl_mode": "require"
+      },
+      "notes": "IAMIdentity source vocabulary; no token generation, SDK validation, discovery, or runtime test.",
+      "runtime_auth_precedence": "NOTRUN"
+    },
+    {
+      "id": "auth-postgres-iam-irsa",
+      "type": "postgres",
+      "attributes": {
+        "use_irsa": true,
+        "aws_region": "us-east-1",
+        "aws_role_arn": "arn:aws:iam::000000000000:role/tf-live-auth-dummy",
+        "aws_service_account": "tf-live-auth-dummy",
+        "use_rds_iam": true,
+        "auth_mode": "aws_rds_iam",
+        "host": "tf-live-auth.invalid",
+        "port": "5432",
+        "username": "tf_live_auth",
+        "database_name": "tf_live_auth",
+        "ssl_mode": "require"
+      },
+      "notes": "IAMIdentity source vocabulary; no token generation, SDK validation, discovery, or runtime test.",
+      "runtime_auth_precedence": "NOTRUN"
+    },
+    {
+      "id": "auth-mysql-iam-static",
+      "type": "mysql",
+      "attributes": {
+        "use_irsa": false,
+        "aws_region": "us-east-1",
+        "aws_role_arn": "arn:aws:iam::000000000000:role/tf-live-auth-dummy",
+        "aws_service_account": "tf-live-auth-dummy",
+        "aws_access_key_id": "TF_LIVE_AUTH_DUMMY_ACCESS",
+        "aws_secret_access_key": "tf-live-auth-dummy-secret",
+        "use_rds_iam": true,
+        "auth_mode": "aws_rds_iam",
+        "host": "tf-live-auth.invalid",
+        "port": "3306",
+        "username": "tf_live_auth",
+        "database_name": "tf_live_auth",
+        "ssl_mode": "required"
+      },
+      "notes": "IAMIdentity source vocabulary; no token generation, SDK validation, discovery, or runtime test.",
+      "runtime_auth_precedence": "NOTRUN"
+    },
+    {
+      "id": "auth-mysql-iam-irsa",
+      "type": "mysql",
+      "attributes": {
+        "use_irsa": true,
+        "aws_region": "us-east-1",
+        "aws_role_arn": "arn:aws:iam::000000000000:role/tf-live-auth-dummy",
+        "aws_service_account": "tf-live-auth-dummy",
+        "use_rds_iam": true,
+        "auth_mode": "aws_rds_iam",
+        "host": "tf-live-auth.invalid",
+        "port": "3306",
+        "username": "tf_live_auth",
+        "database_name": "tf_live_auth",
+        "ssl_mode": "required"
+      },
+      "notes": "IAMIdentity source vocabulary; no token generation, SDK validation, discovery, or runtime test.",
+      "runtime_auth_precedence": "NOTRUN"
+    },
+    {
+      "id": "auth-kafka-iam-static",
+      "type": "kafka",
+      "attributes": {
+        "use_irsa": false,
+        "aws_region": "us-east-1",
+        "aws_role_arn": "arn:aws:iam::000000000000:role/tf-live-auth-dummy",
+        "aws_service_account": "tf-live-auth-dummy",
+        "aws_access_key_id": "TF_LIVE_AUTH_DUMMY_ACCESS",
+        "aws_secret_access_key": "tf-live-auth-dummy-secret",
+        "use_msk_iam": true,
+        "bootstrap_servers": "tf-live-auth.invalid:9098",
+        "client_configuration": "security.protocol=SASL_SSL\nsasl.mechanism=AWS_MSK_IAM\n"
+      },
+      "notes": "IAMIdentity source vocabulary; no token generation, SDK validation, discovery, or runtime test.",
+      "runtime_auth_precedence": "NOTRUN"
+    },
+    {
+      "id": "auth-kafka-iam-irsa",
+      "type": "kafka",
+      "attributes": {
+        "use_irsa": true,
+        "aws_region": "us-east-1",
+        "aws_role_arn": "arn:aws:iam::000000000000:role/tf-live-auth-dummy",
+        "aws_service_account": "tf-live-auth-dummy",
+        "use_msk_iam": true,
+        "bootstrap_servers": "tf-live-auth.invalid:9098",
+        "client_configuration": "security.protocol=SASL_SSL\nsasl.mechanism=AWS_MSK_IAM\n"
+      },
+      "notes": "IAMIdentity source vocabulary; no token generation, SDK validation, discovery, or runtime test.",
+      "runtime_auth_precedence": "NOTRUN"
+    },
+    {
+      "id": "auth-elasticache-replication-group-static",
+      "type": "awselasticcache",
+      "attributes": {
+        "host": "tf-live-auth.invalid",
+        "port": "6379",
+        "username": "tf_live_auth",
+        "tls_enabled": true,
+        "tls_skip_verify": false,
+        "use_iam_auth": true,
+        "use_irsa": false,
+        "aws_role_arn": "arn:aws:iam::000000000000:role/tf-live-auth-dummy",
+        "aws_service_account": "tf-live-auth-dummy",
+        "aws_region_name": "us-east-1",
+        "cache_name": "tf-live-auth-dummy",
+        "cache_type": "replication_group",
+        "aws_access_key_id": "TF_LIVE_AUTH_DUMMY_ACCESS",
+        "aws_secret_access_key": "tf-live-auth-dummy-secret"
+      },
+      "notes": "Persistence only; snake-case cloud keys unlike IAMIdentity. No access-control provisioning or runtime test.",
+      "runtime_auth_precedence": "NOTRUN"
+    },
+    {
+      "id": "auth-elasticache-replication-group-irsa",
+      "type": "awselasticcache",
+      "attributes": {
+        "host": "tf-live-auth.invalid",
+        "port": "6379",
+        "username": "tf_live_auth",
+        "tls_enabled": true,
+        "tls_skip_verify": false,
+        "use_iam_auth": true,
+        "use_irsa": true,
+        "aws_role_arn": "arn:aws:iam::000000000000:role/tf-live-auth-dummy",
+        "aws_service_account": "tf-live-auth-dummy",
+        "aws_region_name": "us-east-1",
+        "cache_name": "tf-live-auth-dummy",
+        "cache_type": "replication_group"
+      },
+      "notes": "Persistence only; snake-case cloud keys unlike IAMIdentity. No access-control provisioning or runtime test.",
+      "runtime_auth_precedence": "NOTRUN"
+    },
+    {
+      "id": "auth-elasticache-serverless-static",
+      "type": "awselasticcache",
+      "attributes": {
+        "host": "tf-live-auth.invalid",
+        "port": "6379",
+        "username": "tf_live_auth",
+        "tls_enabled": true,
+        "tls_skip_verify": false,
+        "use_iam_auth": true,
+        "use_irsa": false,
+        "aws_role_arn": "arn:aws:iam::000000000000:role/tf-live-auth-dummy",
+        "aws_service_account": "tf-live-auth-dummy",
+        "aws_region_name": "us-east-1",
+        "cache_name": "tf-live-auth-dummy",
+        "cache_type": "serverless",
+        "aws_access_key_id": "TF_LIVE_AUTH_DUMMY_ACCESS",
+        "aws_secret_access_key": "tf-live-auth-dummy-secret"
+      },
+      "notes": "Persistence only; snake-case cloud keys unlike IAMIdentity. No access-control provisioning or runtime test.",
+      "runtime_auth_precedence": "NOTRUN"
+    },
+    {
+      "id": "auth-elasticache-serverless-irsa",
+      "type": "awselasticcache",
+      "attributes": {
+        "host": "tf-live-auth.invalid",
+        "port": "6379",
+        "username": "tf_live_auth",
+        "tls_enabled": true,
+        "tls_skip_verify": false,
+        "use_iam_auth": true,
+        "use_irsa": true,
+        "aws_role_arn": "arn:aws:iam::000000000000:role/tf-live-auth-dummy",
+        "aws_service_account": "tf-live-auth-dummy",
+        "aws_region_name": "us-east-1",
+        "cache_name": "tf-live-auth-dummy",
+        "cache_type": "serverless"
+      },
+      "notes": "Persistence only; snake-case cloud keys unlike IAMIdentity. No access-control provisioning or runtime test.",
+      "runtime_auth_precedence": "NOTRUN"
+    },
+    {
+      "id": "auth-ssh-key-only",
+      "type": "ssh",
+      "attributes": {
+        "host": "tf-live-auth.invalid",
+        "port": "22",
+        "username": "tf_live_auth",
+        "key": "TF_LIVE_AUTH_DUMMY_NOT_A_PRIVATE_KEY"
+      },
+      "notes": "Builder derives usePassword=false from nonempty key. Held-secret update blocker expected; observed failure remains FAIL.",
+      "runtime_auth_precedence": "NOTRUN"
+    },
+    {
+      "id": "auth-ssh-both",
+      "type": "ssh",
+      "attributes": {
+        "host": "tf-live-auth.invalid",
+        "port": "22",
+        "username": "tf_live_auth",
+        "key": "TF_LIVE_AUTH_DUMMY_NOT_A_PRIVATE_KEY",
+        "password": "tf-live-auth-dummy-password"
+      },
+      "notes": "Builder derives usePassword=false from nonempty key. Held-secret update blocker expected; observed failure remains FAIL.",
+      "runtime_auth_precedence": "NOTRUN"
+    },
+    {
+      "id": "auth-google-delegated",
+      "type": "google",
+      "attributes": {
+        "domain": "tf-live-auth.invalid",
+        "client_id": "tf-live-auth-dummy-client",
+        "client_secret": "tf-live-auth-dummy-secret",
+        "service_account": "{\"type\":\"service_account\",\"project_id\":\"tf-live-auth-dummy\",\"client_email\":\"tf-live-auth@tf-live-auth.invalid\",\"private_key_id\":\"tf-live-auth-dummy-id\",\"private_key\":\"TF_LIVE_AUTH_GOOGLE_DUMMY_PRIVATE_KEY\",\"token_uri\":\"https://tf-live-auth.invalid/token\"}",
+        "admin_email": "tf-live-admin@tf-live-auth.invalid"
+      },
+      "notes": "Delegated service-account JSON plus administrator context; login/sync not enabled. Inspect default export in memory for dummy private_key visibility; no credential value printed.",
+      "runtime_auth_precedence": "NOTRUN"
+    }
+  ]
+}

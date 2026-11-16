@@ -9,29 +9,23 @@ description: |-
 
 The Adaptive Terraform provider allows you to manage your [Adaptive](https://adaptive.live) infrastructure using Infrastructure as Code (IaC). With this provider, you can:
 
-- **Create and manage resources** - Connect databases, cloud platforms, Kubernetes clusters, and 50+ integration types
+- **Create and manage resources** - Connect databases, cloud platforms, Kubernetes clusters, and 82 registered integration types
 - **Configure endpoints** - Set up secure access points with Just-In-Time (JIT) access controls
 - **Define authorizations** - Create fine-grained permission policies for different resource types
 - **Manage groups** - Organize users and endpoints into logical groups for access control
-- **Execute scripts** - Run commands on endpoints for automation
+- **Manage scripts** - Store reusable command definitions for later invocation
 
 ## Getting Started
 
 ### Prerequisites
 
 1. An Adaptive account - [Sign up](https://adaptive.live) if you don't have one
-2. The [Adaptive CLI](https://docs.adaptive.live/cli) installed
-3. A service token for authentication
+2. Terraform >= 1.11; CLI contract tests pin 1.11.4 and 1.14.3
+3. An authorized service token and the intended workspace URL. The Adaptive CLI is optional with explicit credentials.
 
-### Generate a Service Token
+### Service Token
 
-```bash
-# Login to Adaptive
-adaptive login
-
-# Generate a service token
-adaptive service-token create --name terraform-provider
-```
+Obtain a least-privilege token through your approved Adaptive administration workflow. Keep it out of checked-in files. Explicit credentials avoid relying on a workstation's default CLI deployment.
 
 ### Provider Configuration
 
@@ -41,14 +35,15 @@ The provider can be configured using environment variables (recommended) or dire
 
 ```bash
 export ADAPTIVE_SVC_TOKEN="your-service-token"
+export ADAPTIVE_URL="https://app.adaptive.live"
 ```
 
 ```terraform
 terraform {
+  required_version = ">= 1.11"
   required_providers {
     adaptive = {
       source  = "adaptive-scale/adaptive"
-      version = "~> 1.0"
     }
   }
 }
@@ -87,7 +82,7 @@ resource "adaptive_resource" "postgres_db" {
 resource "adaptive_endpoint" "postgres_endpoint" {
   name     = "postgres-access"
   resource = adaptive_resource.postgres_db.name
-  ttl      = "8h"
+  ttl      = "6h"
   users    = ["developer@example.com", "dba@example.com"]
   tags     = ["production"]
 }

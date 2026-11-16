@@ -9,6 +9,12 @@ description: |-
 
 The `adaptive_authorization` resource defines permission policies that control what actions users can perform on resources. Authorizations are applied to endpoints to enforce least-privilege access.
 
+## Lifecycle compatibility
+
+The authorization integration type cannot be changed in place. Terraform rejects an existing `resource_type` change during planning and apply; it does not automatically replace a policy referenced by endpoints. Name and permissions remain mutable. The current backend does not persist description clearing, so removal is rejected rather than acknowledged without effect.
+
+Supported legacy read aliases are decoded with canonical keys taking precedence. A missing legacy type does not blank an already-known type; import must obtain enough identity to manage the authorization safely. Creation that returns an ID but subsequently fails readiness retains that identity and reports an error. A backend failure without a recoverable ID still requires reconciliation before retrying. Stored or ready status is not proof that a live endpoint has exercised the permission policy.
+
 ## Supported Resource Types
 
 | Type | Description | Permission Format |
@@ -627,7 +633,7 @@ resource "adaptive_endpoint" "admin_endpoint" {
 
 ### Optional
 
-- `description` (String) An optional description of the authorization object.
+- `description` (String) An optional description of the authorization object. The current backend preserves empty descriptions on update, so clearing an existing description is rejected at plan until backend support is available.
 
 ### Read-Only
 
