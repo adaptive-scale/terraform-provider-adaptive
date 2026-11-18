@@ -315,8 +315,17 @@ test "$first" = 1 && test "$second" = 1
     def test_native_backend_yaml_consumer_accepts_list_rejects_scalar(self):
         import re
         import tempfile
-        backend = Path('/Users/dhaivatdshah/IdeaProjects/.worktrees/inventorize/fix/terraform-provider-live-regressions/inventorize-app')
-        source = (backend / 'internal/service/integrations/postgres/authorization.go').read_text()
+        checkout = os.environ.get('INVENTORIZE_CHECKOUT')
+        if not checkout:
+            self.skipTest('Set INVENTORIZE_CHECKOUT to the Inventorize checkout root to test the backend YAML contract')
+        backend = Path(checkout) / 'inventorize-app'
+        postgres = backend / 'internal/service/integrations/postgres'
+        try:
+            source = (postgres / 'authorization.go').read_text(encoding='utf-8')
+            consumer = (postgres / 'authorization_allow_deny.go').read_text(encoding='utf-8')
+        except OSError as exc:
+            self.fail(f'Cannot read Inventorize PostgreSQL source: {exc}. '
+                      'Set INVENTORIZE_CHECKOUT to the Inventorize checkout root (the parent of inventorize-app).')
         type_blocks = []
         for name in ('FilterVal', 'Opt'):
             match = re.search(r'type ' + name + r' struct\s*\{[^}]+\}', source)
@@ -324,7 +333,6 @@ test "$first" = 1 && test "$second" = 1
             assert match is not None
             type_blocks.append(match.group())
         declarations = '\n'.join(type_blocks)
-        consumer = (backend / 'internal/service/integrations/postgres/authorization_allow_deny.go').read_text()
         self.assertIn('yaml.Unmarshal([]byte(yamlFilterConfig), &filterConfig)', consumer)
         policy = self.template()['authorization-postgres']['permissions']
         with tempfile.TemporaryDirectory(dir=os.environ['TMPDIR']) as tmp:

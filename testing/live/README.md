@@ -136,6 +136,17 @@ Actual remote deletion has NOT been exercised during this campaign, by design. S
 
 ## Local harness verification
 
+To run the full Python suite, set `INVENTORIZE_CHECKOUT` to the root of the
+Inventorize checkout under test (the directory containing `inventorize-app`):
+
+    INVENTORIZE_CHECKOUT=/path/to/inventorize python3 -m unittest discover -s testing/live -p 'test_*.py'
+
+The PostgreSQL YAML contract test reads the actual backend source and uses the
+backend's Go toolchain and vendored dependencies. It does not need a running
+backend. Without `INVENTORIZE_CHECKOUT`, only that test is skipped; an invalid
+explicit checkout fails with a diagnostic. Run the provider-only suite and the
+other local checks with:
+
     python3 -m unittest discover -s testing/live -p 'test_*.py'
     go test ./testing/live/fixturetool
     bash testing/live/native/test-check-postgres-client.sh
