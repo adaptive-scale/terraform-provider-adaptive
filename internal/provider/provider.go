@@ -61,6 +61,7 @@ func New(version string) func() *schema.Provider {
 				"adaptive_group":            components.ResourceAdaptiveTeam(),
 				"adaptive_script":           components.ResourceAdaptiveScript(),
 				"adaptive_schedule":         components.ResourceAdaptiveSchedule(),
+				"adaptive_variable":         components.ResourceAdaptiveVariable(),
 				"adaptive_msteams_workflow": integrations.ResourceAdaptiveMSTeamsWorkflow(),
 			}, ConfigureContextFunc: providerConfigure,
 		}

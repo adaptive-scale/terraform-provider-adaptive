@@ -107,6 +107,10 @@ func ResourceAdaptiveResource() *schema.Resource {
 		ReadContext:   ResourceAdaptiveResourceRead,
 		UpdateContext: ResourceAdaptiveResourceUpdate,
 		DeleteContext: ResourceAdaptiveResourceDelete,
+		// Import takes the object's id; Read then hydrates the rest of state.
+		Importer: &schema.ResourceImporter{
+			StateContext: schema.ImportStatePassthroughContext,
+		},
 		Timeouts: &schema.ResourceTimeout{
 			Create: schema.DefaultTimeout(10 * time.Minute),
 			Update: schema.DefaultTimeout(10 * time.Minute),
@@ -166,6 +170,7 @@ func ResourceAdaptiveResource() *schema.Resource {
 				Type:        schema.TypeString,
 				Optional:    true,
 				Description: "Password for the adaptive integration authentication.Used by CockroachDB, Postgres, Mysql, SSH resources",
+				Sensitive:   true,
 			},
 			"database_name": {
 				Type:        schema.TypeString,
@@ -176,6 +181,7 @@ func ResourceAdaptiveResource() *schema.Resource {
 				Type:        schema.TypeString,
 				Optional:    true,
 				Description: "The root certificate to use for the CockroachDB instance.",
+				Sensitive:   true,
 			},
 			"ssl_mode": {
 				Type:     schema.TypeString,
@@ -241,11 +247,13 @@ func ResourceAdaptiveResource() *schema.Resource {
 				Type:        schema.TypeString,
 				Optional:    true,
 				Description: "The cluster token for Kubernetes API server. Used by Kubernetes resource",
+				Sensitive:   true,
 			},
 			"cluster_cert": {
 				Type:        schema.TypeString,
 				Optional:    true,
 				Description: "The cluster token for Kubernetes API server. Used by Kubernetes resource",
+				Sensitive:   true,
 			},
 			"tolerations": {
 				Type:        schema.TypeString,
@@ -276,11 +284,13 @@ func ResourceAdaptiveResource() *schema.Resource {
 				Type:        schema.TypeString,
 				Optional:    true,
 				Description: "The AWS access key id. Used by AWS resource.",
+				Sensitive:   true,
 			},
 			"secret_access_key": {
 				Type:        schema.TypeString,
 				Optional:    true,
 				Description: "The AWS secret access key in plaintext. Used by AWS resource.",
+				Sensitive:   true,
 			},
 			"tenant_id": {
 				Type:        schema.TypeString,
@@ -296,6 +306,7 @@ func ResourceAdaptiveResource() *schema.Resource {
 				Type:        schema.TypeString,
 				Optional:    true,
 				Description: "The client secret for a resource. Used by Azure, Google, Okta resources.",
+				Sensitive:   true,
 			},
 			"api_client_id": {
 				Type:        schema.TypeString,
@@ -306,6 +317,7 @@ func ResourceAdaptiveResource() *schema.Resource {
 				Type:        schema.TypeString,
 				Optional:    true,
 				Description: "The API client secret for a resource. Used by Azure resource.",
+				Sensitive:   true,
 			},
 			"login_url": {
 				Type:        schema.TypeString,
@@ -326,6 +338,7 @@ func ResourceAdaptiveResource() *schema.Resource {
 				Type:        schema.TypeString,
 				Optional:    true,
 				Description: "The Snowflake client certificate. Used by Snowflake resource",
+				Sensitive:   true,
 			},
 			"role": {
 				Type:        schema.TypeString,
@@ -346,6 +359,7 @@ func ResourceAdaptiveResource() *schema.Resource {
 				Type:        schema.TypeString,
 				Optional:    true,
 				Description: "The content of GCP key file. Used by GCP resource",
+				Sensitive:   true,
 			},
 			"domain": {
 				Type:        schema.TypeString,
@@ -380,6 +394,7 @@ func ResourceAdaptiveResource() *schema.Resource {
 				Type:        schema.TypeString,
 				Optional:    true,
 				Description: "The SSH key to use when connecting to the instance. If not specified, password authentication will be used. Used by SSH resource",
+				Sensitive:   true,
 			},
 			"public_key": {
 				Type:        schema.TypeString,
@@ -420,12 +435,14 @@ func ResourceAdaptiveResource() *schema.Resource {
 				Type:        schema.TypeString,
 				Optional:    true,
 				Description: "The API token for the service",
+				Sensitive:   true,
 			},
 
 			"private_key": {
 				Type:        schema.TypeString,
 				Optional:    true,
 				Description: "The private key for the service",
+				Sensitive:   true,
 			},
 			"application_name": {
 				Type:        schema.TypeString,
@@ -441,6 +458,7 @@ func ResourceAdaptiveResource() *schema.Resource {
 				Type:        schema.TypeString,
 				Optional:    true,
 				Description: "The shared secret for the integration",
+				Sensitive:   true,
 			},
 			"image": {
 				Type:        schema.TypeString,
@@ -461,6 +479,7 @@ func ResourceAdaptiveResource() *schema.Resource {
 				Type:        schema.TypeString,
 				Optional:    true,
 				Description: "The Datadog API key",
+				Sensitive:   true,
 			},
 			"index": {
 				Type:        schema.TypeString,
@@ -496,16 +515,19 @@ func ResourceAdaptiveResource() *schema.Resource {
 				Type:        schema.TypeString,
 				Optional:    true,
 				Description: "The root certificate to use for the Postgres-like resources.",
+				Sensitive:   true,
 			},
 			"tls_cert_file": {
 				Type:        schema.TypeString,
 				Optional:    true,
 				Description: "The certificate file to use for the Postgres-like resources.",
+				Sensitive:   true,
 			},
 			"tls_key_file": {
 				Type:        schema.TypeString,
 				Optional:    true,
 				Description: "The key file to use for the Postgres-like resources.",
+				Sensitive:   true,
 			},
 			"token_id": {
 				Type:        schema.TypeString,
@@ -521,36 +543,46 @@ func ResourceAdaptiveResource() *schema.Resource {
 				Type:        schema.TypeString,
 				Optional:    true,
 				Description: "The API key",
+				Sensitive:   true,
+				Deprecated:  "This attribute is not used: no integration reads this; use the credential attribute for your resource type.",
 			},
 			"app_id": {
 				Type:        schema.TypeString,
 				Optional:    true,
 				Description: "The app ID",
+				Deprecated:  "This attribute is not used: msteams reads client_id instead.",
 			},
 			"app_key": {
 				Type:        schema.TypeString,
 				Optional:    true,
 				Description: "The app key",
+				Sensitive:   true,
+				Deprecated:  "This attribute is not used: msteams reads client_secret instead.",
 			},
 			"version": {
 				Type:        schema.TypeString,
 				Optional:    true,
 				Description: "The version",
+				Deprecated:  "This attribute is not used: the configuration version is set by the platform and cannot be overridden.",
 			},
 			"database_account": {
 				Type:        schema.TypeString,
 				Optional:    true,
 				Description: "The database account",
+				Deprecated:  "This attribute is not used: snowflake reads hostname instead.",
 			},
 			"database_username": {
 				Type:        schema.TypeString,
 				Optional:    true,
 				Description: "The database username",
+				Deprecated:  "This attribute is not used: snowflake reads username instead.",
 			},
 			"database_password": {
 				Type:        schema.TypeString,
 				Optional:    true,
 				Description: "The database password",
+				Sensitive:   true,
+				Deprecated:  "This attribute is not used: snowflake reads password instead.",
 			},
 			"default_cluster": {
 				Type:        schema.TypeString,
@@ -794,9 +826,7 @@ func ResourceAdaptiveResourceCreate(ctx context.Context, d *schema.ResourceData,
 	return nil
 }
 
-func ResourceAdaptiveResourceRead(ctx context.Context, d *schema.ResourceData, m interface{}) diag.Diagnostics {
-	return nil
-}
+// ResourceAdaptiveResourceRead is implemented in resource_read.go.
 
 func ResourceAdaptiveResourceUpdate(ctx context.Context, d *schema.ResourceData, m interface{}) diag.Diagnostics {
 	client := m.(*adaptive.Client)

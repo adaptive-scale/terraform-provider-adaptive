@@ -57,6 +57,10 @@ func (c *Client) sessionAPI() string {
 	return fmt.Sprintf("%s/terraform/session", c.workspaceURL)
 }
 
+func (c *Client) variableAPI() string {
+	return fmt.Sprintf("%s/terraform/variable", c.workspaceURL)
+}
+
 func (c *Client) do(ctx context.Context, req *http.Request) (*http.Response, error) {
 	tflog.Debug(ctx, "Making HTTP request", map[string]interface{}{
 		"method": req.Method,

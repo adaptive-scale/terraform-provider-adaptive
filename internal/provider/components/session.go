@@ -137,6 +137,10 @@ func ResourceAdaptiveSession() *schema.Resource {
 		ReadContext:   ResourceAdaptiveSessionRead,
 		UpdateContext: ResourceAdaptiveSessionUpdate,
 		DeleteContext: ResourceAdaptiveSessionDelete,
+		// Import takes the object's id; Read then hydrates the rest of state.
+		Importer: &schema.ResourceImporter{
+			StateContext: schema.ImportStatePassthroughContext,
+		},
 		Timeouts: &schema.ResourceTimeout{
 			Create: schema.DefaultTimeout(10 * time.Minute),
 			Update: schema.DefaultTimeout(10 * time.Minute),
@@ -490,8 +494,51 @@ func ResourceAdaptiveSessionCreate(ctx context.Context, d *schema.ResourceData, 
 }
 
 func ResourceAdaptiveSessionRead(ctx context.Context, d *schema.ResourceData, m interface{}) diag.Diagnostics {
-	var diags diag.Diagnostics
-	return diags
+	client := m.(*adaptive.Client)
+
+	// GetSession rather than ReadSession: ReadSession is a provisioning waiter
+	// that polls up to 30 times and errors unless the endpoint settles on
+	// Status == "created". A refresh needs one request, and an endpoint deleted
+	// out of band has to come back as not-found rather than as an error.
+	endpoint, err := client.GetSession(ctx, d.Id())
+	if err != nil {
+		return diag.FromErr(err)
+	}
+	if endpoint == nil {
+		d.SetId("")
+		return nil
+	}
+
+	// The backend resolves cluster, authorization, resource and group ids back to
+	// names, so these compare directly against config.
+	for attr, value := range map[string]interface{}{
+		"name":               endpoint.Name,
+		"resource":           endpoint.Resource,
+		"authorization":      endpoint.Authorization,
+		"cluster":            endpoint.Cluster,
+		"ttl":                endpoint.TTL,
+		"idle_timeout":       endpoint.IdleTimeout,
+		"pause_timeout":      endpoint.PauseTimeout,
+		"memory":             endpoint.Memory,
+		"cpu":                endpoint.CPU,
+		"is_jit_enabled":     endpoint.IsJITEnabled,
+		"script_only_access": endpoint.ScriptOnlyAccess,
+		"users":              endpoint.SessionUsers,
+		"groups":             endpoint.Groups,
+		"jit_approvers":      endpoint.AccessApprovers,
+		"tags":               endpoint.UserTags,
+	} {
+		if err := d.Set(attr, value); err != nil {
+			return diag.FromErr(err)
+		}
+	}
+
+	// `type` is not refreshed from sessionType. The schema takes the user-facing
+	// spelling ("direct", "cli", "client", "services") but the backend stores the
+	// mapped value - "direct" is written as "cli" - so writing it back would show
+	// permanent drift on every endpoint declared as "direct".
+
+	return nil
 }
 
 func ResourceAdaptiveSessionUpdate(ctx context.Context, d *schema.ResourceData, m interface{}) diag.Diagnostics {

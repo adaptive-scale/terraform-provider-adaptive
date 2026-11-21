@@ -16,6 +16,10 @@ func ResourceAdaptiveTeam() *schema.Resource {
 		ReadContext:   ResourceAdaptiveTeamRead,
 		UpdateContext: ResourceAdaptiveTeamUpdate,
 		DeleteContext: ResourceAdaptiveTeamDelete,
+		// Import takes the object's id; Read then hydrates the rest of state.
+		Importer: &schema.ResourceImporter{
+			StateContext: schema.ImportStatePassthroughContext,
+		},
 
 		Schema: map[string]*schema.Schema{
 			"name": {
@@ -87,21 +91,35 @@ func ResourceAdaptiveTeamCreate(ctx context.Context, d *schema.ResourceData, m i
 }
 
 func ResourceAdaptiveTeamRead(ctx context.Context, d *schema.ResourceData, m interface{}) diag.Diagnostics {
-	// client := m.(*adaptive.Client)
+	client := m.(*adaptive.Client)
 
-	// team, err := client.GetTeam(ctx, d.Id())
-	// if err != nil {
-	// 	return diag.FromErr(err)
-	// }
+	// GetTeamDetail, not the older GetTeam: that one hits /terraform/team/{id},
+	// a route with no /read/ segment that only ever returned {id} and so could
+	// not populate name, members or endpoints. That is why this Read was left
+	// commented out.
+	team, err := client.GetTeamDetail(ctx, d.Id())
+	if err != nil {
+		return diag.FromErr(err)
+	}
+	// Deleted out of band — drop it so Terraform plans a recreate.
+	if team == nil {
+		d.SetId("")
+		return nil
+	}
 
-	// if err := d.Set("name", team.Name); err != nil {
-	// 	return diag.FromErr(err)
-	// }
-	// if err := d.Set("members", team.Members); err != nil {
-	// 	return diag.FromErr(err)
-	// }
-	var diags diag.Diagnostics
-	return diags
+	if err := d.Set("name", team.Name); err != nil {
+		return diag.FromErr(err)
+	}
+	// Members come back as emails and endpoints as names, which is what the
+	// write path accepts, so these compare directly against config.
+	if err := d.Set("members", team.Members); err != nil {
+		return diag.FromErr(err)
+	}
+	if err := d.Set("endpoints", team.Endpoints); err != nil {
+		return diag.FromErr(err)
+	}
+
+	return nil
 }
 
 func ResourceAdaptiveTeamUpdate(ctx context.Context, d *schema.ResourceData, m interface{}) diag.Diagnostics {
